@@ -7,6 +7,10 @@
 3. Optional variable: `LUFFY_MODEL` (default in scripts: `openai/gpt-5-mini`)
 4. On a PR, comment: `@luffy review this pr`
 
+## High-ROI fixes
+
+See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog. Shipped this sprint: **F1–F6** (shallow+sparse checkout, Hermes install cache, hub memory preload, drop broken home cache, reactions, shallow hub clone).
+
 ## Central hub memory (cross-repo)
 
 All target repos publish each run to the hub:
