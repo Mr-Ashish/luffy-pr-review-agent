@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="assets/luffy-mark.svg" alt="Luffy" width="128" />
+  <img src="assets/luffy-hero-banner.svg" alt="Luffy" width="100%" />
 </p>
 
-# Luffy
+<h1 align="center">Luffy</h1>
 
-**Comment-triggered PR review agent**
+<p align="center"><strong>Comment-triggered PR review agent</strong></p>
 
-Hermes Agent + OpenRouter + growing hub memory + redacted run traces.
+<p align="center">Hermes Agent + OpenRouter + growing hub memory + redacted run traces.</p>
 
 [![PR Review](https://img.shields.io/github/actions/workflow/status/Mr-Ashish/luffy-pr-review-agent/luffy-pr-review.yml?branch=main&style=for-the-badge&label=PR%20Review&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/luffy-pr-review.yml)
 [![Hub memory](https://img.shields.io/github/actions/workflow/status/Mr-Ashish/luffy-pr-review-agent/ingest-luffy-run.yml?branch=main&style=for-the-badge&label=Hub%20memory&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/ingest-luffy-run.yml)

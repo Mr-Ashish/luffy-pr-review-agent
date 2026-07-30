@@ -18,16 +18,24 @@ export function renderDocument(config, theme, pack) {
   for (const id of sections) {
     switch (id) {
       case "hero": {
+        const banner = config.hero?.banner;
         const mark = config.hero?.mark;
-        if (config.hero?.show_mark !== false && mark) {
-          parts.push(`<p align="center">\n  <img src="${mark}" alt="${product.name || "logo"}" width="128" />\n</p>\n`);
+        if (banner) {
+          parts.push(
+            `<p align="center">\n  <img src="${banner}" alt="${product.name || "banner"}" width="100%" />\n</p>\n`
+          );
+        } else if (config.hero?.show_mark !== false && mark) {
+          parts.push(
+            `<p align="center">\n  <img src="${mark}" alt="${product.name || "logo"}" width="128" />\n</p>\n`
+          );
         }
-        parts.push(`# ${product.name || "Project"}\n`);
+        const title = product.name || "Project";
+        parts.push(`<h1 align="center">${title}</h1>\n`);
         if (product.tagline) {
-          parts.push(`**${product.tagline}**\n`);
+          parts.push(`<p align="center"><strong>${product.tagline}</strong></p>\n`);
         }
         if (product.one_liner) {
-          parts.push(`${product.one_liner}\n`);
+          parts.push(`<p align="center">${product.one_liner}</p>\n`);
         }
         break;
       }

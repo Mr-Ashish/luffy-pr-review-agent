@@ -1,24 +1,33 @@
 <p align="center">
-  <img src="assets/luffy-mark.png" alt="Luffy mark" width="128" height="128" />
+  <img src="assets/luffy-hero-banner.svg" alt="Luffy" width="100%" />
 </p>
 
-<h1 align="center">Luffy — PR Review Agent</h1>
+<h1 align="center">Luffy</h1>
 
-<p align="center">
-  <img src="assets/twemoji-pirate-flag.png" alt="" width="28" height="28" />
-  <strong>Comment-triggered PR reviews</strong> via
-  <a href="https://github.com/nousresearch/hermes-agent">Hermes Agent</a>
-  + <a href="https://openrouter.ai">OpenRouter</a>
-  <img src="assets/twemoji-ship.png" alt="" width="28" height="28" />
-</p>
+<p align="center"><strong>Comment-triggered PR review agent</strong></p>
 
-<p align="center">
-  <a href="https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/luffy-pr-review.yml"><img alt="Luffy workflow" src="https://img.shields.io/github/actions/workflow/status/Mr-Ashish/luffy-pr-review-agent/luffy-pr-review.yml?label=Luffy%20PR%20Review&logo=github" /></a>
-  <a href="https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/ingest-luffy-run.yml"><img alt="Hub ingest" src="https://img.shields.io/github/actions/workflow/status/Mr-Ashish/luffy-pr-review-agent/ingest-luffy-run.yml?label=Hub%20memory&logo=github" /></a>
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-FF6B2C?logo=open-source-initiative&logoColor=white" />
-</p>
+<p align="center">Hermes Agent + OpenRouter + growing hub memory + redacted run traces.</p>
 
-Comment **`@luffy review this pr`** on a pull request → GitHub Actions runs Hermes + OpenRouter → Markdown review lands on the PR → **central hub memory** grows under [`memory/repos/`](memory/repos/).
+[![PR Review](https://img.shields.io/github/actions/workflow/status/Mr-Ashish/luffy-pr-review-agent/luffy-pr-review.yml?branch=main&style=for-the-badge&label=PR%20Review&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/luffy-pr-review.yml)
+[![Hub memory](https://img.shields.io/github/actions/workflow/status/Mr-Ashish/luffy-pr-review-agent/ingest-luffy-run.yml?branch=main&style=for-the-badge&label=Hub%20memory&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/ingest-luffy-run.yml)
+![trigger](https://img.shields.io/badge/trigger-%40luffy%20review%20this%20pr-FF6B2C?style=for-the-badge&logo=github&logoColor=white)
+![model](https://img.shields.io/badge/model-openai%2Fgpt-5-mini-0B0F19?style=for-the-badge&logo=openai&logoColor=white)
+![provider](https://img.shields.io/badge/provider-OpenRouter-C41E3A?style=for-the-badge)
+[![Last commit](https://img.shields.io/github/last-commit/Mr-Ashish/luffy-pr-review-agent/main?style=for-the-badge&logo=git&logoColor=white&color=0B0F19)](https://github.com/Mr-Ashish/luffy-pr-review-agent/commits/main)
+![License](https://img.shields.io/badge/license-MIT-FFD166?style=for-the-badge&labelColor=0B0F19&logo=open-source-initiative&logoColor=FFD166)
+
+## Why it exists
+
+Most AI PR bots are stateless chat on a diff. Luffy is a review control plane: explicit trigger, bounded context (sparse checkout + capped diff), Hermes via OpenRouter, durable hub memory so the next review on the same repo is smarter, and redacted traces as Actions artifacts for audit.
+
+## Trigger
+
+```text
+@luffy review this pr
+@luffy review
+```
+
+Also: **Actions → Luffy PR Review → Run workflow** (PR number).
 
 ## High-level architecture
 
@@ -28,46 +37,30 @@ flowchart TB
     Dev["Developer"]
   end
 
-  subgraph TargetRepo["Target repo (e.g. Mr-Ashish/odoo)"]
+  subgraph TargetRepo["Target repo"]
     PR["Pull request"]
     Comment["@luffy review this pr"]
-    GHA["GitHub Actions\nluffy-pr-review.yml"]
-    Scripts["scripts/\nassemble · hermes · normalize\ndistill · save-trace · hub publish"]
-    AgentCfg["agent/\nSOUL · config · prompts"]
-    Artifacts["Actions artifacts\ntrace 90d · out 14d"]
+    GHA["GitHub Actions"]
+    Scripts["Luffy scripts"]
   end
 
   subgraph LLM["Inference"]
-    Hermes["Hermes Agent\n(-z one-shot)"]
-    OR["OpenRouter\nopenai/gpt-5-mini"]
+    Hermes["Hermes Agent"]
+    OR["OpenRouter"]
   end
 
-  subgraph Hub["Hub: Mr-Ashish/luffy-pr-review-agent"]
-    Memory["memory/repos/{owner}--{repo}/\nMEMORY.md · runs/{trace_id}/"]
+  subgraph Hub["Hub repo"]
+    Memory["memory/repos/..."]
   end
 
-  Dev --> Comment
-  Comment --> PR
-  PR --> GHA
+  Dev --> Comment --> PR --> GHA
   GHA --> Scripts
-  GHA --> AgentCfg
-  Scripts --> Hermes
-  Hermes --> OR
-  OR --> Hermes
-  Scripts --> Artifacts
+  Scripts --> Hermes --> OR
   Scripts --> Memory
   Scripts --> PR
 ```
 
-**Pieces**
-
-| Layer | Responsibility |
-|--------|----------------|
-| **Target repo** | Workflow install, secrets, PR comment trigger, runs the job |
-| **Luffy scripts** | Context assembly, Hermes invoke, normalize, distill, hub publish |
-| **Hermes + OpenRouter** | Model review of the PR |
-| **Hub repo** | Durable per-repo memory + run summaries |
-| **Artifacts** | Redacted per-run traces for audit |
+Install Luffy on each **target** repo; this hub stores memory under `memory/repos/`.
 
 ## E2E flow
 
@@ -81,31 +74,20 @@ sequenceDiagram
   participant Hermes as Hermes Agent
   participant OR as OpenRouter
 
-  Dev->>PR: Comment "@luffy review this pr"
-  PR->>GHA: issue_comment event
-
-  Note over GHA: Gate + concurrency + 👀 reaction
-  GHA->>GHA: Checkout luffy/ (agent + scripts)
-  GHA->>GHA: Sparse shallow checkout of PR head
-  GHA->>Hub: Preload MEMORY.md for this repo
-  Hub-->>GHA: Prior review notes (if any)
-
-  GHA->>GHA: assemble-context (pr.json, diff, prompt)
-  GHA->>Hermes: hermes -z + SOUL + memory + prompt
-  Hermes->>OR: chat/completions (gpt-5-mini)
-  OR-->>Hermes: review Markdown
-  Hermes-->>GHA: review.raw.md
-
-  GHA->>GHA: normalize-review.py → review.md
-  GHA->>GHA: distill local MEMORY + save-trace
-  GHA->>Hub: publish-run-to-hub (direct push)
-  Note over Hub: memory/repos/.../MEMORY.md<br/>runs/{trace_id}/meta+review+summary
-  GHA->>PR: gh pr comment (review.md)
-  GHA->>GHA: Upload luffy-trace + luffy-out artifacts
-  GHA->>PR: React +1 / -1 on trigger
+  Dev->>PR: @luffy review this pr
+  PR->>GHA: issue_comment
+  GHA->>Hub: preload MEMORY.md
+  Hub-->>GHA: prior notes
+  GHA->>GHA: assemble prompt + diff
+  GHA->>Hermes: hermes -z
+  Hermes->>OR: completions
+  OR-->>Hermes: review markdown
+  Hermes-->>GHA: final text
+  GHA->>Hub: publish memory + run
+  GHA->>PR: review comment + artifacts
 ```
 
-**Pipeline stages** (orchestrator)
+**Pipeline stages**
 
 ```mermaid
 flowchart LR
@@ -118,23 +100,13 @@ flowchart LR
   G --> H[PR comment + artifacts]
 ```
 
-## Trigger
-
-```text
-@luffy review this pr
-@luffy review
-```
-
-Also: **Actions → Luffy PR Review → Run workflow** (manual PR number).
-
 ## Setup (target repo)
 
-1. Copy `agent/`, `scripts/`, and `.github/workflows/luffy-pr-review.yml` onto the **default branch**.
-2. Secrets:
-   - `OPENROUTER_API_KEY` — model calls  
-   - `LUFFY_HUB_TOKEN` — PAT that can push to this hub (for central memory)
-3. Optional variables: `LUFFY_MODEL`, `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`
-4. Comment on a PR: `@luffy review this pr`
+1. Copy `agent/`, `scripts/`, and `.github/workflows/luffy-pr-review.yml` onto the **default branch**
+2. Add secret `OPENROUTER_API_KEY`
+3. Add secret `LUFFY_HUB_TOKEN` (PAT that can push to this hub)
+4. Optional vars: `LUFFY_MODEL`, `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`
+5. Comment on a PR: `@luffy review this pr`
 
 ## Local dry-run
 
@@ -146,7 +118,7 @@ POST_COMMENT=1 ./scripts/review-local.sh owner/repo 123
 
 ## Traces
 
-Each run packages a redacted trace:
+Each run packages a redacted trace and uploads Actions artifacts.
 
 ```text
 .luffy-out/traces/pr{N}-run{id}-a{attempt}/
@@ -154,20 +126,13 @@ Each run packages a redacted trace:
   review.raw.md  review.md  hermes.stderr  timings.json
 ```
 
-Artifacts:
-
-| Name | Retention |
-|------|-----------|
-| `luffy-trace-pr{N}-run{id}` | 90 days |
-| `luffy-out-pr{N}-run{id}` | 14 days |
-
 ```bash
 gh run download <run-id> -R owner/repo -n luffy-trace-pr1-run<run-id>
 ```
 
 ## Central hub memory
 
-After each run, the target publishes into **this** repo:
+After each run, the target publishes into **this** hub repo so memory grows across reviews.
 
 ```text
 memory/repos/{owner}--{repo}/
@@ -176,47 +141,34 @@ memory/repos/{owner}--{repo}/
   runs/{trace_id}/meta.json|review.md|summary.md
 ```
 
-See [memory/README.md](memory/README.md) and [docs/OPERATIONS.md](docs/OPERATIONS.md).
+## Layout
 
-## Brand
-
-| Asset | Path |
-|-------|------|
-| Mark (SVG) | [`assets/luffy-mark.svg`](assets/luffy-mark.svg) |
-| Mark (PNG) | [`assets/luffy-mark.png`](assets/luffy-mark.png) |
-| Favicon | [`assets/favicon.png`](assets/favicon.png) |
-| Twemoji accents | [`assets/twemoji-*.png`](assets/) (CC-BY 4.0 Twitter) |
+```text
+agent/          SOUL, prompts, Hermes config
+scripts/        assemble → hermes → normalize → hub
+memory/         central per-repo MEMORY (hub)
+readme-kit/     compile README from theme + pack + config
+assets/         brand mark + favicon
+.github/workflows/
+```
 
 ## Docs
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Operations](docs/OPERATIONS.md)
-- [README branding ecosystem (variants)](docs/README-BRANDING-ECOSYSTEM.md)
+- [ROI fixes](docs/ROI-FIXES.md)
+- [README branding ecosystem](docs/README-BRANDING-ECOSYSTEM.md)
 - [readme-kit MVP](docs/README-KIT-MVP.md)
-- [readme-kit package](readme-kit/README.md)
-- Generated preview: [`README.generated.md`](README.generated.md) (`node readme-kit/bin/readme-kit.mjs build …`)
 
-## Layout
+## Limits (v1)
 
-```text
-agent/          SOUL, prompts, Hermes config, memory seed
-scripts/        assemble → hermes → normalize → distill → hub publish
-memory/         central per-repo MEMORY (hub)
-assets/         brand mark + favicon
-.github/workflows/
-  luffy-pr-review.yml
-  ingest-luffy-run.yml
-```
-
-## v1 limits
-
-- PR **comment** reviews (not inline threads yet)
-- Large diffs truncated (`MAX_DIFF_BYTES`)
-- Hermes installed on the runner (Docker pin later)
+- PR comment reviews only (not inline threads yet)
+- Diffs truncated at MAX_DIFF_BYTES
+- Default OpenRouter model is paid (openai/gpt-5-mini)
+- Install on each target repo — not a global bot for arbitrary public repos
+- Hermes tool-loop traces not fully exported yet (final review + outer pipeline are)
 
 ---
 
-<p align="center">
-  <img src="assets/twemoji-anchor.png" width="24" height="24" alt="" />
-  <em>Luffy · Hermes Agent · OpenRouter · memory-backed review</em>
-</p>
+*Luffy · Hermes Agent · OpenRouter · memory-backed review · generated by readme-kit*
+

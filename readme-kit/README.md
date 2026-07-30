@@ -20,14 +20,18 @@ node readme-kit/bin/readme-kit.mjs themes
 node readme-kit/bin/readme-kit.mjs packs
 
 # YAML preferred (agent-friendly); JSON also supported
+# Preview (safe):
 node readme-kit/bin/readme-kit.mjs build readme-kit/examples/luffy/readme.config.yaml -o README.generated.md
-node readme-kit/bin/readme-kit.mjs build readme-kit/examples/luffy/readme.config.json -o README.generated.md
+# Live GitHub README (needs --force):
+cd readme-kit && npm run build:luffy:write
 
 node readme-kit/bin/readme-kit.mjs init --theme flame --pack ai-agent
 # → readme.config.yaml
 
 node readme-kit/bin/readme-kit.mjs brand ai-agent --theme flame --dir ./branding
 ```
+
+**Note:** GitHub only renders root `README.md`. Kit defaults used to write `README.generated.md` so the live page never changed until you promote with `--force` / `build:luffy:write`.
 
 ## Layout
 
