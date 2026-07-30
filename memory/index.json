@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-07-30T15:47:27Z",
+  "updated_at": "2026-07-30T15:59:24Z",
   "repos": [
     {
       "slug": "Mr-Ashish--luffy-pr-review-agent",
@@ -11,6 +11,18 @@
         "status": "success",
         "ingested_at": "2026-07-30T15:47:27Z",
         "run_path": "memory/repos/Mr-Ashish--luffy-pr-review-agent/runs/pr1-run30558219555-a1"
+      }
+    },
+    {
+      "slug": "Mr-Ashish--odoo",
+      "path": "memory/repos/Mr-Ashish--odoo",
+      "latest": {
+        "trace_id": "pr1-run30558836212-a1",
+        "pr_number": "1",
+        "verdict": "REQUEST CHANGES",
+        "status": "success",
+        "ingested_at": "2026-07-30T15:59:24Z",
+        "run_path": "memory/repos/Mr-Ashish--odoo/runs/pr1-run30558836212-a1"
       }
     }
   ]
