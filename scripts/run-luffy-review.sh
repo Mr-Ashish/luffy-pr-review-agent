@@ -109,6 +109,19 @@ fi
 
 stage save_trace "$SCRIPTS/save-trace.sh" || true
 
+# Export TRACE_ID for hub payload if save-trace wrote latest dir
+if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
+  TRACE_DIR="$(cat "$OUT_DIR/latest-trace-dir.txt")"
+  export TRACE_DIR
+  if [[ -f "$TRACE_DIR/meta.json" ]]; then
+    export TRACE_ID
+    TRACE_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("trace_id",""))' "$TRACE_DIR/meta.json" 2>/dev/null || true)"
+  fi
+fi
+
+# Push run → central hub (repository_dispatch → ingest workflow on LUFFY_HUB_REPO)
+stage publish_hub "$SCRIPTS/publish-run-to-hub.sh" || true
+
 if [[ "${POST_COMMENT:-0}" == "1" && -f "${REVIEW_FILE:-}" ]]; then
   stage post_comment "$SCRIPTS/post-review-comment.sh" "$REVIEW_FILE" "${PR_NUMBER:-}" || ORCH_RC=$?
 fi

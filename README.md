@@ -74,6 +74,18 @@ Every run writes a redacted trace under `.luffy-out/traces/pr{N}-run{id}-a{attem
 
 Includes prompt, context, diff, raw + final review, hermes stderr, timings, memory before/after, and `meta.json` with SHA256 inventory. See [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
+## Central hub memory
+
+After each run, the target workflow **dispatches** into this hub repo:
+
+```text
+target repo run → repository_dispatch (luffy-run)
+               → Ingest Luffy Run workflow
+               → memory/repos/{owner}--{repo}/MEMORY.md + runs/{trace_id}/
+```
+
+Target repos need secret **`LUFFY_HUB_TOKEN`** (PAT that can open `repository_dispatch` + the hub uses its own `GITHUB_TOKEN` to commit). Details: [memory/README.md](memory/README.md).
+
 ## v1 limits
 
 - Full PR **comment** only (not inline review threads)

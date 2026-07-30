@@ -7,6 +7,39 @@
 3. Optional variable: `LUFFY_MODEL` (default in scripts: `openai/gpt-5-mini`)
 4. On a PR, comment: `@luffy review this pr`
 
+## Central hub memory (cross-repo)
+
+All target repos publish each run to the hub:
+
+**Hub:** `Mr-Ashish/luffy-pr-review-agent`  
+**Path:** `memory/repos/{owner}--{repo}/`
+
+### Flow
+
+```text
+Target Luffy run finishes
+  → build-hub-payload.py (redacted, size-capped)
+  → repository_dispatch event_type=luffy-run
+  → Hub workflow "Ingest Luffy Run"
+  → commits memory/repos/.../MEMORY.md + runs/{trace_id}/
+```
+
+### Target repo secrets / vars
+
+| Name | Required | Purpose |
+|------|----------|---------|
+| `LUFFY_HUB_TOKEN` | yes (cross-repo) | PAT with `repo` (or fine-grained: contents write + metadata on hub) |
+| `LUFFY_HUB_REPO` | no | Default `Mr-Ashish/luffy-pr-review-agent` |
+| `LUFFY_HUB_PUBLISH` | no | Set `0` to disable |
+
+When Luffy runs **on the hub repo itself**, `GITHUB_TOKEN` is used if `LUFFY_HUB_TOKEN` is unset.
+
+### Hub workflow
+
+- File: `.github/workflows/ingest-luffy-run.yml`
+- Trigger: `repository_dispatch` type `luffy-run`
+- Permission: `contents: write` (commits to `main`)
+
 ## Manual dispatch
 
 Actions → **Luffy PR Review** → Run workflow → enter PR number.

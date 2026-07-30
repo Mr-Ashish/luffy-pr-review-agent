@@ -26,6 +26,8 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 | Post | `scripts/post-review-comment.sh` | `gh pr comment` |
 | Orchestrate | `scripts/run-luffy-review.sh` | Compose stages + timings |
 | Trace | `scripts/save-trace.sh` | Redacted per-run package → Actions artifact |
+| Hub publish | `scripts/publish-run-to-hub.sh` | `repository_dispatch` → hub |
+| Hub ingest | `scripts/hub-ingest-run.py` | Commit `memory/repos/{slug}/…` on hub |
 
 ## Dual workspace
 

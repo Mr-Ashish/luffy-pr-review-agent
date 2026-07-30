@@ -24,6 +24,7 @@ permissions:
   pull-requests: write
   issues: write
   actions: write  # required for actions/cache save on GITHUB_TOKEN
+  # GITHUB_TOKEN may repository_dispatch this hub repo when reviewing itself
 
 concurrency:
   group: luffy-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.run_id }}
@@ -129,8 +130,18 @@ jobs:
           OUT_DIR: ${{ github.workspace }}/luffy/.luffy-out
           TRACE_ROOT: ${{ github.workspace }}/luffy/.luffy-out/traces
           GITHUB_EVENT_NAME: ${{ github.event_name }}
+          # Hub memory: prefer dedicated PAT; fall back to GITHUB_TOKEN for self-reviews
+          LUFFY_HUB_TOKEN: ${{ secrets.LUFFY_HUB_TOKEN }}
+          LUFFY_HUB_REPO: ${{ vars.LUFFY_HUB_REPO }}
+          LUFFY_HUB_PUBLISH: ${{ vars.LUFFY_HUB_PUBLISH }}
         run: |
           set -euo pipefail
+          # Fall back to GITHUB_TOKEN when LUFFY_HUB_TOKEN is unset (same-repo dispatch)
+          if [[ -z "${LUFFY_HUB_TOKEN:-}" ]]; then
+            export LUFFY_HUB_TOKEN="${GITHUB_TOKEN}"
+          fi
+          export LUFFY_HUB_REPO="${LUFFY_HUB_REPO:-Mr-Ashish/luffy-pr-review-agent}"
+          export LUFFY_HUB_PUBLISH="${LUFFY_HUB_PUBLISH:-1}"
           chmod +x "$LUFFY_ROOT/scripts/"*.sh
           if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
             echo "::error::Secret OPENROUTER_API_KEY is not set"
@@ -140,9 +151,10 @@ jobs:
             export LUFFY_STATUS=config_error
             export LUFFY_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             "$LUFFY_ROOT/scripts/save-trace.sh" || true
+            "$LUFFY_ROOT/scripts/publish-run-to-hub.sh" || true
             exit 0
           fi
-          # Do not fail the job before post/trace; orchestrator still writes trace on failure
+          # Orchestrator saves trace + dispatches hub memory ingest
           set +e
           "$LUFFY_ROOT/scripts/run-luffy-review.sh"
           echo "pipeline_rc=$?" >> "$GITHUB_OUTPUT"
