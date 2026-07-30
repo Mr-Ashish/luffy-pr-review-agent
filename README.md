@@ -191,6 +191,7 @@ See [memory/README.md](memory/README.md) and [docs/OPERATIONS.md](docs/OPERATION
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Operations](docs/OPERATIONS.md)
+- [README branding ecosystem (variants)](docs/README-BRANDING-ECOSYSTEM.md)
 
 ## Layout
 
