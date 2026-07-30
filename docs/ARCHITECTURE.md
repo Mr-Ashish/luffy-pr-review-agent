@@ -24,7 +24,8 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 | Normalize | `scripts/normalize-review.py` | Contract, fences, size, HTML marker |
 | Distill | `scripts/distill-memory.sh` | Append structured memory block |
 | Post | `scripts/post-review-comment.sh` | `gh pr comment` |
-| Orchestrate | `scripts/run-luffy-review.sh` | Compose stages |
+| Orchestrate | `scripts/run-luffy-review.sh` | Compose stages + timings |
+| Trace | `scripts/save-trace.sh` | Redacted per-run package → Actions artifact |
 
 ## Dual workspace
 

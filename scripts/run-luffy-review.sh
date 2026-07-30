@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Luffy orchestrator: assemble → hermes → normalize → distill.
+# Luffy orchestrator: assemble → hermes → normalize → distill → save-trace.
 #
 # Env:
 #   OPENROUTER_API_KEY (required)
@@ -15,31 +15,119 @@ export WORKSPACE_ROOT="${WORKSPACE_ROOT:-$LUFFY_ROOT}"
 export OUT_DIR="${OUT_DIR:-$LUFFY_ROOT/.luffy-out}"
 export HERMES_HOME="${HERMES_HOME:-$LUFFY_ROOT/.luffy-hermes-home}"
 export GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+export TRACE_ROOT="${TRACE_ROOT:-$OUT_DIR/traces}"
 
 SCRIPTS="$LUFFY_ROOT/scripts"
 chmod +x "$SCRIPTS"/*.sh 2>/dev/null || true
 
+mkdir -p "$OUT_DIR"
+export LUFFY_STARTED_AT
+LUFFY_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+TIMINGS_FILE="$OUT_DIR/timings.json"
+: >"$OUT_DIR/timings.partial.tsv"
+
+stage() {
+  local name="$1"
+  shift
+  local start end elapsed
+  start="$(date +%s)"
+  echo "::notice::Luffy stage: $name" >&2
+  set +e
+  "$@"
+  local rc=$?
+  set -e
+  end="$(date +%s)"
+  elapsed=$((end - start))
+  printf '%s\t%s\t%s\n' "$name" "$elapsed" "$rc" >>"$OUT_DIR/timings.partial.tsv"
+  return "$rc"
+}
+
 echo "::notice::Luffy orchestrator · root=$LUFFY_ROOT workspace=$WORKSPACE_ROOT" >&2
 
-"$SCRIPTS/assemble-context.sh"
-# shellcheck disable=SC1091
-source "$OUT_DIR/meta.env"
-export PROMPT_PATH PR_NUMBER REPO
+# Snapshot memory before review (for trace)
+if [[ -f "$HERMES_HOME/memories/MEMORY.md" ]]; then
+  cp -f "$HERMES_HOME/memories/MEMORY.md" "$OUT_DIR/memory-before.md"
+fi
 
-"$SCRIPTS/run-hermes-review.sh"
+ORCH_RC=0
+stage assemble "$SCRIPTS/assemble-context.sh" || ORCH_RC=$?
 
-REVIEW_FILE="$OUT_DIR/review-${PR_NUMBER}.md"
+if [[ $ORCH_RC -eq 0 ]]; then
+  # shellcheck disable=SC1091
+  source "$OUT_DIR/meta.env"
+  export PROMPT_PATH PR_NUMBER REPO
+fi
+
+if [[ $ORCH_RC -eq 0 ]]; then
+  stage hermes "$SCRIPTS/run-hermes-review.sh" || ORCH_RC=$?
+fi
+
+# Capture hermes rc from timings if available
+export HERMES_RC="${ORCH_RC}"
+
+REVIEW_FILE="${OUT_DIR}/review-${PR_NUMBER:-unknown}.md"
+if [[ -n "${PR_NUMBER:-}" && -f "$OUT_DIR/review-${PR_NUMBER}.md" ]]; then
+  REVIEW_FILE="$OUT_DIR/review-${PR_NUMBER}.md"
+fi
 export REVIEW_FILE
 
-"$SCRIPTS/distill-memory.sh"
+if [[ $ORCH_RC -eq 0 ]]; then
+  stage distill "$SCRIPTS/distill-memory.sh" || true
+fi
 
-if [[ "${POST_COMMENT:-0}" == "1" ]]; then
-  "$SCRIPTS/post-review-comment.sh" "$REVIEW_FILE" "$PR_NUMBER"
+# Build timings.json
+python3 - <<'PY' "$OUT_DIR/timings.partial.tsv" "$TIMINGS_FILE" "$LUFFY_STARTED_AT"
+from pathlib import Path
+import json, sys
+from datetime import datetime, timezone
+
+tsv, out, started = sys.argv[1:4]
+stages = []
+total = 0
+if Path(tsv).exists():
+    for line in Path(tsv).read_text().splitlines():
+        if not line.strip():
+            continue
+        name, elapsed, rc = line.split("\t")
+        elapsed = int(elapsed)
+        total += elapsed
+        stages.append({"name": name, "seconds": elapsed, "exit_code": int(rc)})
+Path(out).write_text(json.dumps({
+    "started_at": started,
+    "ended_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "total_seconds": total,
+    "stages": stages,
+}, indent=2) + "\n")
+PY
+
+export LUFFY_STATUS
+if [[ $ORCH_RC -eq 0 && -s "${REVIEW_FILE:-}" ]]; then
+  LUFFY_STATUS="success"
+else
+  LUFFY_STATUS="failed"
+fi
+
+stage save_trace "$SCRIPTS/save-trace.sh" || true
+
+if [[ "${POST_COMMENT:-0}" == "1" && -f "${REVIEW_FILE:-}" ]]; then
+  stage post_comment "$SCRIPTS/post-review-comment.sh" "$REVIEW_FILE" "${PR_NUMBER:-}" || ORCH_RC=$?
 fi
 
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-  echo "review_file=$REVIEW_FILE" >>"$GITHUB_OUTPUT"
-  echo "pr_number=$PR_NUMBER" >>"$GITHUB_OUTPUT"
+  {
+    echo "review_file=${REVIEW_FILE:-}"
+    echo "pr_number=${PR_NUMBER:-}"
+    echo "luffy_status=$LUFFY_STATUS"
+    if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
+      echo "trace_dir=$(cat "$OUT_DIR/latest-trace-dir.txt")"
+    fi
+  } >>"$GITHUB_OUTPUT"
 fi
 
-echo "REVIEW_FILE=$REVIEW_FILE"
+echo "REVIEW_FILE=${REVIEW_FILE:-}"
+echo "LUFFY_STATUS=$LUFFY_STATUS"
+if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
+  echo "TRACE_DIR=$(cat "$OUT_DIR/latest-trace-dir.txt")"
+fi
+
+exit "$ORCH_RC"

@@ -127,6 +127,8 @@ jobs:
           WORKSPACE_ROOT: ${{ github.workspace }}/workspace
           HERMES_HOME: ${{ github.workspace }}/.luffy-hermes-home
           OUT_DIR: ${{ github.workspace }}/luffy/.luffy-out
+          TRACE_ROOT: ${{ github.workspace }}/luffy/.luffy-out/traces
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           chmod +x "$LUFFY_ROOT/scripts/"*.sh
@@ -135,9 +137,16 @@ jobs:
             "$LUFFY_ROOT/scripts/write-failure-review.sh" "$PR_NUMBER" "$OUT_DIR" \
               "Configuration error: OPENROUTER_API_KEY secret is missing." \
               "Add repository secret OPENROUTER_API_KEY and re-run."
+            export LUFFY_STATUS=config_error
+            export LUFFY_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            "$LUFFY_ROOT/scripts/save-trace.sh" || true
             exit 0
           fi
+          # Do not fail the job before post/trace; orchestrator still writes trace on failure
+          set +e
           "$LUFFY_ROOT/scripts/run-luffy-review.sh"
+          echo "pipeline_rc=$?" >> "$GITHUB_OUTPUT"
+          set -e
 
       - name: Post review comment (always if matched)
         if: steps.gate.outputs.matched == 'true' && always()
@@ -156,14 +165,57 @@ jobs:
             REVIEW_FILE="$("$LUFFY_ROOT/scripts/write-failure-review.sh" "$PR_NUMBER" "$OUT_DIR" \
               "Luffy job ended without a review artifact. Check Actions logs." \
               "Re-run after fixing the workflow failure.")"
+            export LUFFY_STATUS=missing_review
+            export LUFFY_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            export TRACE_ROOT="$OUT_DIR/traces"
+            "$LUFFY_ROOT/scripts/save-trace.sh" || true
           fi
           "$LUFFY_ROOT/scripts/post-review-comment.sh" "$REVIEW_FILE" "$PR_NUMBER"
 
-      - name: Upload debug artifacts
+      - name: Ensure trace package exists
+        if: steps.gate.outputs.matched == 'true' && always()
+        env:
+          LUFFY_ROOT: ${{ github.workspace }}/luffy
+          OUT_DIR: ${{ github.workspace }}/luffy/.luffy-out
+          HERMES_HOME: ${{ github.workspace }}/.luffy-hermes-home
+          TRACE_ROOT: ${{ github.workspace }}/luffy/.luffy-out/traces
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+          LUFFY_MODEL: ${{ vars.LUFFY_MODEL }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          chmod +x "$LUFFY_ROOT/scripts/save-trace.sh"
+          # Re-run save-trace so post-failure stubs are included
+          export LUFFY_STATUS="${LUFFY_STATUS:-complete}"
+          export LUFFY_STARTED_AT="${LUFFY_STARTED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+          "$LUFFY_ROOT/scripts/save-trace.sh"
+          echo "### Luffy trace" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
+            TRACE_DIR="$(cat "$OUT_DIR/latest-trace-dir.txt")"
+            echo "- **trace dir:** \`$TRACE_DIR\`" >> "$GITHUB_STEP_SUMMARY"
+            if [[ -f "$TRACE_DIR/meta.json" ]]; then
+              echo '```json' >> "$GITHUB_STEP_SUMMARY"
+              head -c 4000 "$TRACE_DIR/meta.json" >> "$GITHUB_STEP_SUMMARY"
+              echo >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      - name: Upload run trace artifact
         if: steps.gate.outputs.matched == 'true' && always()
         uses: actions/upload-artifact@v4
         with:
-          name: luffy-out-${{ steps.gate.outputs.pr_number }}-${{ github.run_id }}
+          name: luffy-trace-pr${{ steps.gate.outputs.pr_number }}-run${{ github.run_id }}
+          path: luffy/.luffy-out/traces/
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Upload full out bundle (debug)
+        if: steps.gate.outputs.matched == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: luffy-out-pr${{ steps.gate.outputs.pr_number }}-run${{ github.run_id }}
           path: |
             luffy/.luffy-out/
             .luffy-hermes-home/memories/

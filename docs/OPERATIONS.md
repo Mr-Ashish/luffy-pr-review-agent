@@ -46,5 +46,29 @@ Requires: `gh` authenticated, network for Hermes install + OpenRouter.
 
 ## Debug
 
-- Download artifact `luffy-out-<pr>-<run_id>`
-- Contains `.luffy-out/` (prompt, diff, raw/final review) and memory snapshot
+- Download artifact `luffy-out-pr<N>-run<id>` — full `.luffy-out/` + memory snapshot (14 days)
+- Download artifact **`luffy-trace-pr<N>-run<id>`** — structured per-run trace (90 days)
+
+### Per-run trace layout
+
+```text
+traces/pr{N}-run{RUN_ID}-a{ATTEMPT}/
+  meta.json          # identity, status, timings pointer, file hashes
+  trace.json         # index
+  prompt.md          # agent prompt
+  context.md         # PR context
+  pr.json / pr.diff  # GitHub PR data
+  review.raw.md      # Hermes stdout
+  review.md          # normalized posted body
+  hermes.stderr      # errors if any
+  timings.json       # stage durations
+  memory-before.md   # MEMORY.md before review (if any)
+  memory-after.md    # MEMORY.md after distill
+```
+
+Secrets (`sk-or-…`, `OPENROUTER_API_KEY=…`) are redacted before packaging.
+
+```bash
+# Download latest trace for a run
+gh run download <run-id> -R owner/repo -n luffy-trace-pr1-run<run-id>
+```

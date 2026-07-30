@@ -58,11 +58,21 @@ tests/          normalizer unit tests
 | `distill-memory.sh` | Grow `MEMORY.md` |
 | `post-review-comment.sh` | Post to PR |
 | `run-luffy-review.sh` | Orchestrator |
+| `save-trace.sh` | Per-run trace package (redacted) |
 | `write-failure-review.sh` | Always-comment failure stub |
 
 ## Memory
 
 `.luffy-hermes-home/memories/MEMORY.md` is restored via Actions cache and appended after each review (rotated at ~100KB).
+
+## Traces (per run)
+
+Every run writes a redacted trace under `.luffy-out/traces/pr{N}-run{id}-a{attempt}/` and uploads it as a GitHub Actions artifact:
+
+- **`luffy-trace-pr{N}-run{id}`** — structured trace (90-day retention)
+- **`luffy-out-pr{N}-run{id}`** — full debug bundle (14-day retention)
+
+Includes prompt, context, diff, raw + final review, hermes stderr, timings, memory before/after, and `meta.json` with SHA256 inventory. See [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## v1 limits
 
