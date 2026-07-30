@@ -12,7 +12,8 @@
 See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 
 - **Sprint 1 (F1–F6):** shallow+sparse checkout, Hermes install cache, hub memory preload, drop broken home cache, reactions, shallow hub clone  
-- **Sprint 2 (F11–F12):** author association allowlist, replace previous Luffy PR comment
+- **Sprint 2 (F11–F12):** author association allowlist, replace previous Luffy PR comment  
+- **Sprint 3 (F13–F17):** sparse count bugfix, stable Hermes cache key, honest fail reaction, deny 😕, drop dead install copy
 
 ## Central hub memory (cross-repo)
 

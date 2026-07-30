@@ -22,10 +22,15 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 6 | **F6** | Cap hub clone depth=1 (already ~20) → 1 | XS | Small | **Shipped** |
 | 7 | **F11** | Author association allowlist (default OWNER/MEMBER/COLLABORATOR/CONTRIBUTOR; override via `vars.LUFFY_ALLOWED_ASSOCIATIONS`) | XS | 🔥 Cost control | **Shipped** |
 | 8 | **F12** | Replace previous Luffy comment (delete prior `<!-- luffy-review pr=N` before post) | XS | 🔥 Less PR noise | **Shipped** |
-| 9 | F7 | Pin Hermes version string | S | Repro | Later |
-| 10 | F8 | Docker image with Hermes preinstalled | M | Fastest CI | Later |
-| 11 | F9 | Inline GitHub review comments | L | Product | Later |
-| 12 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
+| 9 | **F13** | Fix sparse path `grep -c \|\| echo 0` → empty PR path count was `0\\n0`, forcing full monorepo clone | XS | 🔥 Correct sparse path | **Shipped** |
+| 10 | **F14** | Hermes cache: stable key `v3`, save **only on miss** (drop per-run_id thrash) | XS | 🔥 Cache hits + GH cache quota | **Shipped** |
+| 11 | **F15** | Config error `pipeline_rc=1` (was 0 → false ✅ reaction) | XS | Honest UX | **Shipped** |
+| 12 | **F16** | Association deny → 😕 reaction (no OpenRouter spend) | XS | Visible deny | **Shipped** |
+| 13 | **F17** | Drop dead `RUNNER_TEMP` Hermes tree copy after cold install | XS | Faster cold path | **Shipped** |
+| 14 | F7 | Pin Hermes version string | S | Repro | Later |
+| 15 | F8 | Docker image with Hermes preinstalled | M | Fastest CI | Later |
+| 16 | F9 | Inline GitHub review comments | L | Product | Later |
+| 17 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
 
 ### Sprint 1 (shipped)
 
@@ -34,6 +39,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 2 (shipped)
 
 **F11–F12** cost control + comment hygiene.
+
+### Sprint 3 (shipped)
+
+**F13–F17** correctness + cache + reaction honesty.
 
 ### readme-kit (shipped)
 
