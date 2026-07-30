@@ -1,0 +1,177 @@
+# Luffy — comment-triggered PR review via Hermes Agent + OpenRouter
+#
+# Trigger on a PR:
+#   @luffy review this pr
+#   @luffy review
+#
+# Required secret: OPENROUTER_API_KEY
+# Optional variable: LUFFY_MODEL
+
+name: Luffy PR Review
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to review
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: luffy-${{ github.repository }}-${{ github.event.issue.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  luffy-review:
+    name: Luffy review
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.issue.pull_request &&
+        (
+          contains(github.event.comment.body, '@luffy review this pr') ||
+          contains(github.event.comment.body, '@luffy review')
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Resolve PR number & gate
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          COMMENT_BODY: ${{ github.event.comment.body || '' }}
+          ISSUE_PR: ${{ github.event.issue.pull_request || '' }}
+          INPUT_PR: ${{ inputs.pr_number || '' }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || '' }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "matched=true" >> "$GITHUB_OUTPUT"
+            echo "pr_number=$INPUT_PR" >> "$GITHUB_OUTPUT"
+            echo "trigger_comment=workflow_dispatch" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ -z "$ISSUE_PR" ]]; then
+            echo "matched=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if printf '%s' "$COMMENT_BODY" | grep -Eiq '@luffy[[:space:]]+review([[:space:]]+this[[:space:]]+pr)?\b'; then
+            echo "matched=true" >> "$GITHUB_OUTPUT"
+            echo "pr_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+            {
+              echo "trigger_comment<<EOF"
+              printf '%s\n' "$COMMENT_BODY"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "matched=false" >> "$GITHUB_OUTPUT"
+            echo "Comment did not match @luffy review pattern; skipping."
+          fi
+
+      - name: Checkout default branch (Luffy system)
+        if: steps.gate.outputs.matched == 'true'
+        uses: actions/checkout@v4
+        with:
+          path: luffy
+          fetch-depth: 1
+
+      - name: Checkout PR head (code under review)
+        if: steps.gate.outputs.matched == 'true'
+        uses: actions/checkout@v4
+        with:
+          path: workspace
+          fetch-depth: 0
+          ref: refs/pull/${{ steps.gate.outputs.pr_number }}/head
+
+      - name: Restore Hermes home (memory)
+        if: steps.gate.outputs.matched == 'true'
+        uses: actions/cache@v4
+        with:
+          path: .luffy-hermes-home
+          key: luffy-hermes-${{ github.repository }}-v1
+          restore-keys: |
+            luffy-hermes-${{ github.repository }}-
+
+      - name: React eyes
+        if: steps.gate.outputs.matched == 'true' && github.event_name == 'issue_comment'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content='eyes' || true
+
+      - name: Run Luffy pipeline
+        if: steps.gate.outputs.matched == 'true'
+        id: review
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+          TRIGGER_COMMENT: ${{ steps.gate.outputs.trigger_comment }}
+          LUFFY_MODEL: ${{ vars.LUFFY_MODEL }}
+          LUFFY_ROOT: ${{ github.workspace }}/luffy
+          WORKSPACE_ROOT: ${{ github.workspace }}/workspace
+          HERMES_HOME: ${{ github.workspace }}/.luffy-hermes-home
+          OUT_DIR: ${{ github.workspace }}/luffy/.luffy-out
+        run: |
+          set -euo pipefail
+          chmod +x "$LUFFY_ROOT/scripts/"*.sh
+          if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
+            echo "::error::Secret OPENROUTER_API_KEY is not set"
+            "$LUFFY_ROOT/scripts/write-failure-review.sh" "$PR_NUMBER" "$OUT_DIR" \
+              "Configuration error: OPENROUTER_API_KEY secret is missing." \
+              "Add repository secret OPENROUTER_API_KEY and re-run."
+            exit 0
+          fi
+          "$LUFFY_ROOT/scripts/run-luffy-review.sh"
+
+      - name: Post review comment (always if matched)
+        if: steps.gate.outputs.matched == 'true' && always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+          OUT_DIR: ${{ github.workspace }}/luffy/.luffy-out
+          LUFFY_ROOT: ${{ github.workspace }}/luffy
+        run: |
+          set -euo pipefail
+          chmod +x "$LUFFY_ROOT/scripts/"*.sh
+          mkdir -p "$OUT_DIR"
+          REVIEW_FILE="$(ls -t "$OUT_DIR"/review-*.md 2>/dev/null | grep -v '\.raw\.md$' | head -1 || true)"
+          if [[ -z "${REVIEW_FILE:-}" || ! -f "$REVIEW_FILE" ]]; then
+            REVIEW_FILE="$("$LUFFY_ROOT/scripts/write-failure-review.sh" "$PR_NUMBER" "$OUT_DIR" \
+              "Luffy job ended without a review artifact. Check Actions logs." \
+              "Re-run after fixing the workflow failure.")"
+          fi
+          "$LUFFY_ROOT/scripts/post-review-comment.sh" "$REVIEW_FILE" "$PR_NUMBER"
+
+      - name: Upload debug artifacts
+        if: steps.gate.outputs.matched == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: luffy-out-${{ steps.gate.outputs.pr_number }}-${{ github.run_id }}
+          path: |
+            luffy/.luffy-out/
+            .luffy-hermes-home/memories/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Save Hermes home (memory)
+        if: steps.gate.outputs.matched == 'true' && always()
+        uses: actions/cache/save@v4
+        with:
+          path: .luffy-hermes-home
+          key: luffy-hermes-${{ github.repository }}-v1-${{ github.run_id }}
