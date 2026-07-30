@@ -77,6 +77,24 @@ export function renderDocument(config, theme, pack) {
         }
         break;
       }
+      case "agentic_loop": {
+        parts.push(h2(content.agentic_loop_title || "Agentic loop (example)"));
+        if (content.agentic_loop_intro) {
+          parts.push(content.agentic_loop_intro.trim() + "\n");
+        }
+        if (content.agentic_loop_ascii) {
+          parts.push("**ASCII (high level)**\n");
+          parts.push(fence("text", content.agentic_loop_ascii) + "\n");
+        }
+        if (content.agentic_loop_mermaid) {
+          parts.push("**Mermaid (full control plane + model loop)**\n");
+          parts.push(fence("mermaid", content.agentic_loop_mermaid) + "\n");
+        }
+        if (content.agentic_loop_note) {
+          parts.push(content.agentic_loop_note.trim() + "\n");
+        }
+        break;
+      }
       case "setup": {
         parts.push(h2("Setup (target repo)"));
         const steps = content.setup_steps || [];

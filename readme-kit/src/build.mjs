@@ -11,7 +11,13 @@ export function build(configPath, { out, brandingDir, force } = {}) {
 
   // Resolve mermaid from files relative to config
   const c = config.content || (config.content = {});
-  for (const key of ["architecture_mermaid", "e2e_mermaid", "pipeline_mermaid"]) {
+  for (const key of [
+    "architecture_mermaid",
+    "e2e_mermaid",
+    "pipeline_mermaid",
+    "agentic_loop_mermaid",
+    "agentic_loop_ascii",
+  ]) {
     if (c[key]) {
       c[key] = resolveMaybeFile(config.__dir, c[key]);
     }

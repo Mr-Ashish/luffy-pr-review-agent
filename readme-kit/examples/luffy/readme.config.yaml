@@ -50,6 +50,7 @@ sections:
   - trigger
   - architecture
   - e2e
+  - agentic_loop
   - custom_showcase
   - setup
   - local
@@ -152,6 +153,15 @@ content:
     gh run download 30572964204 -R Mr-Ashish/odoo -n luffy-trace-pr3-run30572964204
 
     ```
+  agentic_loop_title: Agentic loop (example)
+  agentic_loop_intro: "End-to-end control plane for one review: comment trigger → Actions gate →
+    orchestrator stages → Hermes one-shot agentic loop over OpenRouter → normalize → memory + trace
+    → PR comment. Example from the live Odoo e2e path."
+  agentic_loop_ascii: diagrams/agentic-loop-ascii.txt
+  agentic_loop_mermaid: diagrams/agentic-loop.mmd
+  agentic_loop_note: "Inner loop: Hermes may call tools (read workspace files) before emitting the
+    final Markdown review. Outer loop is deterministic shell orchestration so every run leaves a
+    redacted trace under `.luffy-out/traces/` and hub memory under `memory/repos/`."
 output:
   readme: README.md
   branding_dir: branding

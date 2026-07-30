@@ -100,6 +100,108 @@ flowchart LR
   G --> H[PR comment + artifacts]
 ```
 
+## Agentic loop (example)
+
+End-to-end control plane for one review: comment trigger → Actions gate → orchestrator stages → Hermes one-shot agentic loop over OpenRouter → normalize → memory + trace → PR comment. Example from the live Odoo e2e path.
+
+**ASCII (high level)**
+
+```text
+@luffy review this pr
+        │
+        ▼
+┌───────────────────────────────────────────────────────────────┐
+│  GitHub Actions · luffy-pr-review.yml                         │
+│  gate (pattern + association) → 👀 → sparse checkout → cache  │
+└────────────────────────────┬──────────────────────────────────┘
+                             │
+                             ▼
+┌───────────────────────────────────────────────────────────────┐
+│  Orchestrator · scripts/run-luffy-review.sh                   │
+│                                                               │
+│   1 preload_hub_memory ──► Hub MEMORY.md → HERMES_HOME        │
+│   2 assemble-context   ──► PR meta + diff + prompt + SOUL     │
+│   3 hermes -z  ───────────────────────────────────────────┐   │
+│        │                                                  │   │
+│        │    ┌─ agentic loop (Hermes + OpenRouter) ──────┐ │   │
+│        │    │  prompt + memory + workspace               │ │   │
+│        │    │       │                                   │ │   │
+│        │    │       ▼                                   │ │   │
+│        │    │  model reasoning ◄──► tools (read files)  │ │   │
+│        │    │       │                                   │ │   │
+│        │    │       ▼                                   │ │   │
+│        │    │  draft Markdown review                    │ │   │
+│        │    └───────────────────────────────────────────┘ │   │
+│        ▼                                                  │   │
+│   4 normalize-review   ──► contract · marker · cap        │   │
+│   5 distill-memory     ──► append notes to MEMORY.md      │   │
+│   6 save-trace         ──► redacted .luffy-out/traces/    │   │
+│   7 publish-run-to-hub ──► memory/repos/{owner}--{repo}/  │   │
+└────────────────────────────┬──────────────────────────────────┘
+                             │
+                             ▼
+┌───────────────────────────────────────────────────────────────┐
+│  Ship · PR comment (replace prior) · ✅/❌ · artifacts · cache│
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Mermaid (full control plane + model loop)**
+
+```mermaid
+flowchart TB
+  subgraph Trigger["1 · Trigger"]
+    Dev["Developer"]
+    Comment["@luffy review this pr"]
+    Gate["Gate · pattern + association allowlist"]
+  end
+
+  subgraph ControlPlane["2 · Control plane · GitHub Actions"]
+    Eyes["React 👀"]
+    Sparse["Sparse PR head + Luffy agent/scripts"]
+    CacheR["Restore Hermes install cache"]
+  end
+
+  subgraph Orchestrator["3 · Orchestrator · run-luffy-review.sh"]
+    Preload["preload_hub_memory\nHub MEMORY.md → HERMES_HOME"]
+    Assemble["assemble-context\nPR meta · diff · prompt · SOUL"]
+    Hermes["Hermes Agent · hermes -z"]
+    Normalize["normalize-review\ncontract · marker · size cap"]
+    Distill["distill-memory\nappend structured notes"]
+    Trace["save-trace\nredacted package"]
+    HubPub["publish-run-to-hub\nmemory/repos/…"]
+  end
+
+  subgraph InnerLoop["4 · Agentic loop · Hermes + OpenRouter"]
+    Prompt["Review prompt + workspace + memory"]
+    Think["Model reasoning"]
+    Tools["Optional tools · read workspace"]
+    Draft["Draft Markdown review"]
+    Prompt --> Think
+    Think --> Tools
+    Tools --> Think
+    Think --> Draft
+  end
+
+  subgraph Output["5 · Ship"]
+    Post["Post / replace PR comment"]
+    React["React ✅ / ❌"]
+    Arts["Upload trace + out artifacts"]
+    CacheW["Save Hermes cache on miss"]
+  end
+
+  OR["OpenRouter · openai/gpt-5-mini"]
+
+  Dev --> Comment --> Gate --> Eyes --> Sparse --> CacheR
+  CacheR --> Preload --> Assemble --> Hermes
+  Hermes --> Prompt
+  Think --> OR
+  OR --> Think
+  Draft --> Normalize --> Distill --> Trace --> HubPub
+  HubPub --> Post --> React --> Arts --> CacheW
+```
+
+Inner loop: Hermes may call tools (read workspace files) before emitting the final Markdown review. Outer loop is deterministic shell orchestration so every run leaves a redacted trace under `.luffy-out/traces/` and hub memory under `memory/repos/`.
+
 ## E2E showcase (live)
 
 Real run on a multi-file Odoo core fix ([odoo/odoo#271153](https://github.com/odoo/odoo/issues/271153) → [Mr-Ashish/odoo#3](https://github.com/Mr-Ashish/odoo/pull/3)).
