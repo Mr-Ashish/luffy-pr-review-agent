@@ -25,7 +25,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: luffy-${{ github.repository }}-${{ github.event.issue.number || inputs.pr_number }}
+  group: luffy-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -48,28 +48,28 @@ jobs:
         id: gate
         env:
           EVENT_NAME: ${{ github.event_name }}
-          COMMENT_BODY: ${{ github.event.comment.body || '' }}
-          ISSUE_PR: ${{ github.event.issue.pull_request || '' }}
-          INPUT_PR: ${{ inputs.pr_number || '' }}
-          ISSUE_NUMBER: ${{ github.event.issue.number || '' }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          IS_PR: ${{ github.event.issue.pull_request != null }}
+          INPUT_PR: ${{ github.event.inputs.pr_number }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           set -euo pipefail
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             echo "matched=true" >> "$GITHUB_OUTPUT"
-            echo "pr_number=$INPUT_PR" >> "$GITHUB_OUTPUT"
+            echo "pr_number=${INPUT_PR}" >> "$GITHUB_OUTPUT"
             echo "trigger_comment=workflow_dispatch" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if [[ -z "$ISSUE_PR" ]]; then
+          if [[ "${IS_PR}" != "true" ]]; then
             echo "matched=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if printf '%s' "$COMMENT_BODY" | grep -Eiq '@luffy[[:space:]]+review([[:space:]]+this[[:space:]]+pr)?\b'; then
+          if printf '%s' "${COMMENT_BODY:-}" | grep -Eiq '@luffy[[:space:]]+review([[:space:]]+this[[:space:]]+pr)?\b'; then
             echo "matched=true" >> "$GITHUB_OUTPUT"
-            echo "pr_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "pr_number=${ISSUE_NUMBER}" >> "$GITHUB_OUTPUT"
             {
               echo "trigger_comment<<EOF"
-              printf '%s\n' "$COMMENT_BODY"
+              printf '%s\n' "${COMMENT_BODY:-}"
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
           else
