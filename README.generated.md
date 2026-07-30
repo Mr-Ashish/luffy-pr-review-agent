@@ -332,6 +332,7 @@ assets/         brand mark + favicon
 
 ## Docs
 
+- [Blog: Building Luffy (agentic PR review)](docs/blog/building-luffy-agentic-pr-review.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Operations](docs/OPERATIONS.md)
 - [ROI fixes](docs/ROI-FIXES.md)

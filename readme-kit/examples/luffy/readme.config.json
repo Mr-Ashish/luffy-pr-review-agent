@@ -107,6 +107,10 @@
     "layout": "agent/          SOUL, prompts, Hermes config\nscripts/        assemble → hermes → normalize → hub\nmemory/         central per-repo MEMORY (hub)\nreadme-kit/     compile README from theme + pack + config\nassets/         brand mark + favicon\n.github/workflows/",
     "docs_links": [
       {
+        "title": "Blog: Building Luffy (agentic PR review)",
+        "path": "docs/blog/building-luffy-agentic-pr-review.md"
+      },
+      {
         "title": "Architecture",
         "path": "docs/ARCHITECTURE.md"
       },

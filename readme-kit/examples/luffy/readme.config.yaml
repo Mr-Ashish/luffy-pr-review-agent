@@ -102,6 +102,8 @@ content:
     assets/         brand mark + favicon
     .github/workflows/
   docs_links:
+    - title: "Blog: Building Luffy (agentic PR review)"
+      path: docs/blog/building-luffy-agentic-pr-review.md
     - title: Architecture
       path: docs/ARCHITECTURE.md
     - title: Operations
