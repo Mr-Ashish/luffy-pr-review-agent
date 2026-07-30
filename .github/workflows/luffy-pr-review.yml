@@ -2,7 +2,7 @@
 #
 # Trigger: @luffy review this pr
 # Required secret: OPENROUTER_API_KEY
-# Optional: LUFFY_MODEL, LUFFY_HUB_TOKEN, LUFFY_HUB_REPO
+# Optional: LUFFY_MODEL (default anthropic/claude-opus-5), LUFFY_HUB_TOKEN, LUFFY_HUB_REPO
 
 name: Luffy PR Review
 
@@ -39,7 +39,7 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
 
     steps:
       - name: Resolve PR number & gate
@@ -226,7 +226,10 @@ jobs:
           fi
           export LUFFY_HUB_REPO="${LUFFY_HUB_REPO:-Mr-Ashish/luffy-pr-review-agent}"
           export LUFFY_HUB_PUBLISH="${LUFFY_HUB_PUBLISH:-1}"
+          # Default showcase model: Claude Opus 5 via OpenRouter
+          export LUFFY_MODEL="${LUFFY_MODEL:-anthropic/claude-opus-5}"
           export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
+          chmod +x "$LUFFY_ROOT/scripts/"*.sh "$LUFFY_ROOT/scripts/"*.py 2>/dev/null || true
           chmod +x "$LUFFY_ROOT/scripts/"*.sh
           if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
             echo "::error::Secret OPENROUTER_API_KEY is not set"
