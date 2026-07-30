@@ -40,9 +40,9 @@ badges:
   - type: license
     message: MIT
 hero:
-  banner: assets/luffy-hero-banner.svg
-  mark: assets/luffy-mark.svg
+  mark: assets/luffy-artifact-orbital-core.png
   show_mark: true
+  mark_width: 360
 sections:
   - hero
   - badges

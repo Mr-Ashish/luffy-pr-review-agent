@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/luffy-hero-banner.svg" alt="Luffy" width="100%" />
+  <img src="assets/luffy-artifact-orbital-core.png" alt="Luffy" width="360" />
 </p>
 
 <h1 align="center">Luffy</h1>

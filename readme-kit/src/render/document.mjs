@@ -20,13 +20,14 @@ export function renderDocument(config, theme, pack) {
       case "hero": {
         const banner = config.hero?.banner;
         const mark = config.hero?.mark;
+        const markWidth = config.hero?.mark_width || (mark && String(mark).endsWith(".png") ? 320 : 128);
         if (banner) {
           parts.push(
             `<p align="center">\n  <img src="${banner}" alt="${product.name || "banner"}" width="100%" />\n</p>\n`
           );
         } else if (config.hero?.show_mark !== false && mark) {
           parts.push(
-            `<p align="center">\n  <img src="${mark}" alt="${product.name || "logo"}" width="128" />\n</p>\n`
+            `<p align="center">\n  <img src="${mark}" alt="${product.name || "logo"}" width="${markWidth}" />\n</p>\n`
           );
         }
         const title = product.name || "Project";
