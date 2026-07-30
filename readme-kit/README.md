@@ -43,3 +43,9 @@ examples/   luffy config (yaml + json) + mermaid diagrams
 ```
 
 Node ≥ 18. Dependency: [`yaml`](https://www.npmjs.com/package/yaml) for YAML parsing.
+
+## Hero banner options
+
+```bash
+npm run brand:options   # → ../assets/brand-options/hero-*.svg + gallery
+```
