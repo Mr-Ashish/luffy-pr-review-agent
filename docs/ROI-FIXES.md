@@ -20,13 +20,21 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 4 | **F4** | Drop broken hermes-home Actions cache (hub is SoT) / soft-fail | XS | Removes noise, simpler | **Shipped** |
 | 5 | **F5** | ✅ / ❌ reactions on trigger comment | XS | Clear UX | **Shipped** (`+1`/`-1`) |
 | 6 | **F6** | Cap hub clone depth=1 (already ~20) → 1 | XS | Small | **Shipped** |
-| 7 | F7 | Pin Hermes version string | S | Repro | Later |
-| 8 | F8 | Docker image with Hermes preinstalled | M | Fastest CI | Later |
-| 9 | F9 | Inline GitHub review comments | L | Product | Later |
-| 10 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
-| 11 | F11 | Author association allowlist | S | Cost control | Later |
-| 12 | F12 | Replace previous Luffy comment | S | Less noise | Later |
+| 7 | **F11** | Author association allowlist (default OWNER/MEMBER/COLLABORATOR/CONTRIBUTOR; override via `vars.LUFFY_ALLOWED_ASSOCIATIONS`) | XS | 🔥 Cost control | **Shipped** |
+| 8 | **F12** | Replace previous Luffy comment (delete prior `<!-- luffy-review pr=N` before post) | XS | 🔥 Less PR noise | **Shipped** |
+| 9 | F7 | Pin Hermes version string | S | Repro | Later |
+| 10 | F8 | Docker image with Hermes preinstalled | M | Fastest CI | Later |
+| 11 | F9 | Inline GitHub review comments | L | Product | Later |
+| 12 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
 
-### Recommendation for this sprint
+### Sprint 1 (shipped)
 
-Implement **F1–F6 only** (minimal code, maximum wall-clock + quality ROI).
+**F1–F6** wall-clock + memory quality.
+
+### Sprint 2 (shipped)
+
+**F11–F12** cost control + comment hygiene.
+
+### readme-kit (shipped)
+
+YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser removed.

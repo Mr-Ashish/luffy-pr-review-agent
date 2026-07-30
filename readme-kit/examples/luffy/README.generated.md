@@ -11,7 +11,7 @@ Hermes Agent + OpenRouter + growing hub memory + redacted run traces.
 [![PR Review](https://img.shields.io/github/actions/workflow/status/Mr-Ashish/luffy-pr-review-agent/luffy-pr-review.yml?branch=main&style=for-the-badge&label=PR%20Review&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/luffy-pr-review.yml)
 [![Hub memory](https://img.shields.io/github/actions/workflow/status/Mr-Ashish/luffy-pr-review-agent/ingest-luffy-run.yml?branch=main&style=for-the-badge&label=Hub%20memory&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/ingest-luffy-run.yml)
 ![trigger](https://img.shields.io/badge/trigger-%40luffy%20review%20this%20pr-FF6B2C?style=for-the-badge&logo=github&logoColor=white)
-![model](https://img.shields.io/badge/model-openai/gpt-5-mini-0B0F19?style=for-the-badge&logo=openai&logoColor=white)
+![model](https://img.shields.io/badge/model-openai%2Fgpt-5-mini-0B0F19?style=for-the-badge&logo=openai&logoColor=white)
 ![provider](https://img.shields.io/badge/provider-OpenRouter-C41E3A?style=for-the-badge)
 [![Last commit](https://img.shields.io/github/last-commit/Mr-Ashish/luffy-pr-review-agent/main?style=for-the-badge&logo=git&logoColor=white&color=0B0F19)](https://github.com/Mr-Ashish/luffy-pr-review-agent/commits/main)
 ![License](https://img.shields.io/badge/license-MIT-FFD166?style=for-the-badge&labelColor=0B0F19&logo=open-source-initiative&logoColor=FFD166)

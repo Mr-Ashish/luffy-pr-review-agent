@@ -50,6 +50,10 @@ jobs:
           IS_PR: ${{ github.event.issue.pull_request != null }}
           INPUT_PR: ${{ github.event.inputs.pr_number }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          # F11 cost control: who may trigger paid OpenRouter reviews
+          AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+          # Comma list; override via repo var LUFFY_ALLOWED_ASSOCIATIONS if needed
+          ALLOWED_ASSOCIATIONS: ${{ vars.LUFFY_ALLOWED_ASSOCIATIONS || 'OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR' }}
         run: |
           set -euo pipefail
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
@@ -62,18 +66,33 @@ jobs:
             echo "matched=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if printf '%s' "${COMMENT_BODY:-}" | grep -Eiq '@luffy[[:space:]]+review([[:space:]]+this[[:space:]]+pr)?\b'; then
-            echo "matched=true" >> "$GITHUB_OUTPUT"
-            echo "pr_number=${ISSUE_NUMBER}" >> "$GITHUB_OUTPUT"
-            {
-              echo "trigger_comment<<EOF"
-              printf '%s\n' "${COMMENT_BODY:-}"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-          else
+          if ! printf '%s' "${COMMENT_BODY:-}" | grep -Eiq '@luffy[[:space:]]+review([[:space:]]+this[[:space:]]+pr)?\b'; then
             echo "matched=false" >> "$GITHUB_OUTPUT"
             echo "Comment did not match @luffy review pattern; skipping."
+            exit 0
           fi
+          # Author association allowlist (case-insensitive). Empty ALLOWED = no gate.
+          assoc="$(printf '%s' "${AUTHOR_ASSOCIATION:-NONE}" | tr '[:lower:]' '[:upper:]')"
+          allowed="$(printf '%s' "${ALLOWED_ASSOCIATIONS:-}" | tr '[:lower:]' '[:upper:]' | tr -d ' ')"
+          if [[ -n "$allowed" ]]; then
+            ok=false
+            IFS=',' read -ra parts <<<"$allowed"
+            for a in "${parts[@]}"; do
+              [[ "$a" == "$assoc" ]] && ok=true && break
+            done
+            if [[ "$ok" != "true" ]]; then
+              echo "matched=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::Skipping Luffy: author_association=$assoc not in allowlist ($allowed)"
+              exit 0
+            fi
+          fi
+          echo "matched=true" >> "$GITHUB_OUTPUT"
+          echo "pr_number=${ISSUE_NUMBER}" >> "$GITHUB_OUTPUT"
+          {
+            echo "trigger_comment<<EOF"
+            printf '%s\n' "${COMMENT_BODY:-}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout default branch (Luffy system)
         if: steps.gate.outputs.matched == 'true'

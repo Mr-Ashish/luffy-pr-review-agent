@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse as parseYaml } from "yaml";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const KIT_ROOT = path.resolve(__dirname, "..");
@@ -15,12 +16,20 @@ export function loadConfig(configPath) {
     throw new Error(`Config not found: ${abs}`);
   }
   const raw = fs.readFileSync(abs, "utf8");
+  const lower = abs.toLowerCase();
   let config;
-  if (abs.endsWith(".json")) {
+  if (lower.endsWith(".json")) {
     config = JSON.parse(raw);
+  } else if (lower.endsWith(".yaml") || lower.endsWith(".yml")) {
+    config = parseYaml(raw);
+    if (config == null || typeof config !== "object" || Array.isArray(config)) {
+      throw new Error(`YAML config must be a mapping/object: ${abs}`);
+    }
   } else {
-    // Minimal YAML: allow JSON-in-YAML file or require JSON for MVP
-    throw new Error("MVP supports .json configs only (YAML in next slice). Use readme.config.json");
+    // sniff
+    const t = raw.trimStart();
+    if (t.startsWith("{")) config = JSON.parse(raw);
+    else config = parseYaml(raw);
   }
   config.__path = abs;
   config.__dir = path.dirname(abs);

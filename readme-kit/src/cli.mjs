@@ -7,14 +7,14 @@ function usage() {
   console.log(`readme-kit — compile README branding from intent
 
 Usage:
-  readme-kit build <config.json> [-o out.md] [--force]
-  readme-kit init [--theme flame] [--pack ai-agent] [--dir .]
+  readme-kit build <config.yaml|json> [-o out.md] [--force]
+  readme-kit init [--theme flame] [--pack ai-agent] [--dir .] [--format yaml|json]
   readme-kit brand <pack> [--theme flame] [--dir ./branding]
   readme-kit themes
   readme-kit packs
 
 Examples:
-  readme-kit build examples/luffy/readme.config.json -o README.generated.md
+  readme-kit build examples/luffy/readme.config.yaml -o README.generated.md
   readme-kit init --theme flame --pack ai-agent
 `);
 }
@@ -45,7 +45,7 @@ export async function main(argv = process.argv.slice(2)) {
   if (cmd === "build") {
     const configPath = argv[1];
     if (!configPath) {
-      console.error("build requires <config.json>");
+      console.error("build requires <config.yaml|json>");
       return 1;
     }
     let out;
@@ -64,12 +64,18 @@ export async function main(argv = process.argv.slice(2)) {
     let theme = "flame";
     let pack = "ai-agent";
     let dir = process.cwd();
+    let format = "yaml";
     for (let i = 1; i < argv.length; i++) {
       if (argv[i] === "--theme") theme = argv[++i];
       else if (argv[i] === "--pack") pack = argv[++i];
       else if (argv[i] === "--dir") dir = path.resolve(argv[++i]);
+      else if (argv[i] === "--format") format = String(argv[++i] || "yaml").toLowerCase();
     }
-    const dest = path.join(dir, "readme.config.json");
+    if (format !== "yaml" && format !== "json") {
+      console.error("--format must be yaml or json");
+      return 1;
+    }
+    const dest = path.join(dir, format === "yaml" ? "readme.config.yaml" : "readme.config.json");
     if (fs.existsSync(dest)) {
       console.error(`already exists: ${dest}`);
       return 1;
@@ -127,7 +133,12 @@ export async function main(argv = process.argv.slice(2)) {
         branding_dir: "branding",
       },
     };
-    fs.writeFileSync(dest, JSON.stringify(scaffold, null, 2) + "\n");
+    if (format === "yaml") {
+      const { stringify } = await import("yaml");
+      fs.writeFileSync(dest, stringify(scaffold, { lineWidth: 100 }));
+    } else {
+      fs.writeFileSync(dest, JSON.stringify(scaffold, null, 2) + "\n");
+    }
     console.log(`wrote ${dest}`);
     console.log(`next: edit config, then: readme-kit build ${path.basename(dest)}`);
     return 0;
