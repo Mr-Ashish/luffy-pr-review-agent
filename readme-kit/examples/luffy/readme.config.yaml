@@ -8,13 +8,18 @@ repo:
   owner: Mr-Ashish
   name: luffy-pr-review-agent
   default_branch: main
+  private: true
 badges:
   - type: workflow
     workflow: luffy-pr-review.yml
     label: PR Review
+    message: comment · Actions
+    color: 2ea44f
   - type: workflow
     workflow: ingest-luffy-run.yml
     label: Hub memory
+    message: central ingest
+    color: C41E3A
   - type: static
     label: trigger
     message: "@luffy review this pr"
@@ -24,12 +29,14 @@ badges:
     label: model
     message: openai/gpt-5-mini
     color: 0B0F19
-    logo: openai
   - type: static
     label: provider
     message: OpenRouter
     color: C41E3A
   - type: last-commit
+    label: branch
+    message: main
+    color: 0B0F19
   - type: license
     message: MIT
 hero:

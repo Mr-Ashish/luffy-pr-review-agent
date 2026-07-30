@@ -8,13 +8,13 @@
 
 <p align="center">Hermes Agent + OpenRouter + growing hub memory + redacted run traces.</p>
 
-[![PR Review](https://img.shields.io/github/actions/workflow/status/Mr-Ashish/luffy-pr-review-agent/luffy-pr-review.yml?branch=main&style=for-the-badge&label=PR%20Review&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/luffy-pr-review.yml)
-[![Hub memory](https://img.shields.io/github/actions/workflow/status/Mr-Ashish/luffy-pr-review-agent/ingest-luffy-run.yml?branch=main&style=for-the-badge&label=Hub%20memory&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/ingest-luffy-run.yml)
-![trigger](https://img.shields.io/badge/trigger-%40luffy%20review%20this%20pr-FF6B2C?style=for-the-badge&logo=github&logoColor=white)
-![model](https://img.shields.io/badge/model-openai%2Fgpt-5-mini-0B0F19?style=for-the-badge&logo=openai&logoColor=white)
-![provider](https://img.shields.io/badge/provider-OpenRouter-C41E3A?style=for-the-badge)
-[![Last commit](https://img.shields.io/github/last-commit/Mr-Ashish/luffy-pr-review-agent/main?style=for-the-badge&logo=git&logoColor=white&color=0B0F19)](https://github.com/Mr-Ashish/luffy-pr-review-agent/commits/main)
-![License](https://img.shields.io/badge/license-MIT-FFD166?style=for-the-badge&labelColor=0B0F19&logo=open-source-initiative&logoColor=FFD166)
+[![PR Review](https://img.shields.io/static/v1?label=PR+Review&message=comment+%C2%B7+Actions&color=2ea44f&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/luffy-pr-review.yml)
+[![Hub memory](https://img.shields.io/static/v1?label=Hub+memory&message=central+ingest&color=C41E3A&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/ingest-luffy-run.yml)
+![trigger](https://img.shields.io/static/v1?label=trigger&message=%40luffy+review+this+pr&color=FF6B2C&style=for-the-badge&logo=github&logoColor=white)
+![model](https://img.shields.io/static/v1?label=model&message=openai%2Fgpt-5-mini&color=0B0F19&style=for-the-badge)
+![provider](https://img.shields.io/static/v1?label=provider&message=OpenRouter&color=C41E3A&style=for-the-badge)
+[![Last commit](https://img.shields.io/static/v1?label=branch&message=main&color=0B0F19&style=for-the-badge&logo=git&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/commits/main)
+![License](https://img.shields.io/static/v1?label=license&message=MIT&color=FFD166&style=for-the-badge&logo=open-source-initiative&logoColor=FFD166&labelColor=0B0F19)
 
 ## Why it exists
 
