@@ -135,6 +135,12 @@ export function renderDocument(config, theme, pack) {
         parts.push(`*${f}*\n`);
         break;
       }
+      case "custom_showcase": {
+        const title = content.custom_showcase_title || "Showcase";
+        parts.push(h2(title));
+        parts.push((content.custom_showcase || "_TODO showcase_").trim() + "\n");
+        break;
+      }
       default:
         parts.push(`<!-- unknown section: ${id} -->\n`);
     }

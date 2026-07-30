@@ -100,6 +100,23 @@ flowchart LR
   G --> H[PR comment + artifacts]
 ```
 
+## E2E showcase (live)
+
+Real run on a multi-file Odoo core fix ([odoo/odoo#271153](https://github.com/odoo/odoo/issues/271153) → [Mr-Ashish/odoo#3](https://github.com/Mr-Ashish/odoo/pull/3)).
+
+| | |
+|--|--|
+| **Actions run** | [30572964204](https://github.com/Mr-Ashish/odoo/actions/runs/30572964204) |
+| **Verdict** | REQUEST CHANGES · **Score** 88/100 · effort 3/5 |
+| **Hermes** | ~130s · model `openai/gpt-5-mini` |
+| **Trace** | [`docs/showcase/e2e-odoo-pr3-xml-control-chars/`](docs/showcase/e2e-odoo-pr3-xml-control-chars/) |
+
+Luffy preloaded hub memory, assembled sparse PR context, ran Hermes one-shot, posted a structured review (walkthrough · key findings table · security audit · code suggestion), and uploaded a redacted trace artifact.
+
+```bash
+gh run download 30572964204 -R Mr-Ashish/odoo -n luffy-trace-pr3-run30572964204
+```
+
 ## Setup (target repo)
 
 1. Copy `agent/`, `scripts/`, and `.github/workflows/luffy-pr-review.yml` onto the **default branch**
