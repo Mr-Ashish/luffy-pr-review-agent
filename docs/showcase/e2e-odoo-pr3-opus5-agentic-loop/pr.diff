@@ -14,7 +14,7 @@ index f5912d2d02e9cf..eaa6f7d9a51fc8 100644
      # Add child nodes
      for child_tag, child in node.items():
 diff --git a/odoo/addons/test_testing_utilities/tests/test_xml_tools.py b/odoo/addons/test_testing_utilities/tests/test_xml_tools.py
-index 3cc09bd7f89492..2d21f86386398a 100644
+index 3cc09bd7f89492..921dcd2a0751f9 100644
 --- a/odoo/addons/test_testing_utilities/tests/test_xml_tools.py
 +++ b/odoo/addons/test_testing_utilities/tests/test_xml_tools.py
 @@ -4,7 +4,7 @@
@@ -26,7 +26,7 @@ index 3cc09bd7f89492..2d21f86386398a 100644
  
  
  class TestXMLTools(common.TransactionCase):
-@@ -151,3 +151,39 @@ def check_xml_cleanup_result_is_as_expected(self, original_string, expected_stri
+@@ -151,3 +151,47 @@ def check_xml_cleanup_result_is_as_expected(self, original_string, expected_stri
          result_string = etree.tostring(cleanup_xml_node(original_string, **kwargs)).decode()
          self.assertEqual(expected_string, result_string)
          self.assertNotEqual(expected_string, original_string)
@@ -66,11 +66,19 @@ index 3cc09bd7f89492..2d21f86386398a 100644
 +    def test_type_error_on_bad_input(self):
 +        with self.assertRaises(TypeError):
 +            remove_control_characters(123)
++
++    def test_non_utf8_bytes_do_not_raise(self):
++        # Latin-1 high bytes must not crash the sanitizer (EDI edge case).
++        dirty = "café".encode("latin-1")  # b'caf\xe9'
++        clean = remove_control_characters(dirty)
++        self.assertIsInstance(clean, bytes)
++        # Result is still valid UTF-8 after surrogatepass round-trip.
++        clean.decode("utf-8")
 diff --git a/odoo/tools/xml_utils.py b/odoo/tools/xml_utils.py
-index 09082fb8abbecd..1f1e432f1613f3 100644
+index 09082fb8abbecd..60748f5c37256a 100644
 --- a/odoo/tools/xml_utils.py
 +++ b/odoo/tools/xml_utils.py
-@@ -15,33 +15,54 @@
+@@ -15,33 +15,57 @@
  __all__ = [
      "cleanup_xml_node",
      "load_xsd_files_from_url",
@@ -130,8 +138,11 @@ index 09082fb8abbecd..1f1e432f1613f3 100644
 +        return _XML_ILLEGAL_CHAR_RE.sub('', byte_node)
 +    if isinstance(byte_node, (bytes, bytearray, memoryview)):
 +        raw = bytes(byte_node)
-+        text_ = raw.decode('utf-8')
-+        return _XML_ILLEGAL_CHAR_RE.sub('', text_).encode('utf-8')
++        # UTF-8 with surrogatepass: round-trip any byte sequence while still
++        # filtering illegal XML code points at the Unicode level. Strict
++        # UTF-8 would raise UnicodeDecodeError on legacy Latin-1 EDI bytes.
++        text_ = raw.decode('utf-8', errors='surrogatepass')
++        return _XML_ILLEGAL_CHAR_RE.sub('', text_).encode('utf-8', errors='surrogatepass')
 +    raise TypeError(
 +        f"remove_control_characters() expected str or bytes, got {type(byte_node)!r}"
      )

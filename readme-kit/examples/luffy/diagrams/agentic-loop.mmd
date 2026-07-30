@@ -39,7 +39,7 @@ flowchart TB
     CacheW["Save Hermes cache on miss"]
   end
 
-  OR["OpenRouter · openai/gpt-5-mini"]
+  OR["OpenRouter · anthropic/claude-opus-5"]
 
   Dev --> Comment --> Gate --> Eyes --> Sparse --> CacheR
   CacheR --> Preload --> Assemble --> Hermes

@@ -11,7 +11,7 @@
 [![PR Review](https://img.shields.io/static/v1?label=PR+Review&message=comment+%C2%B7+Actions&color=2ea44f&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/luffy-pr-review.yml)
 [![Hub memory](https://img.shields.io/static/v1?label=Hub+memory&message=central+ingest&color=C41E3A&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/ingest-luffy-run.yml)
 ![trigger](https://img.shields.io/static/v1?label=trigger&message=%40luffy+review+this+pr&color=FF6B2C&style=for-the-badge&logo=github&logoColor=white)
-![model](https://img.shields.io/static/v1?label=model&message=openai%2Fgpt-5-mini&color=0B0F19&style=for-the-badge)
+![model](https://img.shields.io/static/v1?label=model&message=anthropic%2Fclaude-opus-5&color=0B0F19&style=for-the-badge)
 ![provider](https://img.shields.io/static/v1?label=provider&message=OpenRouter&color=C41E3A&style=for-the-badge)
 [![Last commit](https://img.shields.io/static/v1?label=branch&message=main&color=0B0F19&style=for-the-badge&logo=git&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/commits/main)
 ![License](https://img.shields.io/static/v1?label=license&message=MIT&color=FFD166&style=for-the-badge&logo=open-source-initiative&logoColor=FFD166&labelColor=0B0F19)
@@ -102,7 +102,7 @@ flowchart LR
 
 ## Agentic loop (example)
 
-End-to-end control plane for one review: comment trigger → Actions gate → orchestrator stages → Hermes one-shot agentic loop over OpenRouter → normalize → memory + trace → PR comment. Example from the live Odoo e2e path.
+End-to-end control plane for one review: comment trigger → Actions gate → orchestrator stages → Hermes multi-turn agentic loop (tools + OpenRouter · Claude Opus 5) → normalize → memory + full step trace → PR comment. Live package: docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/.
 
 **ASCII (high level)**
 
@@ -189,7 +189,7 @@ flowchart TB
     CacheW["Save Hermes cache on miss"]
   end
 
-  OR["OpenRouter · openai/gpt-5-mini"]
+  OR["OpenRouter · anthropic/claude-opus-5"]
 
   Dev --> Comment --> Gate --> Eyes --> Sparse --> CacheR
   CacheR --> Preload --> Assemble --> Hermes
@@ -202,21 +202,27 @@ flowchart TB
 
 Inner loop: Hermes may call tools (read workspace files) before emitting the final Markdown review. Outer loop is deterministic shell orchestration so every run leaves a redacted trace under `.luffy-out/traces/` and hub memory under `memory/repos/`.
 
-## E2E showcase (live)
+## E2E showcase (live · Opus 5)
 
-Real run on a multi-file Odoo core fix ([odoo/odoo#271153](https://github.com/odoo/odoo/issues/271153) → [Mr-Ashish/odoo#3](https://github.com/Mr-Ashish/odoo/pull/3)).
+Full agentic-loop capture on [odoo/odoo#271153](https://github.com/odoo/odoo/issues/271153) → [Mr-Ashish/odoo#3](https://github.com/Mr-Ashish/odoo/pull/3), model **anthropic/claude-opus-5**.
 
 | | |
 |--|--|
-| **Actions run** | [30572964204](https://github.com/Mr-Ashish/odoo/actions/runs/30572964204) |
-| **Verdict** | REQUEST CHANGES · **Score** 88/100 · effort 3/5 |
-| **Hermes** | ~130s · model `openai/gpt-5-mini` |
-| **Trace** | [`docs/showcase/e2e-odoo-pr3-xml-control-chars/`](docs/showcase/e2e-odoo-pr3-xml-control-chars/) |
+| **Actions** | [30574256524](https://github.com/Mr-Ashish/odoo/actions/runs/30574256524) |
+| **Verdict** | REQUEST CHANGES · **Score** 42/100 · effort 4/5 |
+| **Hermes** | ~251s · **10 API calls** · 9 tool-call turns · 26 messages |
+| **Tokens** | ~195k total (cache-heavy) · est. **$0.59** |
+| **Trace** | [`docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/`](docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/) |
 
-Luffy preloaded hub memory, assembled sparse PR context, ran Hermes one-shot, posted a structured review (walkthrough · key findings table · security audit · code suggestion), and uploaded a redacted trace artifact.
+Package includes **prompts, every tool call, session messages, usage JSON, agent.log**, plus the final review. Start here:
+
+- [`agent-loop/agent-loop.md`](docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/agent-loop/agent-loop.md) — step-by-step loop
+- [`agent-loop/agent-loop.json`](docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/agent-loop/agent-loop.json) — machine-readable messages + tools
+- [`review.md`](docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/review.md) — posted PR comment
+- [`hermes-usage.json`](docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/hermes-usage.json) — tokens / cost / session_id
 
 ```bash
-gh run download 30572964204 -R Mr-Ashish/odoo -n luffy-trace-pr3-run30572964204
+gh run download 30574256524 -R Mr-Ashish/odoo -n luffy-trace-pr3-run30574256524
 ```
 
 ## Setup (target repo)
@@ -283,7 +289,7 @@ assets/         brand mark + favicon
 
 - PR comment reviews only (not inline threads yet)
 - Diffs truncated at MAX_DIFF_BYTES
-- Default OpenRouter model is paid (openai/gpt-5-mini)
+- Default OpenRouter model is paid (anthropic/claude-opus-5; override with LUFFY_MODEL)
 - Install on each target repo — not a global bot for arbitrary public repos
 - Hermes tool-loop traces not fully exported yet (final review + outer pipeline are)
 

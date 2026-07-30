@@ -1,5 +1,0 @@
-Total: +77 / -18 across 3 files
-
-- `addons/account/tools/dict_to_xml.py` (+3/-1)
-- `odoo/addons/test_testing_utilities/tests/test_xml_tools.py` (+37/-1)
-- `odoo/tools/xml_utils.py` (+37/-16)
