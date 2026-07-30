@@ -19,26 +19,32 @@ All target repos publish each run to the hub:
 ```text
 Target Luffy run finishes
   → build-hub-payload.py (redacted, size-capped)
-  → repository_dispatch event_type=luffy-run
-  → Hub workflow "Ingest Luffy Run"
-  → commits memory/repos/.../MEMORY.md + runs/{trace_id}/
+  → publish-run-to-hub.sh
+       default mode=direct:
+         clone hub → hub-ingest-run.py → commit memory/ → push main
+       optional mode=dispatch:
+         repository_dispatch luffy-run → Ingest Luffy Run workflow
 ```
+
+> **Note:** `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403).  
+> Default **direct** push works with `contents: write` on the hub (self-review) or a PAT on target repos.
 
 ### Target repo secrets / vars
 
 | Name | Required | Purpose |
 |------|----------|---------|
-| `LUFFY_HUB_TOKEN` | yes (cross-repo) | PAT with `repo` (or fine-grained: contents write + metadata on hub) |
+| `LUFFY_HUB_TOKEN` | yes (cross-repo) | PAT with contents write on the hub repo |
 | `LUFFY_HUB_REPO` | no | Default `Mr-Ashish/luffy-pr-review-agent` |
+| `LUFFY_HUB_MODE` | no | `direct` (default), `dispatch`, or `both` |
 | `LUFFY_HUB_PUBLISH` | no | Set `0` to disable |
 
-When Luffy runs **on the hub repo itself**, `GITHUB_TOKEN` is used if `LUFFY_HUB_TOKEN` is unset.
+When Luffy runs **on the hub repo itself**, `GITHUB_TOKEN` + `contents: write` is enough for direct ingest.
 
-### Hub workflow
+### Hub workflow (optional dispatch path)
 
 - File: `.github/workflows/ingest-luffy-run.yml`
-- Trigger: `repository_dispatch` type `luffy-run`
-- Permission: `contents: write` (commits to `main`)
+- Trigger: `repository_dispatch` type `luffy-run` (needs classic PAT from target)
+- Permission: `contents: write`
 
 ## Manual dispatch
 

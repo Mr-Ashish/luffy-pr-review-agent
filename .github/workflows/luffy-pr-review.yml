@@ -20,11 +20,11 @@ on:
         type: string
 
 permissions:
-  contents: read
+  # contents:write so self-hosted hub memory can be committed with GITHUB_TOKEN
+  contents: write
   pull-requests: write
   issues: write
-  actions: write  # required for actions/cache save on GITHUB_TOKEN
-  # GITHUB_TOKEN may repository_dispatch this hub repo when reviewing itself
+  actions: write
 
 concurrency:
   group: luffy-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.run_id }}
