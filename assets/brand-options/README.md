@@ -78,3 +78,24 @@ Tell the agent e.g. **“use B”**. We’ll set:
 - `assets/luffy-hero-banner.svg` ← chosen file  
 - readme-kit hero generator default / theme hook  
 - rebuild README
+
+---
+
+## Three.js artifacts (not banners)
+
+Square product marks / seals / devices — open interactively:
+
+**[three-artifacts.html](three-artifacts.html)** (local: `open assets/brand-options/three-artifacts.html`)
+
+| # | Artifact |
+|---|----------|
+| 1 | Monogram L seal |
+| 2 | Orbital core |
+| 3 | Control seal (rec) |
+| 4 | Stacked data planes |
+| 5 | Flame crystal |
+| 6 | Torus knot (loop) |
+| 7 | Review chip / device |
+| 8 | Anchor ring |
+
+Drag to orbit · **Save PNG** downloads a still for README use.
