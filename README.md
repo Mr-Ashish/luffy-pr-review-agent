@@ -20,26 +20,102 @@
 
 Comment **`@luffy review this pr`** on a pull request → GitHub Actions runs Hermes + OpenRouter → Markdown review lands on the PR → **central hub memory** grows under [`memory/repos/`](memory/repos/).
 
-## Flow
+## High-level architecture
 
-```text
-@luffy review this pr
-        │
-        ▼
-GitHub Actions (target repo)
-  · dual workspace: luffy/ + PR head
-  · Hermes one-shot + OpenRouter
-  · normalize Markdown contract
-  · post PR comment
-  · upload run trace artifact
-        │
-        ▼
-Hub publish (direct push / optional dispatch)
-        │
-        ▼
-Mr-Ashish/luffy-pr-review-agent
-  memory/repos/{owner}--{repo}/MEMORY.md
-  memory/repos/{owner}--{repo}/runs/{trace_id}/
+```mermaid
+flowchart TB
+  subgraph Humans
+    Dev["Developer"]
+  end
+
+  subgraph TargetRepo["Target repo (e.g. Mr-Ashish/odoo)"]
+    PR["Pull request"]
+    Comment["@luffy review this pr"]
+    GHA["GitHub Actions\nluffy-pr-review.yml"]
+    Scripts["scripts/\nassemble · hermes · normalize\ndistill · save-trace · hub publish"]
+    AgentCfg["agent/\nSOUL · config · prompts"]
+    Artifacts["Actions artifacts\ntrace 90d · out 14d"]
+  end
+
+  subgraph LLM["Inference"]
+    Hermes["Hermes Agent\n(-z one-shot)"]
+    OR["OpenRouter\nopenai/gpt-5-mini"]
+  end
+
+  subgraph Hub["Hub: Mr-Ashish/luffy-pr-review-agent"]
+    Memory["memory/repos/{owner}--{repo}/\nMEMORY.md · runs/{trace_id}/"]
+  end
+
+  Dev --> Comment
+  Comment --> PR
+  PR --> GHA
+  GHA --> Scripts
+  GHA --> AgentCfg
+  Scripts --> Hermes
+  Hermes --> OR
+  OR --> Hermes
+  Scripts --> Artifacts
+  Scripts --> Memory
+  Scripts --> PR
+```
+
+**Pieces**
+
+| Layer | Responsibility |
+|--------|----------------|
+| **Target repo** | Workflow install, secrets, PR comment trigger, runs the job |
+| **Luffy scripts** | Context assembly, Hermes invoke, normalize, distill, hub publish |
+| **Hermes + OpenRouter** | Model review of the PR |
+| **Hub repo** | Durable per-repo memory + run summaries |
+| **Artifacts** | Redacted per-run traces for audit |
+
+## E2E flow
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Dev as Developer
+  participant PR as Target PR
+  participant GHA as GitHub Actions
+  participant Hub as Luffy hub
+  participant Hermes as Hermes Agent
+  participant OR as OpenRouter
+
+  Dev->>PR: Comment "@luffy review this pr"
+  PR->>GHA: issue_comment event
+
+  Note over GHA: Gate + concurrency + 👀 reaction
+  GHA->>GHA: Checkout luffy/ (agent + scripts)
+  GHA->>GHA: Sparse shallow checkout of PR head
+  GHA->>Hub: Preload MEMORY.md for this repo
+  Hub-->>GHA: Prior review notes (if any)
+
+  GHA->>GHA: assemble-context (pr.json, diff, prompt)
+  GHA->>Hermes: hermes -z + SOUL + memory + prompt
+  Hermes->>OR: chat/completions (gpt-5-mini)
+  OR-->>Hermes: review Markdown
+  Hermes-->>GHA: review.raw.md
+
+  GHA->>GHA: normalize-review.py → review.md
+  GHA->>GHA: distill local MEMORY + save-trace
+  GHA->>Hub: publish-run-to-hub (direct push)
+  Note over Hub: memory/repos/.../MEMORY.md<br/>runs/{trace_id}/meta+review+summary
+  GHA->>PR: gh pr comment (review.md)
+  GHA->>GHA: Upload luffy-trace + luffy-out artifacts
+  GHA->>PR: React +1 / -1 on trigger
+```
+
+**Pipeline stages** (orchestrator)
+
+```mermaid
+flowchart LR
+  A[preload_hub_memory] --> B[assemble]
+  B --> C[hermes -z]
+  C --> D[normalize]
+  D --> E[distill]
+  E --> F[save_trace]
+  F --> G[publish_hub]
+  G --> H[PR comment + artifacts]
 ```
 
 ## Trigger
