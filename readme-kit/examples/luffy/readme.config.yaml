@@ -114,6 +114,8 @@ content:
       path: docs/README-BRANDING-ECOSYSTEM.md
     - title: readme-kit MVP
       path: docs/README-KIT-MVP.md
+    - title: Brand banner options (pick one)
+      path: assets/brand-options/README.md
   limits:
     - PR comment reviews only (not inline threads yet)
     - Diffs truncated at MAX_DIFF_BYTES

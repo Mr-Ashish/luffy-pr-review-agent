@@ -338,6 +338,7 @@ assets/         brand mark + favicon
 - [ROI fixes](docs/ROI-FIXES.md)
 - [README branding ecosystem](docs/README-BRANDING-ECOSYSTEM.md)
 - [readme-kit MVP](docs/README-KIT-MVP.md)
+- [Brand banner options (pick one)](assets/brand-options/README.md)
 
 ## Limits (v1)
 
