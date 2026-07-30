@@ -1,8 +1,8 @@
 # README Branding as an Ecosystem
 
-**Status:** design exploration (variants for ranking — not the final product)  
+**Status:** ranked + spine locked — see [README-KIT-MVP.md](./README-KIT-MVP.md)  
 **Date:** 2026-07-31  
-**Lens:** first principles → primitives → axes → permutations → concrete variants
+**Lens:** first principles → primitives → axes → permutations → concrete variants → **MVP**
 
 ---
 
@@ -456,16 +456,16 @@ pnpm readme preview    # local HTML approx of GitHub
 
 ---
 
-## 11. Decision log (fill when ranking)
+## 11. Decision log
 
 | Decision | Options | Choice | Date |
 |----------|---------|--------|------|
-| MVP recipe | α / β / γ / δ | _TBD_ | |
-| Authoring format | YAML / MDX / TSX | _TBD_ | |
-| Asset strategy | hand SVG / generated / hybrid | _TBD_ | |
-| First vertical | generic / AI agents / profiles | _TBD_ | |
-| Relation to Luffy | separate OSS / monorepo / ignore | _TBD_ | |
-
+| MVP recipe | α / β / γ / δ | **δ** (β + Luffy vertical) | 2026-07-31 |
+| Authoring format | YAML / MDX / TSX | **YAML** | 2026-07-31 |
+| Asset strategy | hand SVG / generated / hybrid | **hybrid** (keep mark; generate hero/badge chrome) | 2026-07-31 |
+| First vertical | generic / AI agents / profiles | **AI agents (`ai-agent` pack)** | 2026-07-31 |
+| Relation to Luffy | separate OSS / monorepo / ignore | **monorepo path `readme-kit/`** | 2026-07-31 |
+| Ship order | — | α mechanics → β compiler → γ components later | 2026-07-31 |
 ---
 
 ## 12. One-sentence thesis

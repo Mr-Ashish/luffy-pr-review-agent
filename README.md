@@ -192,6 +192,9 @@ See [memory/README.md](memory/README.md) and [docs/OPERATIONS.md](docs/OPERATION
 - [Architecture](docs/ARCHITECTURE.md)
 - [Operations](docs/OPERATIONS.md)
 - [README branding ecosystem (variants)](docs/README-BRANDING-ECOSYSTEM.md)
+- [readme-kit MVP](docs/README-KIT-MVP.md)
+- [readme-kit package](readme-kit/README.md)
+- Generated preview: [`README.generated.md`](README.generated.md) (`node readme-kit/bin/readme-kit.mjs build …`)
 
 ## Layout
 
