@@ -141,6 +141,7 @@ def collect_signals(
       tool-turns-gate.env (F45)                         → tool_turns_gate (H12)
       tool-turns-reprompt.env (F49)                     → tool_turns_reprompt (H15)
       soul-context.env (F46)                            → soul_blocked (H13)
+      severity-calibration.env (F50)                    → severity_calibration (H20)
     """
     signals: dict = {
         "timeout": False,
@@ -164,6 +165,8 @@ def collect_signals(
         "tool_turns_reprompt_recovered": False,
         "soul_blocked": False,
         "soul_blocked_reason": None,
+        "severity_calibration": False,
+        "severity_calibration_reason": None,
         "flags": [],  # short chip labels for UI
     }
     te = _parse_env_file(dir_path / "hermes-timeout.env")
@@ -387,6 +390,27 @@ def collect_signals(
         signals["soul_blocked"] = True
         signals["soul_blocked_reason"] = signals.get("soul_blocked_reason") or "prompt_injection"
 
+    # F50 severity calibration (H20 missing-test → REQUEST CHANGES)
+    sc = _parse_env_file(dir_path / "severity-calibration.env")
+    if sc.get("gate") in ("1", "true", "yes") or sc.get("mutated") in (
+        "1",
+        "true",
+        "yes",
+    ):
+        signals["severity_calibration"] = True
+        if sc.get("reason"):
+            signals["severity_calibration_reason"] = sc["reason"]
+        if sc.get("match"):
+            signals["severity_calibration_match"] = sc["match"]
+    if not signals["severity_calibration"] and (
+        "severity calibration (f50" in low
+        or "severity calibration (f50 / h20)" in low
+    ):
+        signals["severity_calibration"] = True
+        signals["severity_calibration_reason"] = (
+            signals.get("severity_calibration_reason") or "review_banner"
+        )
+
     flags: list[str] = []
     if signals["path_skip"]:
         flags.append("path-skip")
@@ -411,6 +435,8 @@ def collect_signals(
             flags.append("tool-reprompt")
     if signals.get("soul_blocked"):
         flags.append("soul-blocked")
+    if signals.get("severity_calibration"):
+        flags.append("sev-cal")
     # Surface auto/cheap/full when tier mode is active (not plain off/default)
     mode = (signals.get("model_tier_mode") or "").lower()
     tier = (signals.get("model_tier") or "").lower()

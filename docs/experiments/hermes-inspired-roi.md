@@ -27,7 +27,7 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | **H17** | **Scope SOUL/max-turns detect + agent.log capture to this-invocation log offset** | **S** | **H16: stale agent.log → false soul_blocked=1** | **Shipped F48** |
 | H18 | Hard tool nudge / require ≥1 workspace read on multi-file code PRs | S–M | First-pass still 0 tools on mini; F49 recovers — optional cost win | **P2 optional** (F49 live ok) |
 | H19 | Live F49 re-score #4 multi-module PERF | S | Confirm recovery + lift 31→38 on 7-file stock/mrp | **Done H19** (38/50; 0→9 tools) |
-| H20 | Severity calibration: missing tests → blocking when issue claims fix | S | F49 #2 APPROVE 95 vs GHA REQUEST CHANGES on alias tests | **P0 next** |
+| **H20** | **Severity calibration: missing tests → blocking when issue claims fix** | **S** | **F49 #2 APPROVE 95 vs GHA REQUEST CHANGES on alias tests** | **Shipped F50** + offline #2/#5 |
 | H22 | Live F49 mini e2e + score odoo#5 (POS ticket screen) | S | Fresh corpus member needs baseline dims | **Done H22** (37/50; 0→8 tools) |
 | H21 | Source 5th complex odoo/odoo PR → luffy-eval corpus | S | Keep multi-PR evidence growing; prefer multi-module | **Done H21** (#5 odoo#279360) |
 | H23 | Source 6th+ complex odoo/odoo PR → luffy-eval corpus | S | Keep multi-PR evidence growing beyond 5 | backlog |
@@ -64,4 +64,6 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 
 **H21 corpus #5** (2026-07-31): ported odoo#279360 → [Mr-Ashish/odoo#5](https://github.com/Mr-Ashish/odoo/pull/5) (6 files POS+restaurant).
 
-**H22 F49 #5** (2026-07-31): `.luffy-out-e2e-pr5-f49` — recovered tool_turns **0→8**; score **37/50**; F45 skipped; ~$0.028 · 56s; soul_blocked=0. All 5 corpus PRs scored. **Next: H20** severity calibration (or H23 6th upstream).
+**H22 F49 #5** (2026-07-31): `.luffy-out-e2e-pr5-f49` — recovered tool_turns **0→8**; score **37/50**; F45 skipped; ~$0.028 · 56s; soul_blocked=0. All 5 corpus PRs scored.
+
+**H20 → F50** (2026-07-31): `severity_calibration.py` — APPROVE + self-reported test gap → REQUEST CHANGES (score cap 69) + SOUL/prompt rules. Offline: #2 F49 36→**42**/50; #5 F49 37→**40**/50; #4 no-op. Chip `sev-cal`. **Next: H23** 6th upstream complex PR (or live F50 mini re-run).

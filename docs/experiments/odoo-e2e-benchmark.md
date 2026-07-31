@@ -25,10 +25,12 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 | #2 web fields (F45 gate on F44) | 3 | 3 | 2 | 4 | 2 | 5 | 4 | 1 | 3 | 3 | **30** | Still no tools; no longer false APPROVE |
 | #2 web fields (H16 mini post-F47) | 2 | 3 | 2 | 4 | 2 | 5 | 4 | 2 | 3 | 3 | **30** | -z ok; tool_turns=0 model choice; F45 gate |
 | #2 web fields (F49 mini re-prompt) | 3 | 4 | 4 | 4 | 3 | 3 | 5 | 3 | 3 | 4 | **36** | tools 0→23 recovered; still soft vs GHA gap |
+| #2 web fields (F50 offline on F49) | 4 | 4 | 4 | 5 | 3 | 4 | 5 | 3 | 5 | 5 | **42** | F50 APPROVE→REQUEST CHANGES; score 95→69; match GHA test-gap severity |
 | #3 xml scrub (local mini+showcase) | 4 | 4 | 4 | 4 | 3 | 4 | 5 | 3 | 4 | 4 | **39** | D5 inline |
 | #4 stock/mrp PERF (mini post-F48) | 2 | 3 | 2 | 4 | 2 | 5 | 5 | 2 | 3 | 3 | **31** | tool_turns=0; multi-module needs tools; F49 not re-run |
 | #4 stock/mrp PERF (F49 mini re-prompt) | 3 | 4 | 4 | 4 | 3 | 4 | 5 | 3 | 4 | 4 | **38** | tools 0→9; soft comment nits only; no deep PERF hazards |
 | #5 POS ticket (F49 mini re-prompt) | 3 | 4 | 3 | 4 | 3 | 4 | 5 | 3 | 4 | 4 | **37** | tools 0→8; soft i18n/import nits; no deep layout/responsive hazards |
+| #5 POS ticket (F50 offline on F49) | 3 | 4 | 4 | 5 | 3 | 4 | 5 | 3 | 5 | 4 | **40** | F50 tests:no under APPROVE → REQUEST CHANGES; score 92→69 |
 
 ### Evidence (one line)
 
@@ -38,10 +40,12 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 - **#2 F45 gate:** Same body post-processed — APPROVE→COMMENT + F45 banner + score 55; honesty/trust up, findings unchanged.
 - **#2 H16 mini:** F47 confirmed — `hermes -z` (no argv reject, no chat fallback); 1 API call · ~$0.003 · 12s; still `tool_turns=0` (model single-shot); F45→COMMENT/55; F46 preflight clean; **false** runtime `soul_blocked` from stale agent.log → **F48**.
 - **#2 F49 mini:** Soft re-prompt recovered `tool_turns` **0→23** (session `20260731_221752_851ba1`); F45 gate skipped (`tools_used`); APPROVE 95 · ~$0.063 · 24 API · 95s; soft float `format:false` test ask (not GHA-level REQUEST CHANGES on missing alias tests); chip `tool-reprompt-ok`; soul_blocked=0.
+- **#2 F50 offline:** `severity_calibration.py apply` on F49 body — match=`missing_tests:suggestions` (“enhance test coverage”); APPROVE→**REQUEST CHANGES**, score **95→69**, F50 banner; D9 3→5; total **42/50** (was 36). Aligns with GHA blocking missing alias tests.
 - **#3:** Approve justified; tests cover str/bytes/lxml; showcase loop usable.
 - **#4 mini:** Port of odoo#279776 (7 files stock/mrp/purchase_mrp); `-z` ok; F48 `soul_blocked=0`; tool_turns=0 → F45 COMMENT/55; soft rename nit only; ~$0.002 · 16s.
 - **#4 F49 mini:** Soft re-prompt recovered `tool_turns` **0→9** (sessions `20260731_222340_fb13a3` → `20260731_222355_b47e5a`); F45 skipped; APPROVE 95 · attempt-2 ~$0.014 · 10 API · total ~58s (attempt-1 ~$0.003); read mrp orderpoint/rule + tests; cache-comment suggestion only; chip `tool-reprompt-ok`; soul_blocked=0; score **38/50** (was 31).
 - **#5 F49 mini:** Soft re-prompt recovered `tool_turns` **0→8** (sessions `20260731_223146_62f430` → `20260731_223158_96a569`); F45 skipped (`tools_used`); APPROVE 92 · attempt-2 ~$0.026 · 9 API · total ~56s (attempt-1 ~$0.002); read ticket_screen js/xml/scss + pos_restaurant; noted no UI tests; soft i18n/`_t` + unused-import nits (partial-read risk); chip `tool-reprompt-ok`; soul_blocked=0; score **37/50**.
+- **#5 F50 offline:** match=`tests_no_line` (Relevant tests: no) under APPROVE 92 → **REQUEST CHANGES** + score 69; #4 F49 clean (no gap signal, stays APPROVE).
 
 ### #2 F44 sub-dims (D1=2, D3=2, D8=1)
 

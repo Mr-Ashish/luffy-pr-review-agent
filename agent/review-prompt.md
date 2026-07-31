@@ -115,6 +115,13 @@ If none: `None`
 - **40–69:** meaningful issues or missing tests on risky paths
 - **0–39:** blocking correctness/security problems
 
+## Severity calibration (H20 / tests)
+- **Missing tests for new production behavior the PR claims to fix → REQUEST CHANGES.**
+  Put the gap under **Blocking**, not only Suggestions. Score ≤69.
+- Multi-behavior PRs: tests must cover **each** production path changed (not just one of them).
+- Never **APPROVE** while also asking the author to add tests for code this PR introduced.
+- Docstring/style-only gaps stay Suggestions/Nits.
+
 ## Rules
 1. Cite paths and symbols with backticks.
 2. Do not invent line numbers you did not see. When you *did* see a `+` line, prefer `` `path:LINE` `` in Key findings / Blocking so inline comments land accurately (F9b).

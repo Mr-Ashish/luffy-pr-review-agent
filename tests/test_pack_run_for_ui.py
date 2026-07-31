@@ -328,6 +328,29 @@ class PackRunForUiTests(unittest.TestCase):
             self.assertTrue(sig.get("tool_turns_reprompt_recovered"))
             self.assertIn("tool-reprompt-ok", sig.get("flags") or [])
 
+    def test_f50_severity_calibration_signal(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "run"
+            src.mkdir()
+            (src / "review-2.md").write_text(
+                "**Verdict:** REQUEST CHANGES\n\n"
+                "> ⚠️ **Severity calibration (F50 / H20):** test gap under APPROVE.\n",
+                encoding="utf-8",
+            )
+            (src / "severity-calibration.env").write_text(
+                "gate=1\nreason=approve_with_test_gap\nmatch=missing_tests:suggestions\n"
+                "action=upgrade_request_changes\nmutated=1\n",
+                encoding="utf-8",
+            )
+            out = Path(td) / "bundle.json"
+            r = _run(["--dir", str(src), "-o", str(out), "--host", "local"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            sig = json.loads(out.read_text())["signals"]
+            self.assertTrue(sig.get("severity_calibration"))
+            self.assertEqual(sig.get("severity_calibration_reason"), "approve_with_test_gap")
+            self.assertIn("sev-cal", sig.get("flags") or [])
+            self.assertTrue(sig.get("any"))
+
 
 if __name__ == "__main__":
     unittest.main()

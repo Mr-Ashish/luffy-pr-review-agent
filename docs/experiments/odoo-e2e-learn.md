@@ -30,6 +30,7 @@ Corpus size: **5** open eval PRs (grew fire: ported odoo#279360).
 | **2026-07-31 F49 live** | **#2** | **local / pr2-runlocal-a1** (`.luffy-out-e2e-pr2-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→23**; F45 skipped; APPROVE 95; ~$0.063 · 24 API · 95s; soul_blocked=0; chip `tool-reprompt-ok`; score **36/50** (was 30 H16) |
 | **2026-07-31 H19 F49 #4** | **#4** | **local / pr4-runlocal-a1** (`.luffy-out-e2e-pr4-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→9**; F45 skipped; APPROVE 95; ~$0.014 · 10 API · 58s; soul_blocked=0; chip `tool-reprompt-ok`; score **38/50** (was 31 post-F48) |
 | **2026-07-31 H22 F49 #5** | **#5** | **local / pr5-runlocal-a1** (`.luffy-out-e2e-pr5-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→8**; F45 skipped; APPROVE 92; ~$0.026 · 9 API · 56s; soul_blocked=0; chip `tool-reprompt-ok`; score **37/50** |
+| **2026-07-31 F50 offline** | **#2/#5** | **post-process F49 bodies** | n/a | local | **H20/F50:** #2 APPROVE→REQUEST CHANGES (test gap in Suggestions); #5 tests:no → RC; #4 clean; scores **42** / **40** |
 
 Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`; F49 #2: `.luffy-out-e2e-pr2-f49/`; F49 #4: `.luffy-out-e2e-pr4-f49/`; F49 #5: `.luffy-out-e2e-pr5-f49/`.
 

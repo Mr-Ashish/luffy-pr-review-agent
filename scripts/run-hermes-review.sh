@@ -17,6 +17,7 @@
 #   LUFFY_PREFLIGHT_ACTION  F43 force_cheap|refuse|warn (default force_cheap)
 #   LUFFY_TOOL_TURNS_GATE  F45 fail-closed on zero tools multi-file (default 1)
 #   LUFFY_TOOL_TURNS_REPROMPT  F49/H15 soft re-prompt once when zero tools (default 1)
+#   LUFFY_SEVERITY_CALIBRATION  F50/H20 APPROVE+test-gap → REQUEST CHANGES (default 1)
 #   PR_NUMBER
 set -euo pipefail
 
@@ -932,6 +933,39 @@ if [[ -f "$TOOL_TURNS_GATE_HELPER" && -s "$FINAL_OUT" ]]; then
     fi
   else
     notice "F45 tool-turns gate soft-failed"
+  fi
+fi
+
+# F50 / H20: severity calibration — APPROVE + self-reported test gap → REQUEST CHANGES
+# (odoo e2e #2 F49 APPROVE 95 while Suggestions asked for missing format:false tests).
+SEVERITY_CAL_HELPER="${SEVERITY_CAL_HELPER:-$LUFFY_ROOT/scripts/severity_calibration.py}"
+if [[ -f "$SEVERITY_CAL_HELPER" && -s "$FINAL_OUT" ]]; then
+  _sc_args=(
+    apply
+    --review "$FINAL_OUT"
+    --out "$FINAL_OUT"
+    --env-out "$OUT_DIR/severity-calibration.env"
+  )
+  if _sc_kv="$(python3 "$SEVERITY_CAL_HELPER" "${_sc_args[@]}" 2>/dev/null)"; then
+    _sc_gate="$(printf '%s\n' "$_sc_kv" | sed -n 's/^gate=//p' | head -1)"
+    _sc_mut="$(printf '%s\n' "$_sc_kv" | sed -n 's/^mutated=//p' | head -1)"
+    _sc_reason="$(printf '%s\n' "$_sc_kv" | sed -n 's/^reason=//p' | head -1)"
+    _sc_match="$(printf '%s\n' "$_sc_kv" | sed -n 's/^match=//p' | head -1)"
+    if [[ "$_sc_gate" == "1" || "$_sc_gate" == "true" ]]; then
+      notice "F50 severity calibration · reason=${_sc_reason:-?} match=${_sc_match:-?} mutated=${_sc_mut:-0}"
+      if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        {
+          echo "### Luffy severity calibration (F50 / H20)"
+          echo "- **Gate fired:** self-reported test gap under merge-green verdict"
+          echo "- **Reason:** \`${_sc_reason:-approve_with_test_gap}\`"
+          echo "- **Match:** \`${_sc_match:-}\`"
+          echo "- **Action:** APPROVE → REQUEST CHANGES when applicable; score capped; banner injected"
+          echo
+        } >>"$GITHUB_STEP_SUMMARY" || true
+      fi
+    fi
+  else
+    notice "F50 severity calibration soft-failed"
   fi
 fi
 

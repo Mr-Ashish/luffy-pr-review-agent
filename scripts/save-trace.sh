@@ -72,6 +72,7 @@ copy_if "$OUT_DIR/hermes-run.log" "$TRACE_DIR/hermes-run.log"
 copy_if "$OUT_DIR/hermes-pin.txt" "$TRACE_DIR/hermes-pin.txt"
 copy_if "$OUT_DIR/tool-turns-gate.env" "$TRACE_DIR/tool-turns-gate.env"
 copy_if "$OUT_DIR/tool-turns-reprompt.env" "$TRACE_DIR/tool-turns-reprompt.env"
+copy_if "$OUT_DIR/severity-calibration.env" "$TRACE_DIR/severity-calibration.env"
 copy_if "$OUT_DIR/prompt-reprompt.md" "$TRACE_DIR/prompt-reprompt.md"
 copy_if "$OUT_DIR/hermes-max-turns.env" "$TRACE_DIR/hermes-max-turns.env"
 if [[ -d "$OUT_DIR/agent-loop-attempt1" ]]; then
