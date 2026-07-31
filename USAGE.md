@@ -187,6 +187,9 @@ REPO=owner/name HERMES_HOME=/tmp/hh LUFFY_MEMORY_MODE=local bash scripts/preload
 - `LUFFY_INLINE_DIFF` overrides which diff file the anchor resolution reads, so you can replay anchoring against a saved `pr.diff` (e.g. from a showcase trace) without re-assembling context.
 - Identify Luffy's inline output by its markers when auditing a PR: each comment body carries `<!-- luffy-inline -->` and the enclosing review body carries `<!-- luffy-inline-review pr=N -->`.
 
+- Disable just apply blocks while keeping inline findings: set repo variable `LUFFY_INLINE_SUGGESTIONS=0`. Tune volume with `LUFFY_SUGGESTION_MAX` (default 3).
+- Posted suggestion comments carry the `<!-- luffy-suggestion -->` marker — grep for it to tell F9c output apart from F9/F9b finding notes when auditing a PR.
+
 ## Troubleshooting
 
 - Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` (`mode=pack|caller`, `source_sha`) and compare with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`. For `mode=caller`, runtime tracks hub `main`, not the stamp alone.

@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T15:14:38Z
+- **assembled_at:** 2026-07-31T15:20:53Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+b2d2f91 feat(product): F9c GitHub apply-suggestion blocks
+13ddcd0 docs(knowledge): dogfood F38 path-skip + showcase
 974ba39 feat(cost): F38 path-glob free skip for docs-only PRs
 9633311 docs(knowledge): dogfood F37 verdict labels + showcase
 bbe2cfa feat(ops): F37 verdict-aware PR labels
-293d95a docs(experiments): streak 0 after F36 ship
-22c068b docs(knowledge): dogfood F36 review timeout + showcase
 ```
 
 ## tree (sample)
@@ -123,6 +123,7 @@ docs/experiments/2026-07-31-f37-verdict-labels.md
 docs/experiments/2026-07-31-f38-path-skip.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
+docs/experiments/2026-07-31-f9c-suggestions.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/experiments/f28-repo-local-memory.md
 docs/experiments/loop-no-work-streak.md
@@ -221,7 +222,6 @@ assets/brand-options/hero-E-volumetric.svg
 assets/brand-options/hero-F-cyber.svg
 assets/brand-options/hero-G-mark.svg
 assets/brand-options/hero-H-cinematic.svg
-assets/brand-options/index.json
 ```
 
 ## git diff

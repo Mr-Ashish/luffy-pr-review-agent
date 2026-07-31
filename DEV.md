@@ -58,6 +58,9 @@
 - Two escape hatches keep the gate overridable per run: comment `@luffy review force` and `workflow_dispatch` (env form `LUFFY_SKIP_PATHS_FORCE=1`).
 - The helper emits `key=value` stdout (`allowed`, `reason`, `matched_n`, `total_n`, `globs`, `sample`) rather than JSON, matching the other shell-composed stages.
 
+- Anchoring is derived, not trusted: the suggestion's `-` lines must match a **contiguous run of `+` lines in the PR diff for the same file**; a match yields `start_line`/`line` on side RIGHT (multi-line comment), and no match means the suggestion is dropped rather than anchored to a guessed line.
+- Two independent kill switches by design: `LUFFY_INLINE_COMMENTS=0` disables *all* inline output (findings + suggestions), while `LUFFY_INLINE_SUGGESTIONS=0` disables only F9c and leaves F9/F9b finding notes running.
+
 ## Pitfalls
 
 - `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403), so the hub publish default is `mode=direct` (clone hub → ingest → push `main`); the dispatch path needs a classic PAT on the target repo.
@@ -94,6 +97,10 @@
 - Config errors must exit non-zero (F15): a missing-secret path returned `pipeline_rc=0`, so the trigger comment got a false ✅ reaction while no review happened. Reaction/status honesty depends on the pipeline exit code, not on whether a comment was posted.
 
 - The dismiss step is deliberately soft-fail and keyed off the `<!-- luffy-pr-review pr=N` marker: a review body whose marker was stripped or reformatted is invisible to F24 and survives re-runs untouched.
+
+- Suggestion volume is capped separately from findings: `LUFFY_SUGGESTION_MAX` (default 3) bounds apply blocks, `LUFFY_INLINE_MAX` (default 6) bounds finding notes — raising one does not raise the other, and a review with many `### Code suggestions` will silently post only the first N.
+- A well-formed suggestion can still vanish: because mapping requires the `-` lines to line up with contiguous PR `+` lines, a suggestion that rewrites *unchanged* context (or reflows lines) has no valid anchor and is skipped. Confirm with plan mode before assuming the poster failed.
+- `LUFFY_INLINE_SEVERITY` filtering applies to findings only — it is not a lever on F9c, so severity tuning will not suppress apply blocks.
 
 ## Patterns
 

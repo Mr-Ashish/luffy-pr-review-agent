@@ -1,6 +1,6 @@
 ```json
 {
-  "summary": "Session documents F38 (path-glob free skip): a pre-checkout cost gate that skips paid Hermes/OpenRouter review when every changed path matches skip globs, plus its opt-in var, force escape hatches, fail-open exit-code contract, and CLI self-check commands. None of this appears in the existing DEV/USAGE claim index.",
+  "summary": "Session documents F9c (GitHub apply-suggestion inline blocks) — a new capability layered on the existing F9/F9b inline-comment path: parsing the review's `### Code suggestions` section into ```suggestion``` fences, the diff-mapping constraint that gates them, the two new caps/opt-out vars, and how the optional SOUL 'Code suggestions' field became load-bearing. None of this appears in the existing claim index (which covers F9/F9b anchoring only).",
   "session_ids": ["dogfood-luffy-session"],
   "units": [
     {
@@ -8,12 +8,36 @@
       "path": ".",
       "action": "merge",
       "section": "Design decisions",
-      "content": "- **F38 path-glob free skip** sits early in the pipeline — after the sparse path list, *before* dual checkout — so a docs-only PR never pays for the monorepo checkout or the Hermes/OpenRouter call.\n- It is a whole-PR gate, not a filter: the skip fires only when **every** changed path matches the skip globs; one code file re-enables the paid run.\n- Default is **off** (`vars.LUFFY_SKIP_PATH_GLOBS` empty). Operators opt in with the built-in `docs` preset or a comma glob list (e.g. `*.md,docs/**`); `off` is also accepted as a preset name.\n- Two escape hatches keep the gate overridable per run: comment `@luffy review force` and `workflow_dispatch` (env form `LUFFY_SKIP_PATHS_FORCE=1`).\n- `scripts/path-skip-check.py` is **fail-open by contract**: exit 0 allow, exit 2 skip, exit 1 hard error which the caller treats as allow. A broken helper must never silently suppress reviews.\n- A skipped run is still a visible run: stub COMMENT body, rocket reaction, F37 verdict labels, and a **Luffy path skip (F38)** job summary — so skip is distinguishable from a crash, not from silence.\n- The helper emits `key=value` stdout (`allowed`, `reason`, `matched_n`, `total_n`, `globs`, `sample`) rather than JSON, matching the other shell-composed stages.",
+      "content": "- **F9c apply-suggestion blocks:** `scripts/post-inline-comments.py` parses the review's `### Code suggestions` section (`#### title (`path`)` heading + ```diff``` fence) and re-emits each one as an inline comment whose body wraps the suggested code in a GitHub ```suggestion``` fence, so the author gets a one-click **Apply** button in Files changed instead of prose to retype.\n- Anchoring is derived, not trusted: the suggestion's `-` lines must match a **contiguous run of `+` lines in the PR diff for the same file**; a match yields `start_line`/`line` on side RIGHT (multi-line comment), and no match means the suggestion is dropped rather than anchored to a guessed line.\n- F9c rides the existing F9 rails deliberately — same soft-fail policy (never raises on network), same `LUFFY_INLINE_FIXTURE` offline path, same posted review, and comment bodies are tagged `<!-- luffy-suggestion -->` so they are distinguishable from F9/F9b finding notes.\n- Two independent kill switches by design: `LUFFY_INLINE_COMMENTS=0` disables *all* inline output (findings + suggestions), while `LUFFY_INLINE_SUGGESTIONS=0` disables only F9c and leaves F9/F9b finding notes running.",
       "evidence": [
-        "Skip paid review when **every** changed file matches skip globs (docs/changelog PRs).",
-        "Force paid run: `@luffy review force` or `workflow_dispatch`. Fail-open on script errors.",
-        "Stub COMMENT + rocket + F37 labels; job summary **Luffy path skip (F38)**",
-        "1  hard error (caller should fail-open → allow)"
+        "F9c — ### Code suggestions → GitHub ```suggestion``` apply blocks (multi-line when the suggestion's `-` lines match PR `+` lines)",
+        "Mapping: suggestion `-` lines must match a contiguous run of PR `+` lines (same file). Multi-line → `start_line`/`line` on RIGHT. Soft-fail with F9.",
+        "body = f\"**Suggestion (F9c):** {title}\\n\\n```suggestion\\n{inner}\\n```\\n\\n<!-- luffy-suggestion -->\""
+      ],
+      "confidence": "high"
+    },
+    {
+      "kind": "dev",
+      "path": ".",
+      "action": "merge",
+      "section": "Pitfalls",
+      "content": "- Suggestion volume is capped separately from findings: `LUFFY_SUGGESTION_MAX` (default 3) bounds apply blocks, `LUFFY_INLINE_MAX` (default 6) bounds finding notes — raising one does not raise the other, and a review with many `### Code suggestions` will silently post only the first N.\n- A well-formed suggestion can still vanish: because mapping requires the `-` lines to line up with contiguous PR `+` lines, a suggestion that rewrites *unchanged* context (or reflows lines) has no valid anchor and is skipped. Confirm with plan mode before assuming the poster failed.\n- `LUFFY_INLINE_SEVERITY` filtering applies to findings only — it is not a lever on F9c, so severity tuning will not suppress apply blocks.",
+      "evidence": [
+        "`LUFFY_SUGGESTION_MAX` | `3` | Max suggestion comments per run",
+        "`LUFFY_INLINE_MAX` | `6` | Cap finding notes per run",
+        "LUFFY_INLINE_SEVERITY=critical,high   (comma list; empty = all)"
+      ],
+      "confidence": "high"
+    },
+    {
+      "kind": "dev",
+      "path": "agent",
+      "action": "merge",
+      "section": "Design decisions",
+      "content": "- The SOUL's *optional* **Code suggestions** field is now load-bearing downstream: F9c turns each `#### title (`path`)` + ```diff``` block into a GitHub apply-suggestion comment, so the section's shape (heading with backticked path, diff fence with `-`/`+` lines that mirror real PR lines) is a machine contract, not free-form prose.\n- Consequence for prompt/SOUL edits: changing how suggestions are formatted, or encouraging suggestions against unchanged context, degrades F9c to zero posted apply blocks without any error — the reviewer instruction \"only when you can show a concrete better snippet for **new** code\" is what keeps suggestions anchorable.",
+      "evidence": [
+        "**F9c** GitHub apply-suggestion blocks: parse `### Code suggestions` (`#### title (`path`)` + ```diff```), map the suggestion’s `-` lines onto contiguous PR `+` lines",
+        "**Code suggestions (optional):** only when you can show a concrete better snippet for new code."
       ],
       "confidence": "high"
     },
@@ -21,26 +45,13 @@
       "kind": "usage",
       "path": ".",
       "action": "merge",
-      "section": "Common commands",
-      "content": "- Enable free skip on a target repo: set repo variable `LUFFY_SKIP_PATH_GLOBS` to `docs` (preset) or a comma list such as `*.md,docs/**`. Unset/empty = feature off.\n- Self-check the gate before wiring it up (exit code is the answer): `python3 scripts/path-skip-check.py --path README.md --path docs/a.md --globs docs` → exit 2 (skip); `python3 scripts/path-skip-check.py --path src/x.py --path README.md --globs docs` → exit 0 (allow).\n- Batch form for a real PR path list: `python3 scripts/path-skip-check.py --paths-file pr-paths.txt` (paths come from `scripts/sparse-pr-paths.sh`).\n- Regression coverage: `tests/test_path_skip_check.py`.",
+      "section": "Debugging",
+      "content": "- Verify F9c offline before blaming the GitHub API: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff` prints JSON with a suggestions count and `kind=suggestion` entries alongside the finding entries (`anchor`, `line_hint`). Zero suggestions with a non-empty `### Code suggestions` section means the `-` lines did not map onto contiguous PR `+` lines.\n- Disable just apply blocks while keeping inline findings: set repo variable `LUFFY_INLINE_SUGGESTIONS=0`. Tune volume with `LUFFY_SUGGESTION_MAX` (default 3).\n- Posted suggestion comments carry the `<!-- luffy-suggestion -->` marker — grep for it to tell F9c output apart from F9/F9b finding notes when auditing a PR.",
       "evidence": [
-        "python3 scripts/path-skip-check.py --path README.md --path docs/a.md --globs docs  # exit 2 skip",
-        "python3 scripts/path-skip-check.py --paths-file pr-paths.txt"
+        "python3 scripts/post-inline-comments.py plan \\\n  --review review.md --diff pr.diff   # JSON: suggestions count + kind=suggestion",
+        "`LUFFY_INLINE_SUGGESTIONS` | `1` | `0` disables F9c (findings F9/F9b still run)"
       ],
       "confidence": "high"
-    },
-    {
-      "kind": "usage",
-      "path": ".",
-      "action": "merge",
-      "section": "Troubleshooting",
-      "content": "- \"Luffy posted a stub instead of a review\": check the job summary for **Luffy path skip (F38)** — the PR was all-docs under `LUFFY_SKIP_PATH_GLOBS`. Re-run with `@luffy review force` to get a paid review.\n- Matching is `fnmatch`-based, so glob depth is literal: the `docs` preset ships both `docs/**` and `**/docs/**` because a top-level-only pattern will not match nested `pkg/docs/…`. Add both shapes when writing custom globs for a monorepo.\n- Extension globs in the preset are unanchored (`*.md`, `*.mdx`, `*.rst`, `*.txt`, `*.adoc`) — a `.txt` fixture inside `src/` counts as skippable, so audit `matched_n`/`sample` output before trusting the preset on a mixed repo.",
-      "evidence": [
-        "\"docs/**\",\n    \"**/docs/**\",",
-        "DOCS_PRESET: list[str] = [\n    \"*.md\",",
-        "sample=path1,path2"
-      ],
-      "confidence": "medium"
     }
   ]
 }

@@ -44,7 +44,7 @@ Respond with **only** the JSON object (fence optional).
 
 ### Transcript
 
-# Luffy dogfood — F38 path-glob free skip
+# Luffy dogfood — F9c apply-suggestion blocks
 
 ## ARCHITECTURE
 # Luffy architecture
@@ -76,7 +76,7 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 | Normalize | `scripts/normalize-review.py` | Contract, fences, size, HTML marker, secret redact |
 | Cost UX | `scripts/usage-summary.py` | Append cost/tokens footer + job-summary from `hermes-usage.json` (F21) |
 | Verdict signal | `scripts/parse-verdict.py` + `report-verdict.sh` | Map verdict → reaction + commit status `luffy/review` + job summary (F22) + F23 PR review + F9 inline + F37 PR labels |
-| Inline notes | `scripts/post-inline-comments.py` | Path-anchored comments; prefer `path:LINE` when in diff, else nearest/first (F9/F9b) |
+| Inline notes | `scripts/post-inline-comments.py` | Path-anchored findings (F9/F9b) + Code suggestions → ```suggestion``` apply blocks (F9c) |
 | Distill | `scripts/distill-memory.sh` | Append structured memory block |
 | Post | `scripts/post-review-comment.sh` | Delete prior `<!-- luffy-review pr=N` comments, then `gh pr comment` |
 | Orchestrate | `scripts/run-luffy-review.sh` | Compose stages + timings |
@@ -149,23 +149,48 @@ Host label: auto (`GITHUB_ACTIONS` → `gha`, Modal env → `modal`, else `local
 
 **F32 trigger:** `scripts/trigger-review.sh` (`print|local|modal`) + console **Run** tab. Modal bit 4 webhook/`enqueue_review` only **spawns** `review_pr` (never Hermes in the doorbell).
 
-## OPERATIONS F38
-## Path-glob free skip (F38)
+## OPERATIONS F9c
+## Apply-suggestion blocks (F9c)
 
-Skip paid review when **every** changed file matches skip globs (docs/changelog PRs).
+When the review includes `### Code suggestions` with a ```diff``` fence, Luffy posts
+inline comments containing a GitHub ```suggestion``` block so authors can **Apply**
+in the Files changed UI.
 
 | Var | Default | Meaning |
 |-----|---------|---------|
-| `LUFFY_SKIP_PATH_GLOBS` | empty (off) | `docs` = built-in docs preset; or comma globs e.g. `*.md,docs/**` |
+| `LUFFY_INLINE_SUGGESTIONS` | `1` | `0` disables F9c (findings F9/F9b still run) |
+| `LUFFY_SUGGESTION_MAX` | `3` | Max suggestion comments per run |
 
-Force paid run: `@luffy review force` or `workflow_dispatch`. Fail-open on script errors.
+Mapping: suggestion `-` lines must match a contiguous run of PR `+` lines (same
+file). Multi-line → `start_line`/`line` on RIGHT. Soft-fail with F9.
 
 ```bash
-python3 scripts/path-skip-check.py --path README.md --path docs/a.md --globs docs  # exit 2 skip
-python3 scripts/path-skip-check.py --path src/x.py --path README.md --globs docs   # exit 0 allow
+python3 scripts/post-inline-comments.py plan \
+  --review review.md --diff pr.diff   # JSON: suggestions count + kind=suggestion
 ```
 
-## Verdict PR labels (F37)
+## Path-glob free skip (F38)
+## Inline comments (F9 / F9b / F9c)
+
+After the formal F23 review, Luffy may post a second COMMENT review with **inline** notes. Anchors (F9b):
+
+1. `` `path:LINE` `` / line hint from the finding when LINE is a changed `+` line → **exact**
+2. else nearest changed line on that file → **nearest**
+3. else first added line → **first** (F9)
+
+**F9c:** also posts apply-suggestion blocks from `### Code suggestions` (see section above).
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_INLINE_COMMENTS` | `1` | `0`/`off` disables all inline (findings + suggestions) |
+| `LUFFY_INLINE_SEVERITY` | `critical,high,blocking` | Comma list; `all` = no filter |
+| `LUFFY_INLINE_MAX` | `6` | Cap finding notes per run |
+| `LUFFY_INLINE_SUGGESTIONS` | `1` | F9c apply blocks |
+| `LUFFY_SUGGESTION_MAX` | `3` | Cap suggestion notes per run |
+
+Offline plan: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff` (see `anchor` / `line_hint` / `kind` in JSON).
+
+## Repo-local memory (F28 default)
 
 ## SOUL
 # Luffy — PR Review Agent
@@ -264,64 +289,56 @@ usage-summary.py
 webhook_auth.py
 write-failure-review.sh
 
-## ROI Sprint 29
-### Sprint 29 (shipped)
+## ROI Sprint 30
+### Sprint 30 (shipped)
 
-**F38** path-glob free skip: when `vars.LUFFY_SKIP_PATH_GLOBS` is set (`docs` preset or comma globs) and **every** changed path matches, skip Hermes/OpenRouter (no monorepo checkout). Default **off** (empty var). Force: `@luffy review force` / `workflow_dispatch`. Stub COMMENT + rocket + F37 labels; job summary **Luffy path skip (F38)**. Helper: `scripts/path-skip-check.py`.
+**F9c** GitHub apply-suggestion blocks: parse `### Code suggestions` (`#### title (`path`)` + ```diff```), map the suggestion’s `-` lines onto contiguous PR `+` lines, post multi-line inline comments with a ```suggestion``` fence (one-click apply in Files changed). Cap `vars.LUFFY_SUGGESTION_MAX` (default 3); opt-out `vars.LUFFY_INLINE_SUGGESTIONS=0`. Shares F9 soft-fail + fixture path.
 
 ### readme-kit (shipped)
 
-## path-skip-check header
+## post-inline F9c headers
 #!/usr/bin/env python3
-"""F38: skip paid OpenRouter review when every changed path matches skip globs.
+"""F9/F9b/F9c: post path-anchored inline GitHub PR review comments.
 
-Cost control for monorepos: docs/changelog-only PRs should not burn Hermes.
-Default is **off** (empty globs) — operators opt in via env/repo var.
+Maps Key findings (+ Blocking bullets) onto lines in pr.diff:
+  F9  — first *added* line per file (fallback)
+  F9b — prefer path:line / L### hints when that line is a changed `+` line
+        (else nearest changed line, else first)
+  F9c — ### Code suggestions → GitHub ```suggestion``` apply blocks
+        (multi-line when the suggestion's `-` lines match PR `+` lines)
 
 Usage:
-  python3 scripts/path-skip-check.py --paths-file pr-paths.txt
-  python3 scripts/path-skip-check.py --path a.md --path docs/x.md
+  python3 scripts/post-inline-comments.py plan \\
+    --review review.md --diff pr.diff
+
+  python3 scripts/post-inline-comments.py post \\
+    --review review.md --diff pr.diff --repo owner/name --pr 3 --commit SHA
 
 Env:
-  LUFFY_SKIP_PATH_GLOBS   comma list, or preset name `docs` / `off`
-  LUFFY_SKIP_PATHS_FORCE=1  always allow (paid run)
-  LUFFY_SKIP_PATHS_FIXTURE  unused (paths come from CLI)
+  LUFFY_INLINE_COMMENTS=1 (default) | 0/off to skip
+  LUFFY_INLINE_MAX=6
+  LUFFY_INLINE_SEVERITY=critical,high   (comma list; empty = all)
+  LUFFY_INLINE_SUGGESTIONS=1 (default) | 0/off to skip F9c
+  LUFFY_SUGGESTION_MAX=3
+  GH_TOKEN / GITHUB_TOKEN for post
+  LUFFY_INLINE_FIXTURE=path.json  — write planned payload instead of API (tests)
 
-Exit:
-  0  allow paid run
-  2  skip paid run (all paths matched)
-  1  hard error (caller should fail-open → allow)
-
-Stdout key=value:
-  allowed=true|false
-  reason=...
-  matched_n=N
-  total_n=N
-  globs=...
-  sample=path1,path2
+Soft-fail policy: never raises for network; plan mode is pure offline.
 """
 
 from __future__ import annotations
-
-import argparse
-import os
-import sys
-from fnmatch import fnmatch
-from pathlib import Path
-from typing import Iterable
-
-
-# Convenience preset for docs/docs-adjacent PRs (no code).
-DOCS_PRESET: list[str] = [
-    "*.md",
-    "*.mdx",
-    "*.markdown",
-    "*.rst",
-    "*.txt",
-    "*.adoc",
-    "docs/**",
-    "**/docs/**",
-    "doc/**",
+2:"""F9/F9b/F9c: post path-anchored inline GitHub PR review comments.
+8:  F9c — ### Code suggestions → GitHub ```suggestion``` apply blocks
+22:  LUFFY_INLINE_SUGGESTIONS=1 (default) | 0/off to skip F9c
+342:    # F9c: GitHub apply-suggestion blocks from ### Code suggestions
+353:# F9c: Code suggestions → GitHub ```suggestion``` apply blocks
+379:def parse_code_suggestions(review_md: str) -> list[dict[str, Any]]:
+536:    body = f"**Suggestion (F9c):** {title}\n\n```suggestion\n{inner}\n```\n\n<!-- luffy-suggestion -->"
+540:def plan_suggestions(
+546:    """Plan F9c multi-line suggestion comments."""
+653:        bits.append(f"{n_sug} apply-suggestion(s) (F9c)")
+655:        "## 🏴‍☠️ Luffy inline findings (F9/F9c)\n\n"
+669:        # F9c multi-line
 
 
 ## Existing directories (allowed `path` values)
@@ -372,11 +389,11 @@ agent
 
 ### recent log
 ```
+b2d2f91 feat(product): F9c GitHub apply-suggestion blocks
+13ddcd0 docs(knowledge): dogfood F38 path-skip + showcase
 974ba39 feat(cost): F38 path-glob free skip for docs-only PRs
 9633311 docs(knowledge): dogfood F37 verdict labels + showcase
 bbe2cfa feat(ops): F37 verdict-aware PR labels
-293d95a docs(experiments): streak 0 after F36 ship
-22c068b docs(knowledge): dogfood F36 review timeout + showcase
 ```
 
 ### tree (sample)
@@ -482,6 +499,7 @@ docs/experiments/2026-07-31-f37-verdict-labels.md
 docs/experiments/2026-07-31-f38-path-skip.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
+docs/experiments/2026-07-31-f9c-suggestions.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/experiments/f28-repo-local-memory.md
 docs/experiments/loop-no-work-streak.md
@@ -580,7 +598,6 @@ assets/brand-options/hero-E-volumetric.svg
 assets/brand-options/hero-F-cyber.svg
 assets/brand-options/hero-G-mark.svg
 assets/brand-options/hero-H-cinematic.svg
-assets/brand-options/index.json
 ```
 
 ### git diff
