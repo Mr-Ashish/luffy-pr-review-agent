@@ -13,6 +13,8 @@
 
 ## Design decisions
 
+- **F58 PR description filler:** `scripts/pr_description_filler.py` builds a deterministic description (type, file walkthrough, test-plan checklist, linked #issues) from `pr.json` — no LLM. Modes: `fill-empty` (default, never clobber rich author prose), `markers` (refresh `<!-- luffy-description -->` block), `force`. Assemble writes `pr-description.md`; `gh pr edit` only when `LUFFY_PR_DESCRIPTION_APPLY=1`.
+
 - **F57 Mermaid architecture:** `scripts/mermaid_architecture.py` builds a flowchart from PR changed paths (grouped by package; adjacency edges only — not invented runtime deps). Assemble injects into prompt; post-normalize soft-injects if the model omitted `### Architecture diagram`. Toggle `LUFFY_MERMAID` / F55 keys `mermaid`, `mermaid_max_nodes`.
 
 - **F56 lens recipes / named packs:** `agent/packs/*.json` declare multi-lens recipes (default, security, docs, odoo, performance). `scripts/lens_recipes.py` loads + rewrites the Multi-lens pass/checklist in the assembled prompt. Active pack via `LUFFY_LENS_PACK` (F55 key `lens_pack`); opt-out `LUFFY_LENS_PACKS=0`. Judgment remains model-side; pack selection and checklist shape are code.

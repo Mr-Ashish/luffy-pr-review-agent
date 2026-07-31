@@ -227,6 +227,41 @@ try:
 except Exception:
     mermaid_on = "0"
 
+# F58: deterministic PR description scaffold (soft; never posts unless apply path)
+pr_desc_action = "skip"
+try:
+    import sys as _sys3
+    _sys3.path.insert(0, str(luffy_root / "scripts"))
+    from pr_description_filler import (  # type: ignore
+        enabled as pr_desc_enabled,
+        build_scaffold,
+        merge_body,
+        mode_from_env,
+    )
+
+    if pr_desc_enabled():
+        arch_md = None
+        arch_file = out_dir / "architecture.md"
+        if arch_file.is_file():
+            arch_md = arch_file.read_text(encoding="utf-8", errors="replace")
+        sc = build_scaffold(pr, architecture_md=arch_md)
+        mode = mode_from_env()
+        new_body, pr_desc_action = merge_body(pr.get("body"), sc["body"], mode)
+        (out_dir / "pr-description.md").write_text(
+            sc["body"], encoding="utf-8"
+        )
+        (out_dir / "pr-description-merged.md").write_text(
+            new_body, encoding="utf-8"
+        )
+        (out_dir / "pr-description.env").write_text(
+            f"PR_DESCRIPTION_ACTION={pr_desc_action}\n"
+            f"PR_DESCRIPTION_TYPE={sc.get('type', '')}\n"
+            f"PR_DESCRIPTION_FILES={sc.get('files', 0)}\n",
+            encoding="utf-8",
+        )
+except Exception:
+    pr_desc_action = "error"
+
 # Shell-safe meta for later steps
 meta = {
     "REPO": repo,
@@ -250,6 +285,7 @@ meta = {
     "LENS_PACKS": lens_packs_on,
     "MERMAID": mermaid_on,
     "MERMAID_FILES": mermaid_nodes,
+    "PR_DESCRIPTION_ACTION": pr_desc_action,
 }
 with open(os.environ["META_PATH"], "w") as fh:
     for k, v in meta.items():

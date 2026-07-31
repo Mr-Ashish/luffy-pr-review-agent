@@ -1,6 +1,6 @@
 # Product feature progress
 
-**Updated:** 2026-07-31 (F57 mermaid architecture)  
+**Updated:** 2026-07-31 (F58 PR description filler)  
 **Loop:** 019fb948dbe8 orchestrator
 
 ## SHIPPED
@@ -13,35 +13,38 @@
 | F54 | Fix-it prompts | product | PR #4 |
 | F55 | Feature toggles | product | PR #5 |
 | F56 | Lens recipes + packs | product | PR #6 |
-| F57 | Mermaid architecture | product | **MERGED** PR #7 — `mermaid_architecture.py` |
+| F57 | Mermaid architecture | product | PR #7 |
+| F58 | PR description filler | product | **this fire** — pr_description_filler.py |
 
 ## IN_PROGRESS
 
 | ID | Feature | Notes |
 |----|---------|-------|
-| — | Live e2e fixit + issue-ctx + mermaid + odoo pack | quality measure |
-| — | PR description filler | next product |
+| — | Live e2e multi-feature quality | fixit + issue + mermaid + odoo pack |
 | — | Federated memory / FP | deferred |
+| — | Incremental review / reply / testplan | next wave |
 
-## LEFT (priority product backlog)
+## LEFT
 
-1–3. ~~toggles / fixit / recipes~~  
 4. multi-lens auto-select (optional)  
-5. PR DESCRIPTION FILLER  
+5. ~~PR DESCRIPTION FILLER~~ → **F58**  
 6. linked issue live e2e  
-7. ~~MERMAID ARCHITECTURE~~ → **F57**  
-8–15. incremental, reply, testplan, FP, federated, tools eval, hermes, multi-PR e2e  
+7. ~~MERMAID~~ → F57  
+8. INCREMENTAL REVIEW  
+9. REPLY ON THREAD  
+10. TESTPLAN GENERATION  
+11–15. FP, federated, tools eval, hermes, multi-PR e2e  
 
 ## Counts
 
-- **features_built_count:** 14 (F44–F57)
+- **features_built_count:** 15 (F44–F58)
 - **types_built:** agent_quality, product
-- **left_count:** 10
-- **progress_pct:** ~67%
-- **eta:** 4–7 fires
-- **active_worktrees:** none (F57 merged)
+- **left_count:** 9
+- **progress_pct:** ~73%
+- **eta:** 3–6 fires
+- **active_worktrees:** f58-pr-description
 - **federated_memory_note:** deferred
 
 ## Status line
 
-`features_built_count=14 types_built=agent_quality,product left_count=10 progress_pct=67 eta=4-7fires active_worktrees=0 federated_memory_note=deferred`
+`features_built_count=15 types_built=agent_quality,product left_count=9 progress_pct=73 eta=3-6fires active_worktrees=1 federated_memory_note=deferred`

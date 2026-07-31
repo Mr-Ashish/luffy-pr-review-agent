@@ -130,6 +130,7 @@ RUNTIME_SCRIPTS=(
   mermaid_architecture.py
   model_tier.py
   preflight_cost.py
+  pr_description_filler.py
   tool_turns_gate.py
   severity_calibration.py
   soul_context_scan.py

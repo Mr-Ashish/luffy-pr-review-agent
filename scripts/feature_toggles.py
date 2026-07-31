@@ -199,6 +199,33 @@ REGISTRY: list[ToggleSpec] = [
         "Max nodes in auto Mermaid architecture diagram",
         "F57",
     ),
+    ToggleSpec(
+        "pr_description",
+        "LUFFY_PR_DESCRIPTION",
+        "bool",
+        True,
+        "product",
+        "Build deterministic PR description scaffold (F58)",
+        "F58",
+    ),
+    ToggleSpec(
+        "pr_description_apply",
+        "LUFFY_PR_DESCRIPTION_APPLY",
+        "bool",
+        False,
+        "product",
+        "Allow gh pr edit to push F58 description scaffold",
+        "F58",
+    ),
+    ToggleSpec(
+        "pr_description_mode",
+        "LUFFY_PR_DESCRIPTION_MODE",
+        "str",
+        "fill-empty",
+        "product",
+        "F58 mode: fill-empty | markers | force",
+        "F58",
+    ),
     # --- quality / agent ---
     ToggleSpec(
         "soul_scan",
