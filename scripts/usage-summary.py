@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""F21: surface Hermes/OpenRouter cost + tokens on PR comments and job summaries.
+"""F21/F29: surface Hermes/OpenRouter cost + tokens on PR comments and job summaries.
 
 Reads hermes --usage-file JSON (see run-hermes-review.sh) and emits:
   footer        — one Markdown italic line for the posted review
   append        — inject/update that line on an existing review.md
   step-summary  — Markdown section for $GITHUB_STEP_SUMMARY
+  budget        — F29 key=value budget check (over_budget= / cost= / max=)
+
+F29: optional soft max via --max-usd or env LUFFY_MAX_COST_USD. Over budget is
+reported (footer note + job summary + ::warning::) but never fails the review
+(spend already happened; this is operator visibility + alerting).
 
 Missing or empty usage files are soft no-ops (exit 0) so the pipeline never
 fails because cost telemetry was absent.
@@ -14,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -86,7 +92,46 @@ def format_cost_usd(v: float | int | None) -> str:
     return "$0"
 
 
-def format_footer_line(usage: dict[str, Any]) -> str:
+def parse_max_usd(raw: str | None) -> float | None:
+    """Parse LUFFY_MAX_COST_USD / --max-usd. Empty/0/off/invalid → disabled."""
+    if raw is None:
+        return None
+    s = str(raw).strip().lower()
+    if not s or s in {"0", "off", "false", "no", "none", "disabled"}:
+        return None
+    try:
+        v = float(s)
+    except ValueError:
+        return None
+    if v <= 0:
+        return None
+    return v
+
+
+def budget_status(
+    usage: dict[str, Any] | None, max_usd: float | None
+) -> dict[str, Any]:
+    """F29 soft budget check (never blocks the pipeline)."""
+    if max_usd is None:
+        return {
+            "budget_enabled": False,
+            "over_budget": False,
+            "cost": None,
+            "max_usd": None,
+        }
+    cost = None if usage is None else _num(usage.get("estimated_cost_usd"))
+    over = cost is not None and float(cost) > float(max_usd)
+    return {
+        "budget_enabled": True,
+        "over_budget": over,
+        "cost": float(cost) if cost is not None else None,
+        "max_usd": float(max_usd),
+    }
+
+
+def format_footer_line(
+    usage: dict[str, Any], *, max_usd: float | None = None
+) -> str:
     """Single italic Markdown line (no leading ---)."""
     model = str(usage.get("model") or usage.get("model_id") or "unknown")
     cost = format_cost_usd(_num(usage.get("estimated_cost_usd")))
@@ -95,15 +140,23 @@ def format_footer_line(usage: dict[str, Any]) -> str:
     calls_s = str(int(api_calls)) if api_calls is not None else "n/a"
     status = str(usage.get("cost_status") or "").strip()
     cost_note = f" ({status})" if status and status not in {"ok", "exact"} else ""
+    bud = budget_status(usage, max_usd)
+    budget_note = ""
+    if bud["budget_enabled"] and bud["over_budget"]:
+        budget_note = f" · ⚠️ OVER BUDGET (max {format_cost_usd(bud['max_usd'])})"
+    elif bud["budget_enabled"]:
+        budget_note = f" · budget max {format_cost_usd(bud['max_usd'])}"
     return (
         f"*Cost / usage: model=`{model}` · ~{cost}{cost_note} · "
-        f"{total} tokens · {calls_s} API calls*"
+        f"{total} tokens · {calls_s} API calls{budget_note}*"
     )
 
 
 def format_step_summary(
     usage: dict[str, Any] | None,
     timings: dict[str, Any] | None = None,
+    *,
+    max_usd: float | None = None,
 ) -> str:
     lines = ["### Luffy cost / usage (F21)", ""]
     if usage is None:
@@ -143,13 +196,30 @@ def format_step_summary(
             if bits:
                 lines.append(f"- **Stages:** {', '.join(bits)}")
     lines.append("")
+
+    # F29 soft budget section (only when max is configured)
+    bud = budget_status(usage, max_usd)
+    if bud["budget_enabled"]:
+        lines.append("### Luffy cost budget (F29)")
+        lines.append("")
+        lines.append(f"- **Max (soft):** {format_cost_usd(bud['max_usd'])}")
+        lines.append(
+            f"- **Actual:** {format_cost_usd(bud['cost']) if bud['cost'] is not None else 'n/a'}"
+        )
+        if bud["over_budget"]:
+            lines.append("- **Status:** ⚠️ **OVER BUDGET** (soft alert — run not failed)")
+        else:
+            lines.append("- **Status:** within budget")
+        lines.append("")
     return "\n".join(lines)
 
 
-def append_footer_to_review(review_path: Path, usage: dict[str, Any]) -> bool:
+def append_footer_to_review(
+    review_path: Path, usage: dict[str, Any], *, max_usd: float | None = None
+) -> bool:
     """Inject cost line into review.md. Returns True if file changed."""
     text = review_path.read_text(encoding="utf-8", errors="replace")
-    cost_line = format_footer_line(usage)
+    cost_line = format_footer_line(usage, max_usd=max_usd)
 
     if _COST_LINE_RX.search(text):
         new_text = _COST_LINE_RX.sub(cost_line, text, count=1)
@@ -172,8 +242,8 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "mode",
-        choices=("footer", "append", "step-summary"),
-        help="footer=print line; append=mutate review; step-summary=Actions summary MD",
+        choices=("footer", "append", "step-summary", "budget"),
+        help="footer|append|step-summary (F21); budget=F29 kv check",
     )
     p.add_argument(
         "--usage",
@@ -184,6 +254,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--review", type=Path, default=None, help="review.md for append mode")
     p.add_argument("--timings", type=Path, default=None, help="timings.json for step-summary")
     p.add_argument(
+        "--max-usd",
+        default=None,
+        help="F29 soft max USD (default: env LUFFY_MAX_COST_USD; 0/off disables)",
+    )
+    p.add_argument(
         "--out",
         type=Path,
         default=None,
@@ -193,15 +268,34 @@ def main(argv: list[str] | None = None) -> int:
 
     usage_path = args.usage
     if usage_path is None:
-        out_dir = Path(__import__("os").environ.get("OUT_DIR", "."))
+        out_dir = Path(os.environ.get("OUT_DIR", "."))
         usage_path = out_dir / "hermes-usage.json"
 
     usage = load_usage(usage_path)
+    max_raw = args.max_usd if args.max_usd is not None else os.environ.get("LUFFY_MAX_COST_USD")
+    max_usd = parse_max_usd(max_raw)
+
+    if args.mode == "budget":
+        bud = budget_status(usage, max_usd)
+        # Always exit 0 — soft alert only
+        cost_s = "" if bud["cost"] is None else f"{bud['cost']:.6f}".rstrip("0").rstrip(".")
+        max_s = "" if bud["max_usd"] is None else f"{bud['max_usd']:.6f}".rstrip("0").rstrip(".")
+        print(f"budget_enabled={'true' if bud['budget_enabled'] else 'false'}")
+        print(f"over_budget={'true' if bud['over_budget'] else 'false'}")
+        print(f"cost={cost_s}")
+        print(f"max_usd={max_s}")
+        if bud["over_budget"]:
+            print(
+                f"::warning::F29 cost over soft budget "
+                f"(~{format_cost_usd(bud['cost'])} > max {format_cost_usd(bud['max_usd'])})",
+                file=sys.stderr,
+            )
+        return 0
 
     if args.mode == "footer":
         if usage is None:
             return 0
-        line = format_footer_line(usage) + "\n"
+        line = format_footer_line(usage, max_usd=max_usd) + "\n"
         if args.out:
             args.out.write_text(line, encoding="utf-8")
         else:
@@ -215,20 +309,36 @@ def main(argv: list[str] | None = None) -> int:
         if args.review is None or not args.review.is_file():
             print("usage-summary: --review required for append", file=sys.stderr)
             return 1
-        changed = append_footer_to_review(args.review, usage)
+        changed = append_footer_to_review(args.review, usage, max_usd=max_usd)
         print(
             f"usage-summary: {'updated' if changed else 'unchanged'} {args.review}",
             file=sys.stderr,
         )
+        if max_usd is not None:
+            bud = budget_status(usage, max_usd)
+            if bud["over_budget"]:
+                print(
+                    f"::warning::F29 cost over soft budget "
+                    f"(~{format_cost_usd(bud['cost'])} > max {format_cost_usd(bud['max_usd'])})",
+                    file=sys.stderr,
+                )
         return 0
 
     # step-summary
     timings = load_timings(args.timings)
-    md = format_step_summary(usage, timings)
+    md = format_step_summary(usage, timings, max_usd=max_usd)
     if args.out:
         args.out.write_text(md, encoding="utf-8")
     else:
         sys.stdout.write(md)
+    if max_usd is not None and usage is not None:
+        bud = budget_status(usage, max_usd)
+        if bud["over_budget"]:
+            print(
+                f"::warning::F29 cost over soft budget "
+                f"(~{format_cost_usd(bud['cost'])} > max {format_cost_usd(bud['max_usd'])})",
+                file=sys.stderr,
+            )
     return 0
 
 

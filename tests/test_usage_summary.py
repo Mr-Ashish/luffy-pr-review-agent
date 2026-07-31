@@ -150,6 +150,60 @@ class UsageSummaryTests(unittest.TestCase):
             cp = self.run_cli("footer", "--usage", str(usage))
             self.assertIn("$0.0042", cp.stdout)
 
+    def test_f29_budget_over(self):
+        with tempfile.TemporaryDirectory() as td:
+            usage = Path(td) / "u.json"
+            usage.write_text(json.dumps(SAMPLE))  # ~$0.59
+            cp = self.run_cli("budget", "--usage", str(usage), "--max-usd", "0.10")
+            self.assertEqual(cp.returncode, 0)
+            kv = dict(
+                line.split("=", 1) for line in cp.stdout.splitlines() if "=" in line
+            )
+            self.assertEqual(kv["budget_enabled"], "true")
+            self.assertEqual(kv["over_budget"], "true")
+            self.assertIn("over soft budget", cp.stderr.lower())
+
+    def test_f29_budget_within(self):
+        with tempfile.TemporaryDirectory() as td:
+            usage = Path(td) / "u.json"
+            usage.write_text(json.dumps(SAMPLE))
+            cp = self.run_cli("budget", "--usage", str(usage), "--max-usd", "5.00")
+            kv = dict(
+                line.split("=", 1) for line in cp.stdout.splitlines() if "=" in line
+            )
+            self.assertEqual(kv["over_budget"], "false")
+            self.assertNotIn("OVER BUDGET", cp.stderr)
+
+    def test_f29_budget_disabled(self):
+        with tempfile.TemporaryDirectory() as td:
+            usage = Path(td) / "u.json"
+            usage.write_text(json.dumps(SAMPLE))
+            for raw in ("", "0", "off", "disabled"):
+                cp = self.run_cli("budget", "--usage", str(usage), "--max-usd", raw)
+                kv = dict(
+                    line.split("=", 1) for line in cp.stdout.splitlines() if "=" in line
+                )
+                self.assertEqual(kv["budget_enabled"], "false", msg=raw)
+                self.assertEqual(kv["over_budget"], "false", msg=raw)
+
+    def test_f29_footer_over_budget_note(self):
+        with tempfile.TemporaryDirectory() as td:
+            usage = Path(td) / "u.json"
+            usage.write_text(json.dumps(SAMPLE))
+            cp = self.run_cli("footer", "--usage", str(usage), "--max-usd", "0.10")
+            self.assertIn("OVER BUDGET", cp.stdout)
+            self.assertIn("max $0.10", cp.stdout)
+
+    def test_f29_step_summary_budget_section(self):
+        with tempfile.TemporaryDirectory() as td:
+            usage = Path(td) / "u.json"
+            usage.write_text(json.dumps(SAMPLE))
+            cp = self.run_cli(
+                "step-summary", "--usage", str(usage), "--max-usd", "0.10"
+            )
+            self.assertIn("### Luffy cost budget (F29)", cp.stdout)
+            self.assertIn("OVER BUDGET", cp.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

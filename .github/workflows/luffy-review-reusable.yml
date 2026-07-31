@@ -499,6 +499,8 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
           LUFFY_MODEL: ${{ vars.LUFFY_MODEL }}
+          # F29: soft max OpenRouter spend (USD); empty/0 = disabled
+          LUFFY_MAX_COST_USD: ${{ vars.LUFFY_MAX_COST_USD }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
@@ -506,11 +508,15 @@ jobs:
           export LUFFY_STATUS="${LUFFY_STATUS:-complete}"
           export LUFFY_STARTED_AT="${LUFFY_STARTED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
           "$LUFFY_ROOT/scripts/save-trace.sh"
-          # F21: cost/token summary before trace meta (ops visibility without artifact download)
+          # F21/F29: cost/token summary + soft budget alert (ops visibility without artifact download)
           if [[ -f "$LUFFY_ROOT/scripts/usage-summary.py" ]]; then
             python3 "$LUFFY_ROOT/scripts/usage-summary.py" step-summary \
               --usage "$OUT_DIR/hermes-usage.json" \
-              --timings "$OUT_DIR/timings.json" >> "$GITHUB_STEP_SUMMARY" || true
+              --timings "$OUT_DIR/timings.json" \
+              --max-usd "${LUFFY_MAX_COST_USD:-}" >> "$GITHUB_STEP_SUMMARY" || true
+            python3 "$LUFFY_ROOT/scripts/usage-summary.py" budget \
+              --usage "$OUT_DIR/hermes-usage.json" \
+              --max-usd "${LUFFY_MAX_COST_USD:-}" || true
           fi
           echo "### Luffy trace" >> "$GITHUB_STEP_SUMMARY"
           if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then

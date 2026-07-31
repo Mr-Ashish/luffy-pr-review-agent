@@ -37,6 +37,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 15 (F26):** default model SoT `anthropic/claude-opus-5` in `run-hermes-review.sh`; docs/.env.example aligned; cheaper via `vars.LUFFY_MODEL`
 - **Sprint 16 (F27):** posted review gets a ⚠️ banner when the assembled PR diff was size-truncated (`MAX_DIFF_BYTES`)
 - **Sprint 17 (F28):** repo-local `.luffy/` memory is the default SoT; hub publish is opt-in
+- **Sprint 18 (F29):** soft max cost budget via `vars.LUFFY_MAX_COST_USD` (footer + job summary + warning; never fails the run)
 
 ## Repo-local memory (F28 default)
 
@@ -126,6 +127,7 @@ Requires: `gh` authenticated, network for Hermes install + OpenRouter.
 - Re-runs **replace** prior Luffy comments on the same PR (marker `<!-- luffy-review pr=N`); set `LUFFY_REPLACE_PREVIOUS=0` to stack
 - **Per-PR cooldown (F19):** default 900s after a *successful* Luffy comment — skip paid run (rocket reaction). Override `vars.LUFFY_COOLDOWN_SECONDS` (`0`/`off` disables). Bypass: `@luffy review force` or workflow_dispatch
 - **Cost visibility (F21):** each successful review footer includes estimated OpenRouter cost + token/API counts from `hermes-usage.json`; the Actions job summary has a matching **Luffy cost / usage** section (no artifact download required)
+- **Soft max cost (F29):** set `vars.LUFFY_MAX_COST_USD` (e.g. `1.00`) to get ⚠️ OVER BUDGET on the PR cost line + job-summary budget section + Actions warning when estimated spend exceeds the max. Soft only (does not cancel/fail the review). `0`/`off`/unset disables.
 - **Formal PR Review (F23):** after the full issue comment, Luffy also submits a short Pull Request Review with event `APPROVE` / `REQUEST_CHANGES` / `COMMENT` so the Reviews panel matches the verdict. Opt-out: `vars.LUFFY_PR_REVIEW=0`. APPROVE may soft-fall back to COMMENT (self-review / org policy).
 - **Dismiss prior PR reviews (F24):** before a new F23 review, prior Luffy reviews with marker `<!-- luffy-pr-review pr=N` in state APPROVED/CHANGES_REQUESTED are dismissed (soft). Controlled by `LUFFY_REPLACE_PREVIOUS` (same as comment replace). COMMENTED reviews cannot be dismissed by GitHub and may remain.
 

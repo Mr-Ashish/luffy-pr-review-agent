@@ -41,7 +41,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 25 | **F26** | Align default model docs + code (`anthropic/claude-opus-5` SoT) | XS | 🔥 Trust/cost — ops docs no longer understate spend | **Shipped** (`DEFAULT_LUFFY_MODEL`) |
 | 26 | **F27** | Auto banner when PR diff was size-truncated | XS | 🔥 Trust — incomplete context always visible on PR | **Shipped** (`normalize-review --diff-truncated`) |
 | 27 | **F28** | Repo-local `.luffy/` memory (primary); hub publish opt-in only | S | 🔥 Product memory lives on the target; no hub required | **Shipped** (`publish-run-local.sh`, ingest layout=local, preload local-first) |
-| 28 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 28 | **F29** | Soft max cost budget (`LUFFY_MAX_COST_USD`) after F21 usage | XS | 🔥 Cost ops — overage alert on comment + job summary | **Shipped** (`usage-summary.py budget`) |
+| 29 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -110,6 +111,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 17 (shipped)
 
 **F28** repo-local `.luffy/` memory: target repo is SoT for `MEMORY.md` + slim `runs/{trace}/`. Default `LUFFY_MEMORY_MODE=local` (hub off). Preload local-first via contents API; hub only if `both|hub` or `LUFFY_HUB_PUBLISH=1`. Install seeds `.luffy/MEMORY.md`. Scripts: `publish-run-local.sh`, `hub-ingest-run.py` layout=local, updated `preload-hub-memory.sh` / `publish-run-to-hub.sh`.
+
+### Sprint 18 (shipped)
+
+**F29** soft max cost budget: repo var `LUFFY_MAX_COST_USD` (e.g. `1.00`). When `hermes-usage.json` estimated cost exceeds the max, the PR cost footer notes ⚠️ OVER BUDGET, the job summary gains a **Luffy cost budget (F29)** section, and Actions emits `::warning::`. Soft only — never fails the review (spend already incurred). Disabled when unset/`0`/`off`. CLI: `usage-summary.py budget|footer|append|step-summary --max-usd …`.
 
 ### readme-kit (shipped)
 

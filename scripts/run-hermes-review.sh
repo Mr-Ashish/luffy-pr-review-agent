@@ -289,11 +289,12 @@ if [[ "${#_NORM_EXTRA[@]}" -gt 0 ]]; then
   fi
 fi
 
-# F21: surface cost/tokens on the posted comment (soft-fail if no usage file)
+# F21/F29: surface cost/tokens (+ soft budget note) on the posted comment
 if [[ -f "$LUFFY_ROOT/scripts/usage-summary.py" ]]; then
   python3 "$LUFFY_ROOT/scripts/usage-summary.py" append \
     --usage "$USAGE_FILE" \
-    --review "$FINAL_OUT" || notice "usage-summary append soft-failed"
+    --review "$FINAL_OUT" \
+    --max-usd "${LUFFY_MAX_COST_USD:-}" || notice "usage-summary append soft-failed"
 fi
 
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
