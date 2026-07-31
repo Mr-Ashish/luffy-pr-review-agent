@@ -1,19 +1,28 @@
 ```json
 {
-  "summary": "The session is largely a restatement of already-indexed F29 soft-budget knowledge (OPERATIONS/USAGE/DEV/ROI-FIXES all already document LUFFY_MAX_COST_USD). The only non-duplicative durable detail is the concrete parsing/formatting contract inside usage-summary.py's budget path (disable vocabulary, under-budget footer shape, cost formatting thresholds).",
+  "summary": "Most of the session restates already-indexed claims (F31 bundle, F28 memory layers, install modes, SOUL contract). Two items are not covered by existing knowledge: how the Modal entrypoint participates in the F31 Run Console contract, and the readme-kit config-format decision (YAML preferred with JSON parity, hand-rolled parser removed).",
   "session_ids": ["dogfood-luffy-session"],
   "units": [
     {
       "kind": "dev",
-      "path": ".",
+      "path": "modal_app",
       "action": "merge",
       "section": "Design decisions",
-      "content": "- `parse_max_usd` (usage-summary.py) treats a wide disable vocabulary as \"budget off\": empty, `0`, `off`, `false`, `no`, `none`, `disabled`, any non-float string, and any value `<= 0` all return `None` — a typo'd `LUFFY_MAX_COST_USD` silently disables F29 rather than erroring, so a missing OVER BUDGET note is not proof the run was under budget.\n- When a budget *is* enabled the cost footer changes shape in both directions: under budget appends ` · budget max $X`, over budget appends ` · ⚠️ OVER BUDGET (max $X)`. The presence of the `budget max` suffix is the cheapest way to confirm from a posted PR comment that the var was actually parsed.\n- `budget_status` compares strictly (`cost > max`), and returns `cost: None` when the usage file is missing/empty — so `over_budget` is `False` whenever cost telemetry is absent, keeping the missing-usage case a soft no-op consistent with the other modes.\n- Cost rendering is threshold-based, not fixed precision: `>= $0.01` → 2 decimals, `> 0` but smaller → 4 decimals, `0`/unknown → `$0`; cheap-model runs therefore show `$0.0034`-style values on the same line format.",
+      "content": "- The Modal entrypoint is a first-class host in the F31 Run Console contract: `review_pr` exports `LUFFY_HOST=modal` so `pack-run-for-ui.py` stamps the bundle's host label as `modal` instead of falling through the `GITHUB_ACTIONS`/else auto-detect to `local`.\n- `review_pr` also returns the `run_bundle` path in its result, so a Modal caller gets the console bundle handle back directly rather than having to download an Actions artifact (the GHA path's only option).",
       "evidence": [
-        "\"\"\"Parse LUFFY_MAX_COST_USD / --max-usd. Empty/0/off/invalid → disabled.\"\"\"",
-        "if not s or s in {\"0\", \"off\", \"false\", \"no\", \"none\", \"disabled\"}",
-        "budget_note = f\" · budget max {format_cost_usd(bud['max_usd'])}\"",
-        "cost = None if usage is None else _num(usage.get(\"estimated_cost_usd\"))"
+        "Modal `review_pr` sets `LUFFY_HOST=modal` and returns `run_bundle`",
+        "Host label: auto (`GITHUB_ACTIONS` → `gha`, Modal env → `modal`, else `local`) or `LUFFY_HOST`"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "kind": "dev",
+      "path": "readme-kit",
+      "action": "merge",
+      "section": "Design decisions",
+      "content": "- Config format: YAML is the preferred input with JSON kept at parity (`examples/luffy/` ships both `readme.config.yaml` and `readme.config.json`), so either file shape drives the same build.\n- YAML parsing uses the `yaml` npm dependency; the previously hand-rolled parser was deleted rather than kept as a fallback — do not reintroduce a bespoke parser for \"zero-dep\" reasons.",
+      "evidence": [
+        "YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser removed."
       ],
       "confidence": "medium"
     }

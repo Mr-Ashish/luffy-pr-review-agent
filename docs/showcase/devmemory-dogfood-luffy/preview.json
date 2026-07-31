@@ -1,16 +1,22 @@
 {
   "stats": {
-    "files": 1,
-    "lines_added": 4,
-    "lines_removed": 4,
-    "changes": 1
+    "files": 2,
+    "lines_added": 16,
+    "lines_removed": 0,
+    "changes": 2
   },
   "files": [
     {
-      "path": "DEV.md",
-      "is_new": false,
-      "lines_added": 4,
-      "lines_removed": 4
+      "path": "modal_app/DEV.md",
+      "is_new": true,
+      "lines_added": 8,
+      "lines_removed": 0
+    },
+    {
+      "path": "readme-kit/DEV.md",
+      "is_new": true,
+      "lines_added": 8,
+      "lines_removed": 0
     }
   ]
 }
