@@ -49,9 +49,13 @@ if [[ -f "$HERMES_HOME/memories/MEMORY.md" ]]; then
   cp -f "$HERMES_HOME/memories/MEMORY.md" "$OUT_DIR/memory-before.md"
 fi
 
+# F28: repo-local memory default
+export LUFFY_MEMORY_MODE="${LUFFY_MEMORY_MODE:-local}"
+export LUFFY_MEMORY_PATH="${LUFFY_MEMORY_PATH:-.luffy}"
+
 ORCH_RC=0
-# F3: load central hub MEMORY for this repo before Hermes runs
-stage preload_hub_memory "$SCRIPTS/preload-hub-memory.sh" || true
+# F3/F28: preload MEMORY — local .luffy/ first, hub only if opted in
+stage preload_memory "$SCRIPTS/preload-hub-memory.sh" || true
 
 stage assemble "$SCRIPTS/assemble-context.sh" || ORCH_RC=$?
 
@@ -122,7 +126,8 @@ if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
   fi
 fi
 
-# Push run → central hub (repository_dispatch → ingest workflow on LUFFY_HUB_REPO)
+# F28: always (default) publish slim pack → target .luffy/; hub only when opted in
+stage publish_local "$SCRIPTS/publish-run-local.sh" || true
 stage publish_hub "$SCRIPTS/publish-run-to-hub.sh" || true
 
 if [[ "${POST_COMMENT:-0}" == "1" && -f "${REVIEW_FILE:-}" ]]; then

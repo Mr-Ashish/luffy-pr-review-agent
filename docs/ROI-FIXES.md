@@ -40,7 +40,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 24 | **F25** | Hermes pin single source of truth (no workflow hardcoded SHA) | XS | 🔥 Ops/repro — bump pin in one place | **Shipped** (workflows call `hermes-pin.sh default`) |
 | 25 | **F26** | Align default model docs + code (`anthropic/claude-opus-5` SoT) | XS | 🔥 Trust/cost — ops docs no longer understate spend | **Shipped** (`DEFAULT_LUFFY_MODEL`) |
 | 26 | **F27** | Auto banner when PR diff was size-truncated | XS | 🔥 Trust — incomplete context always visible on PR | **Shipped** (`normalize-review --diff-truncated`) |
-| 27 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 27 | **F28** | Repo-local `.luffy/` memory (primary); hub publish opt-in only | S | 🔥 Product memory lives on the target; no hub required | **Shipped** (`publish-run-local.sh`, ingest layout=local, preload local-first) |
+| 28 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -105,6 +106,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 16 (shipped)
 
 **F27** diff-truncation trust banner: when `assemble-context` sets `DIFF_TRUNCATED=true` (PR diff > `MAX_DIFF_BYTES`), `normalize-review.py --diff-truncated` injects a ⚠️ callout before `**Verdict:**` so the posted comment always shows incomplete context even if the model forgets. Job summary gets a **Luffy diff truncation (F27)** section.
+
+### Sprint 17 (shipped)
+
+**F28** repo-local `.luffy/` memory: target repo is SoT for `MEMORY.md` + slim `runs/{trace}/`. Default `LUFFY_MEMORY_MODE=local` (hub off). Preload local-first via contents API; hub only if `both|hub` or `LUFFY_HUB_PUBLISH=1`. Install seeds `.luffy/MEMORY.md`. Scripts: `publish-run-local.sh`, `hub-ingest-run.py` layout=local, updated `preload-hub-memory.sh` / `publish-run-to-hub.sh`.
 
 ### readme-kit (shipped)
 

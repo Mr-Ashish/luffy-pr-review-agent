@@ -390,6 +390,9 @@ jobs:
           LUFFY_HUB_TOKEN: ${{ secrets.LUFFY_HUB_TOKEN }}
           LUFFY_HUB_REPO: ${{ vars.LUFFY_HUB_REPO }}
           LUFFY_HUB_PUBLISH: ${{ vars.LUFFY_HUB_PUBLISH }}
+          # F28: repo-local .luffy/ memory (default); hub only when mode/hub publish set
+          LUFFY_MEMORY_MODE: ${{ vars.LUFFY_MEMORY_MODE }}
+          LUFFY_MEMORY_PATH: ${{ vars.LUFFY_MEMORY_PATH }}
           # F7: job-level env already sets default; re-export for pipeline scripts
           LUFFY_HERMES_COMMIT: ${{ env.LUFFY_HERMES_COMMIT }}
         run: |
@@ -398,7 +401,13 @@ jobs:
             export LUFFY_HUB_TOKEN="${GITHUB_TOKEN}"
           fi
           export LUFFY_HUB_REPO="${LUFFY_HUB_REPO:-Mr-Ashish/luffy-pr-review-agent}"
-          export LUFFY_HUB_PUBLISH="${LUFFY_HUB_PUBLISH:-1}"
+          # F28: default memory mode local; hub publish off unless explicitly enabled
+          export LUFFY_MEMORY_MODE="${LUFFY_MEMORY_MODE:-local}"
+          export LUFFY_MEMORY_PATH="${LUFFY_MEMORY_PATH:-.luffy}"
+          # Empty GHA var → treat as unset so scripts apply mode-based defaults
+          if [[ -z "${LUFFY_HUB_PUBLISH:-}" ]]; then
+            unset LUFFY_HUB_PUBLISH || true
+          fi
           # F26: empty vars.LUFFY_MODEL → run-hermes-review.sh DEFAULT_LUFFY_MODEL (SoT)
           # Do not hardcode a second default here; leave unset when var empty.
           if [[ -z "${LUFFY_MODEL:-}" ]]; then
@@ -415,6 +424,7 @@ jobs:
             export LUFFY_STATUS=config_error
             export LUFFY_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             "$LUFFY_ROOT/scripts/save-trace.sh" || true
+            "$LUFFY_ROOT/scripts/publish-run-local.sh" || true
             "$LUFFY_ROOT/scripts/publish-run-to-hub.sh" || true
             # F15: non-zero so React result shows ❌ not ✅
             echo "pipeline_rc=1" >> "$GITHUB_OUTPUT"

@@ -36,10 +36,26 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 14 (F25):** Hermes pin single source of truth — bump only `scripts/hermes-pin.sh`; workflows resolve empty var via `default`
 - **Sprint 15 (F26):** default model SoT `anthropic/claude-opus-5` in `run-hermes-review.sh`; docs/.env.example aligned; cheaper via `vars.LUFFY_MODEL`
 - **Sprint 16 (F27):** posted review gets a ⚠️ banner when the assembled PR diff was size-truncated (`MAX_DIFF_BYTES`)
+- **Sprint 17 (F28):** repo-local `.luffy/` memory is the default SoT; hub publish is opt-in
 
-## Central hub memory (cross-repo)
+## Repo-local memory (F28 default)
 
-All target repos publish each run to the hub:
+Each target repo owns review memory under **`.luffy/`** on its default branch:
+
+```text
+.luffy/
+  MEMORY.md
+  runs/{trace_id}/meta.json|review.md|summary.md
+```
+
+- Preload: `preload-hub-memory.sh` loads `.luffy/MEMORY.md` via contents API first (sparse PR workspace is not enough).
+- Publish: `publish-run-local.sh` clones default branch → ingest layout=local → commit+push (`contents: write`).
+- Fat traces stay Actions artifacts only.
+- Vars: `LUFFY_MEMORY_MODE=local|hub|both` (default `local`), `LUFFY_MEMORY_PATH` (default `.luffy`), `LUFFY_HUB_PUBLISH=1` to force hub.
+
+## Central hub memory (opt-in cross-repo)
+
+Hub publish runs only when `LUFFY_MEMORY_MODE=hub|both` or `LUFFY_HUB_PUBLISH=1`.
 
 **Hub:** `Mr-Ashish/luffy-pr-review-agent`  
 **Path:** `memory/repos/{owner}--{repo}/`
@@ -49,8 +65,9 @@ All target repos publish each run to the hub:
 ```text
 Target Luffy run finishes
   → build-hub-payload.py (redacted, size-capped)
-  → publish-run-to-hub.sh
-       default mode=direct:
+  → publish-run-local.sh  (default: commit target .luffy/)
+  → publish-run-to-hub.sh (opt-in)
+       mode=direct when enabled:
          clone hub → hub-ingest-run.py → commit memory/ → push main
        optional mode=dispatch:
          repository_dispatch luffy-run → Ingest Luffy Run workflow

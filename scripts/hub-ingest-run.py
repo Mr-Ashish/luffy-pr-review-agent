@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """
-Apply a luffy-run payload onto memory/repos/{owner}--{repo}/ and prepare a commit.
+Apply a luffy-run payload onto memory storage and prepare a commit.
+
+Layouts (LUFFY_INGEST_LAYOUT):
+  hub   (default) — memory/repos/{owner}--{repo}/ under HUB_ROOT
+  local           — {LUFFY_MEMORY_PATH}/ (default .luffy/) under LUFFY_MEMORY_ROOT
 
 Reads CLIENT_PAYLOAD JSON from env (object with key "run" or the run object itself).
-Writes files under repo root (cwd should be hub checkout).
 """
 
 from __future__ import annotations
@@ -44,32 +47,16 @@ def rotate_memory(text: str, max_bytes: int) -> str:
     return text if text.endswith("\n") else text + "\n"
 
 
-def main() -> int:
-    raw = os.environ.get("CLIENT_PAYLOAD") or os.environ.get("LUFFY_RUN_PAYLOAD")
-    if not raw:
-        # Allow file path
-        path = os.environ.get("CLIENT_PAYLOAD_FILE")
-        if path and Path(path).exists():
-            raw = Path(path).read_text()
-        else:
-            print("CLIENT_PAYLOAD missing", file=sys.stderr)
-            return 1
+def _safe_trace_id(trace_id: str) -> str:
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", trace_id)
 
-    data = json.loads(raw)
-    run = data.get("run") if isinstance(data, dict) and "run" in data else data
-    if not isinstance(run, dict):
-        print("invalid payload shape", file=sys.stderr)
-        return 1
 
-    source_repo = run.get("source_repo") or "unknown/unknown"
-    slug = slugify_repo(source_repo)
+def write_run_pack(repo_dir: Path, run: dict, source_repo: str, slug: str | None) -> tuple[Path, Path, dict]:
+    """Write runs/{trace}/meta|review|summary + MEMORY.md under repo_dir. Returns (memory_file, run_dir, meta)."""
     pr = str(run.get("pr_number") or "unknown")
     trace_id = str(run.get("trace_id") or f"pr{pr}-run{run.get('run_id', 'unknown')}")
-    # sanitize trace_id for path
-    safe_trace = re.sub(r"[^A-Za-z0-9._-]+", "-", trace_id)
+    safe_trace = _safe_trace_id(trace_id)
 
-    root = Path(os.environ.get("HUB_ROOT", ".")).resolve()
-    repo_dir = root / "memory" / "repos" / slug
     run_dir = repo_dir / "runs" / safe_trace
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -90,6 +77,7 @@ def main() -> int:
         "timings": run.get("timings") or {},
         "meta": run.get("meta") or {},
         "schema_version": run.get("schema_version", 1),
+        "layout": "local" if slug is None else "hub",
     }
 
     (run_dir / "meta.json").write_text(json.dumps(meta, indent=2) + "\n")
@@ -102,37 +90,40 @@ def main() -> int:
             memory_block if memory_block.endswith("\n") else memory_block + "\n"
         )
 
-    # latest pointer
-    (repo_dir / "latest.json").write_text(
-        json.dumps(
-            {
-                "trace_id": trace_id,
-                "pr_number": pr,
-                "verdict": run.get("verdict"),
-                "status": run.get("status"),
-                "ingested_at": meta["ingested_at"],
-                "run_path": f"memory/repos/{slug}/runs/{safe_trace}",
-            },
-            indent=2,
-        )
-        + "\n"
+    run_path_rel = (
+        f"{repo_dir.name}/runs/{safe_trace}"
+        if slug is None
+        else f"memory/repos/{slug}/runs/{safe_trace}"
     )
+    latest_payload = {
+        "trace_id": trace_id,
+        "pr_number": pr,
+        "verdict": run.get("verdict"),
+        "status": run.get("status"),
+        "ingested_at": meta["ingested_at"],
+        "run_path": run_path_rel,
+    }
+    (repo_dir / "latest.json").write_text(json.dumps(latest_payload, indent=2) + "\n")
 
     memory_file = repo_dir / "MEMORY.md"
     if memory_file.exists():
         existing = memory_file.read_text(errors="replace")
     else:
+        title = source_repo if source_repo else "repo"
+        kind = "repo-local" if slug is None else "hub-ingested"
         existing = (
-            f"# Luffy review memory — `{source_repo}`\n\n"
-            "Cumulative notes from Luffy PR reviews (hub-ingested).\n"
+            f"# Luffy review memory — `{title}`\n\n"
+            f"Cumulative notes from Luffy PR reviews ({kind}).\n"
         )
 
     if memory_block and memory_block.strip() not in existing:
         existing = existing.rstrip() + "\n\n" + memory_block.strip() + "\n"
     existing = rotate_memory(existing, MAX_MEMORY_BYTES)
     memory_file.write_text(existing)
+    return memory_file, run_dir, meta
 
-    # index of all known repos
+
+def update_hub_index(root: Path, meta: dict) -> None:
     index_path = root / "memory" / "index.json"
     repos = []
     repos_root = root / "memory" / "repos"
@@ -153,6 +144,7 @@ def main() -> int:
                         "latest": latest,
                     }
                 )
+    index_path.parent.mkdir(parents=True, exist_ok=True)
     index_path.write_text(
         json.dumps(
             {
@@ -164,14 +156,69 @@ def main() -> int:
         + "\n"
     )
 
-    # Export for commit message
+
+def load_run_payload() -> dict:
+    raw = os.environ.get("CLIENT_PAYLOAD") or os.environ.get("LUFFY_RUN_PAYLOAD")
+    if not raw:
+        path = os.environ.get("CLIENT_PAYLOAD_FILE")
+        if path and Path(path).exists():
+            raw = Path(path).read_text()
+        else:
+            raise SystemExit("CLIENT_PAYLOAD missing")
+    data = json.loads(raw)
+    run = data.get("run") if isinstance(data, dict) and "run" in data else data
+    if not isinstance(run, dict):
+        raise SystemExit("invalid payload shape")
+    return run
+
+
+def main() -> int:
+    try:
+        run = load_run_payload()
+    except SystemExit as e:
+        print(str(e) or "payload error", file=sys.stderr)
+        return 1
+
+    source_repo = run.get("source_repo") or "unknown/unknown"
+    layout = (os.environ.get("LUFFY_INGEST_LAYOUT") or "hub").strip().lower()
+    pr = str(run.get("pr_number") or "unknown")
+    trace_id = str(run.get("trace_id") or f"pr{pr}-run{run.get('run_id', 'unknown')}")
+
+    if layout == "local":
+        root = Path(os.environ.get("LUFFY_MEMORY_ROOT") or os.environ.get("HUB_ROOT") or ".").resolve()
+        mem_rel = os.environ.get("LUFFY_MEMORY_PATH") or ".luffy"
+        repo_dir = (root / mem_rel).resolve()
+        # Safety: keep under root
+        if not str(repo_dir).startswith(str(root)):
+            print(f"LUFFY_MEMORY_PATH escapes root: {repo_dir}", file=sys.stderr)
+            return 1
+        repo_dir.mkdir(parents=True, exist_ok=True)
+        memory_file, run_dir, meta = write_run_pack(repo_dir, run, source_repo, slug=None)
+        summary_path = root / ".luffy-ingest-summary.txt"
+        summary_path.write_text(
+            f"local-ingest {source_repo} PR #{pr} trace={trace_id} verdict={run.get('verdict')}\n"
+        )
+        print(f"Wrote local memory under {repo_dir} trace={_safe_trace_id(trace_id)}")
+        print(f"MEMORY={memory_file}")
+        print(f"RUN_DIR={run_dir}")
+        print("LAYOUT=local")
+        return 0
+
+    # hub layout (default)
+    slug = slugify_repo(source_repo)
+    root = Path(os.environ.get("HUB_ROOT", ".")).resolve()
+    repo_dir = root / "memory" / "repos" / slug
+    memory_file, run_dir, meta = write_run_pack(repo_dir, run, source_repo, slug=slug)
+    update_hub_index(root, meta)
+
     summary_path = root / ".luffy-ingest-summary.txt"
     summary_path.write_text(
         f"ingest {source_repo} PR #{pr} trace={trace_id} verdict={run.get('verdict')}\n"
     )
-    print(f"Wrote memory for {slug} trace={safe_trace}")
+    print(f"Wrote memory for {slug} trace={_safe_trace_id(trace_id)}")
     print(f"MEMORY={memory_file}")
     print(f"RUN_DIR={run_dir}")
+    print("LAYOUT=hub")
     return 0
 
 

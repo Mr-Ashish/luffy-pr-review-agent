@@ -10,9 +10,11 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 @luffy review this pr
     → gate + concurrency
     → dual checkout (luffy/ + workspace/)
-    → restore HERMES_HOME memory
+    → preload MEMORY (.luffy/ first, hub opt-in)
     → assemble-context → hermes -z → normalize → PR comment
-    → distill MEMORY.md → cache + artifacts
+    → distill MEMORY.md → save-trace (fat artifact)
+    → publish slim pack → target .luffy/ (default)
+    → hub memory only if LUFFY_MEMORY_MODE=hub|both or LUFFY_HUB_PUBLISH=1
 ```
 
 ## Stages
@@ -27,9 +29,10 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 | Distill | `scripts/distill-memory.sh` | Append structured memory block |
 | Post | `scripts/post-review-comment.sh` | Delete prior `<!-- luffy-review pr=N` comments, then `gh pr comment` |
 | Orchestrate | `scripts/run-luffy-review.sh` | Compose stages + timings |
-| Trace | `scripts/save-trace.sh` | Redacted per-run package → Actions artifact |
-| Hub publish | `scripts/publish-run-to-hub.sh` | `repository_dispatch` → hub |
-| Hub ingest | `scripts/hub-ingest-run.py` | Commit `memory/repos/{slug}/…` on hub |
+| Trace | `scripts/save-trace.sh` | Redacted per-run package → Actions artifact (fat; not committed) |
+| Local memory | `scripts/publish-run-local.sh` + `hub-ingest-run.py` layout=local | Commit target `.luffy/` slim pack (F28 default) |
+| Hub publish | `scripts/publish-run-to-hub.sh` | Opt-in hub clone/ingest or `repository_dispatch` |
+| Hub ingest | `scripts/hub-ingest-run.py` | Hub: `memory/repos/{slug}/…`; local: `.luffy/` |
 
 ## Dual workspace
 
@@ -38,20 +41,36 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 | `luffy/` | Agent SOUL, prompts, scripts (from default branch) |
 | `workspace/` | PR head only (code under review) |
 | `.luffy-hermes-home/` | Hermes config + growing memory (cached) |
+| target `.luffy/` | **Repo-local** MEMORY + slim run history (committed; F28 SoT) |
 
-## Memory layers
+## Memory layers (F28)
 
 1. **L0** — single-run Hermes home  
-2. **L1** — Actions cache of `.luffy-hermes-home`  
-3. **L2** — workflow artifacts (debug + memory snapshots)  
-4. **Distill** — explicit append after each review  
+2. **L1** — preload from target **`.luffy/MEMORY.md`** (default branch via API; sparse PR workspace is not enough)  
+3. **L2** — Actions artifacts (fat traces + debug; 14–90 day expiry OK)  
+4. **L3** — opt-in hub `memory/repos/{slug}/` when `LUFFY_MEMORY_MODE=hub|both` or `LUFFY_HUB_PUBLISH=1`  
+5. **Distill** — explicit append after each review (then local publish)  
+
+Layout under the target repo:
+
+```text
+.luffy/
+  MEMORY.md
+  runs/{trace_id}/
+    meta.json
+    review.md
+    summary.md
+```
+
+Vars: `LUFFY_MEMORY_MODE` (`local` default | `hub` | `both`), `LUFFY_MEMORY_PATH` (default `.luffy`), `LUFFY_HUB_PUBLISH` (force hub on/off).
 
 ## Security
 
 - PR body/diff treated as untrusted data  
-- Least-privilege token permissions  
+- Least-privilege token permissions (`contents: write` also enables local `.luffy` push)  
 - Secrets only via env / Hermes `.env` (mode 0600)  
-- No formal GitHub “request changes” review API in v1 (comment only)  
+- Slim git history only — full hermes logs stay in artifacts, not git  
+
 
 ## Packaging (F10)
 

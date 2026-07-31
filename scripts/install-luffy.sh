@@ -110,6 +110,7 @@ RUNTIME_SCRIPTS=(
   parse-verdict.py
   post-review-comment.sh
   preload-hub-memory.sh
+  publish-run-local.sh
   publish-run-to-hub.sh
   report-verdict.sh
   review-local.sh
@@ -196,10 +197,12 @@ if [[ "$CALLER_MODE" == "1" ]]; then
   log ""
   log "Next steps (hub-managed / F10 caller):"
   log "  1. Commit .github/workflows/luffy-pr-review.yml and push to the default branch."
-  log "  2. Add secret OPENROUTER_API_KEY (and optional LUFFY_HUB_TOKEN)."
-  log "  3. Optional vars: LUFFY_MODEL, LUFFY_HERMES_COMMIT, LUFFY_COOLDOWN_SECONDS, LUFFY_RUNNER_IMAGE."
-  log "  4. On a PR, comment: @luffy review this pr"
+  log "  2. Add secret OPENROUTER_API_KEY."
+  log "  3. Memory defaults to repo-local .luffy/ (F28). Optional hub: LUFFY_MEMORY_MODE=both|hub and/or LUFFY_HUB_PUBLISH=1 + LUFFY_HUB_TOKEN."
+  log "  4. Optional vars: LUFFY_MODEL, LUFFY_HERMES_COMMIT, LUFFY_COOLDOWN_SECONDS, LUFFY_RUNNER_IMAGE, LUFFY_MEMORY_PATH."
+  log "  5. On a PR, comment: @luffy review this pr"
   log "  Runtime agent/scripts are fetched from Mr-Ashish/luffy-pr-review-agent@main each run."
+  log "  Tip: seed .luffy/MEMORY.md on the target default branch (or re-install pack mode once)."
   log "Done."
   exit 0
 fi
@@ -251,13 +254,41 @@ if [[ "$WITH_RUNNER" == "1" ]]; then
   done
 fi
 
+# F28: seed repo-local memory stub (committed; grows after each review)
+seed_local_memory() {
+  local mem_dir="$DEST/.luffy"
+  local mem_file="$mem_dir/MEMORY.md"
+  if [[ -e "$mem_file" && "$FORCE" != "1" ]]; then
+    log "exists (skip, use --force): $mem_file"
+    return 0
+  fi
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "DRY  seed $mem_file"
+    return 0
+  fi
+  mkdir -p "$mem_dir"
+  if [[ -f "$SRC/agent/MEMORY.seed.md" ]]; then
+    cp -f "$SRC/agent/MEMORY.seed.md" "$mem_file"
+  else
+    cat >"$mem_file" <<'EOF'
+# Luffy review memory
+
+Cumulative notes from Luffy PR reviews (repo-local under `.luffy/`).
+EOF
+  fi
+  log "OK   $mem_file"
+}
+
+seed_local_memory
+
 write_stamp "pack"
 
 log ""
 log "Next steps on the target repo (default branch):"
-log "  1. Commit the installed pack and push to the default branch."
+log "  1. Commit the installed pack + .luffy/MEMORY.md and push to the default branch."
 log "  2. Add secret OPENROUTER_API_KEY."
-log "  3. Optional: LUFFY_HUB_TOKEN, vars LUFFY_MODEL / LUFFY_HERMES_COMMIT / LUFFY_COOLDOWN_SECONDS / LUFFY_RUNNER_IMAGE."
-log "  4. On a PR, comment: @luffy review this pr"
+log "  3. Memory is repo-local (.luffy/) by default (F28). Optional hub: vars LUFFY_MEMORY_MODE=both|hub and/or LUFFY_HUB_PUBLISH=1 + secret LUFFY_HUB_TOKEN."
+log "  4. Optional vars: LUFFY_MODEL / LUFFY_HERMES_COMMIT / LUFFY_COOLDOWN_SECONDS / LUFFY_RUNNER_IMAGE / LUFFY_MEMORY_PATH."
+log "  5. On a PR, comment: @luffy review this pr"
 log "  Tip: for hub-managed installs (no local scripts), re-run with --caller."
 log "Done."

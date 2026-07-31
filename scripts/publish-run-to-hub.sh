@@ -9,15 +9,27 @@
 #   LUFFY_HUB_REPO     default Mr-Ashish/luffy-pr-review-agent
 #   LUFFY_HUB_TOKEN    write token (or GH_TOKEN/GITHUB_TOKEN)
 #   LUFFY_HUB_MODE     auto|direct|dispatch  (default auto)
-#   LUFFY_HUB_PUBLISH  0 to skip
+#   LUFFY_MEMORY_MODE  local|hub|both  (default local — hub off unless hub|both or LUFFY_HUB_PUBLISH=1)
+#   LUFFY_HUB_PUBLISH  1 to force hub publish; 0 to force skip
 #   OUT_DIR, REPO, PR_NUMBER, ...
 set -euo pipefail
 
 log() { echo "$*" >&2; }
 notice() { echo "::notice::$*" >&2; log "$*"; }
 
-if [[ "${LUFFY_HUB_PUBLISH:-1}" == "0" ]]; then
-  log "LUFFY_HUB_PUBLISH=0; skip hub publish"
+MODE_MEM="${LUFFY_MEMORY_MODE:-local}"
+MODE_MEM="$(printf '%s' "$MODE_MEM" | tr '[:upper:]' '[:lower:]')"
+
+# Default hub publish: off for local (F28); on for hub|both; explicit LUFFY_HUB_PUBLISH wins
+if [[ -z "${LUFFY_HUB_PUBLISH:-}" ]]; then
+  case "$MODE_MEM" in
+    hub|both) LUFFY_HUB_PUBLISH=1 ;;
+    *) LUFFY_HUB_PUBLISH=0 ;;
+  esac
+fi
+
+if [[ "${LUFFY_HUB_PUBLISH}" == "0" ]]; then
+  log "LUFFY_HUB_PUBLISH=0 (mode=${MODE_MEM}); skip hub publish"
   exit 0
 fi
 
@@ -81,6 +93,7 @@ publish_direct() {
     git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
     export CLIENT_PAYLOAD_FILE="$OUT_DIR/client_payload.json"
     export HUB_ROOT="$WORK/hub"
+    export LUFFY_INGEST_LAYOUT=hub
     python3 "$INGEST"
     git add memory/
     if git diff --cached --quiet; then
