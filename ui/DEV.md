@@ -11,6 +11,7 @@
 - Agent loop panel (F41) is separate from cost model tier: turns thrash vs which OpenRouter model was selected.
 - Browser is not a kitchen: **Run** tab copies `trigger-review.sh` / Modal commands; review work stays in GHA/Modal.
 
+- **F49 adds a chip pair** to the pack signals, not a single flag: `tool-reprompt` (a soft re-prompt was attempted) and `tool-reprompt-ok` (the second pass actually produced tool turns). Both are filled from `tool-turns-reprompt.env`, so the console can distinguish "we retried" from "the retry worked" without opening the raw logs — a run showing `tool-reprompt` without `tool-reprompt-ok` is the H18 escalation signal.
 
 ## Pitfalls
 
