@@ -5,19 +5,58 @@
       "path": ".",
       "action": "merge",
       "section": "Patterns",
-      "content": "- Secret scrubbing is a single choke-point helper (`redact_secrets()` in `scripts/normalize-review.py`) driven by one `_SECRET_PATTERNS` table: `sk-or-v1-…`, `[REDACTED] generic `api_key`-style assignments, `gh[pousr]_…`, and `github_pat_…`.\n- It is applied **twice per run**: once after `strip_outer_fence` (so the `### Raw agent output` contract-failure fallback is scrubbed too) and again after `ensure_contract` (so repair/templating cannot reintroduce a leak). Adding new output paths in `normalize-review.py` means re-checking both call sites.\n- Redaction patterns are intentionally duplicated-but-aligned across `normalize-review.py`, `scripts/save-trace.sh`, and `scripts/build-hub-payload.py`; when a pattern is added to one, add it to all three or posted comments, traces, and hub payloads drift apart in scrub policy.\n- Redaction is enforced mechanically at the post step, not delegated to the model: `agent/SOUL.md`'s \"never echo secrets\" rule remains the intent, but the guarantee lives in the normalize stage.\n- Regression tests in `tests/test_normalize_review.py` assert the leaked literal is absent *and* the placeholder (`[OPENROUTER_KEY_REDACTED]` / `[GITHUB_TOKEN_REDACTED]`) is present, including in the broken-output fallback case — copy that both-sided assertion shape for any new pattern.",
+      "content": "- `scripts/hermes-pin.sh` is a pure, network-free resolver with a 5-verb CLI (`resolve`, `install-args`, `matches <head>`, `cache-suffix`, `default`); every consumer (workflow step, `run-hermes-review.sh`) calls it instead of re-deriving pin logic, so the pin lives in exactly one place.\n- Pin comparison is prefix-tolerant in both directions (`head == pin*` or `pin == head*`), so short and full SHAs interoperate; no pin means `matches` always succeeds (floating mode is a no-op gate).\n- `cache-suffix` truncates the pin to 12 chars (or prints `latest` when floating) purely to keep the Actions cache key readable — cache keys are derived, never hand-written.\n- `ensure_hermes` in `run-hermes-review.sh` verifies an already-present binary before trusting it: probe `~/.hermes/hermes-agent`, `$HERMES_INSTALL_DIR`, `~/.local/share/hermes-agent` for a `.git` HEAD; on mismatch it reinstalls rather than silently reviewing with the wrong build.\n- After any install the script re-exports PATH, sources `~/.bashrc`, runs `hash -r`, then probes `~/.local/bin/hermes`, `~/.hermes/bin/hermes`, `~/.hermes/hermes` — installer layout is treated as unstable, so the binary is located by search, not assumption.",
       "evidence": [
-        "Redaction runs both before contract repair (so fallback 'raw agent output' is scrubbed) and after ensure_contract",
-        "Patterns align with save-trace.sh and build-hub-payload.py so traces, hub payloads, and live comments share the same scrub policy",
-        "agent/ SOUL trust model still applies; F18 is mechanical enforcement at the post choke-point."
+        "scripts/hermes-pin.sh resolve → print effective pin (empty if floating)",
+        "if [[ \"$head\" == \"$pin\"* || \"$pin\" == \"$head\"* ]]; then",
+        "for d in \"${HOME}/.hermes/hermes-agent\" \"${HERMES_INSTALL_DIR:-}\" \"${HOME}/.local/share/hermes-agent\""
+      ],
+      "confidence": "high"
+    },
+    {
+      "kind": "dev",
+      "path": ".",
+      "action": "merge",
+      "section": "Pitfalls",
+      "content": "- Default model diverges by layer: `scripts/run-hermes-review.sh` falls back to `anthropic/claude-opus-5` while the ops docs advertise `openai/gpt-5-mini` as the default. Anyone reasoning about cost from the docs alone will be wrong for local/dry runs — set `LUFFY_MODEL` explicitly instead of relying on either default.\n- Pin verification degrades to a substring check: when the install tree has no `.git`, `ensure_hermes` accepts the binary if `hermes --version` merely contains the pin's first 8 chars. A cached install without git metadata can therefore pass the pin gate on weak evidence — check `hermes-pin.txt` in the trace when a run's behaviour looks off for the pinned SHA.\n- `DEFAULT_HERMES_COMMIT` is hardcoded in `scripts/hermes-pin.sh` and duplicated as the workflow env fallback (`vars.LUFFY_HERMES_COMMIT || <sha>`); bumping the pin means editing both or the workflow will keep overriding the script default.",
+      "evidence": [
+        "MODEL=\"${LUFFY_MODEL:-${OPENROUTER_MODEL:-anthropic/claude-opus-5}}\"",
+        "Optional variable: `LUFFY_MODEL` (default in scripts: `openai/gpt-5-mini`)",
+        "if [[ -n \"$ver\" && \"$ver\" == *\"${pin:0:8}\"* ]]; then"
+      ],
+      "confidence": "high"
+    },
+    {
+      "kind": "dev",
+      "path": ".",
+      "action": "merge",
+      "section": "Design decisions",
+      "content": "- The review step is agentic, not a single completion: Hermes runs with `LUFFY_TOOLSETS` (default `terminal`) so the reviewer can inspect files under `WORKSPACE_ROOT` beyond the assembled diff, and `capture-hermes-loop.py` records the tool loop.\n- Observability is forced on at the env level (`HERMES_TUI_TOOL_PROGRESS=verbose`, `PYTHONUNBUFFERED=1`) so agent/tool activity is recoverable from logs even for a run that later fails.\n- `HERMES_HOME` is seeded per run but `MEMORY.md` is explicitly preserved through seeding — the home directory is disposable, the memory file is not.",
+      "evidence": [
+        "TOOLSETS=\"${LUFFY_TOOLSETS:-terminal}\"",
+        "export HERMES_TUI_TOOL_PROGRESS=\"${HERMES_TUI_TOOL_PROGRESS:-verbose}\"",
+        "# Seed HERMES_HOME (preserve growing MEMORY.md)"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "kind": "usage",
+      "path": ".",
+      "action": "merge",
+      "section": "Common commands",
+      "content": "- Inspect the effective Hermes pin locally without network: `scripts/hermes-pin.sh resolve` (empty output = floating), `scripts/hermes-pin.sh default` (baked-in known-good SHA), `scripts/hermes-pin.sh install-args` (exact `install.sh` args), `scripts/hermes-pin.sh cache-suffix` (Actions cache key suffix).\n- Check whether an installed tree satisfies the pin: `scripts/hermes-pin.sh matches <git-head-sha>` — exit 0 means acceptable (short/full SHA prefixes both count).\n- Float a run off the pin for a one-off experiment: `LUFFY_HERMES_COMMIT=latest scripts/hermes-pin.sh resolve` (also accepts `main`, `floating`, or empty).\n- Per-run pin actually used is recorded at `.luffy-out/hermes-pin.txt` and shipped in the trace artifact — read it before blaming the model for a behaviour change.",
+      "evidence": [
+        "usage: $0 resolve|install-args|matches <head>|cache-suffix|default",
+        "printf '%s\\n' \"${pin:-floating}\" >\"$OUT_DIR/hermes-pin.txt\"",
+        "Trace includes `hermes-pin.txt`."
       ],
       "confidence": "high"
     }
   ],
-  "summary": "The only genuinely new durable knowledge is the F18 implementation pattern: a single shared secret-redaction helper in normalize-review.py applied twice around contract repair, with patterns deliberately kept in sync with save-trace.sh and build-hub-payload.py so posted comments, traces, and hub payloads share one scrub policy. The trust-model consequence is already recorded in DEV.md#Pitfalls, so only the pattern/ordering detail is emitted.",
+  "summary": "The session's new durable content is the implementation-level contract of the F7 Hermes pin (hermes-pin.sh subcommand API, prefix/version-string match semantics, 12-char cache suffix) and the ensure_hermes bootstrap in run-hermes-review.sh (install-dir probing, PATH re-resolution, reinstall-on-mismatch), plus the agent-run env contract (LUFFY_TOOLSETS=terminal, verbose loop capture) and a real doc/script default-model divergence.",
   "session_ids": [
-    "file-dogfood-luffy-session"
+    "dogfood-luffy-session"
   ],
   "model": "anthropic/claude-opus-5",
-  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T174058-4971db/extract.raw.md"
+  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T174533-1c0b41/extract.raw.md"
 }

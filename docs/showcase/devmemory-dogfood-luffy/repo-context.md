@@ -1,27 +1,22 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T12:10:58Z
+- **assembled_at:** 2026-07-31T12:15:33Z
 
 ## git status
 
 ```
-M DEV.md
- M docs/OPERATIONS.md
- M docs/ROI-FIXES.md
- M scripts/normalize-review.py
- M tests/test_normalize_review.py
-?? docs/experiments/
+(clean)
 ```
 
 ## recent log
 
 ```
+34841d9 feat(ops): pin Hermes install for reproducible CI (F7)
+fc672e8 feat(security): redact secrets in posted PR reviews (F18)
 0cfa72c Add colocated DEV/USAGE from devmemory dogfood on Luffy
 dea239c brand: use Three.js orbital core as README hero artifact
 6a938b1 feat(brand): Three.js square artifact gallery (not banners)
-0b578c4 fix(readme-kit): repair package.json; link brand options in docs
-8d24dec feat(brand): 8 code-generated hero banner options for review
 ```
 
 ## tree (sample)
@@ -59,6 +54,7 @@ memory/repos/Mr-Ashish--odoo/latest.json
 memory/repos/Mr-Ashish--luffy-pr-review-agent/MEMORY.md
 memory/repos/Mr-Ashish--luffy-pr-review-agent/latest.json
 tests/test_gate_helpers.py
+tests/test_hermes_pin.py
 tests/test_hub_ingest.py
 tests/test_normalize_review.py
 agent/DEV.md
@@ -108,6 +104,7 @@ scripts/association-allowed.sh
 scripts/build-hub-payload.py
 scripts/capture-hermes-loop.py
 scripts/distill-memory.sh
+scripts/hermes-pin.sh
 scripts/hub-ingest-run.py
 scripts/normalize-review.py
 scripts/post-review-comment.sh
@@ -150,149 +147,7 @@ assets/brand-options/three-artifacts.html
 ## git diff
 
 ```
-diff --git a/DEV.md b/DEV.md
-index 8a563b5..4735008 100644
---- a/DEV.md
-+++ b/DEV.md
-@@ -19,6 +19,6 @@
- 
- - `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403), so the hub publish default is `mode=direct` (clone hub → ingest → push `main`); the dispatch path needs a classic PAT on the target repo.
- - Cross-repo publishing requires `LUFFY_HUB_TOKEN` (PAT with contents write on the hub); only when Luffy runs on the hub repo itself is `GITHUB_TOKEN` + `contents: write` sufficient.
--- PR title, body, comments, and diff are untrusted input — the agent must not honour embedded instructions, and secrets must never be echoed; traces redact `sk-or-…` and `[REDACTED] before packaging.
-+- PR title, body, comments, and diff are untrusted input — the agent must not honour embedded instructions, and secrets must never be echoed; `normalize-review.py` redacts `sk-or-…`, `[REDACTED] and common GitHub tokens before any PR comment is posted (F18); traces/hub scrub again before packaging.
- - `MEMORY.md` rotates when it exceeds `MAX_MEMORY_BYTES` (default 100000); unbounded growth would otherwise blow the prompt budget.
- - Historical bug classes worth watching (per the ranked ROI backlog): broken Hermes home cache key, sparse-checkout path count bug, and dishonest success reactions on failed runs.
-diff --git a/docs/OPERATIONS.md b/docs/OPERATIONS.md
-index b41674a..a0d4f66 100644
---- a/docs/OPERATIONS.md
-+++ b/docs/OPERATIONS.md
-@@ -115,7 +115,7 @@ traces/pr{N}-run{RUN_ID}-a{ATTEMPT}/
-   memory-after.md    # MEMORY.md after distill
- ```
- 
--Secrets (`sk-or-…`, `[REDACTED] are redacted before packaging.
-+Secrets (`sk-or-…`, `[REDACTED] common `ghp_`/`github_pat_` tokens) are redacted in **posted review bodies** (`normalize-review.py`, F18) and again before trace packaging / hub payload.
- 
- ```bash
- # Download latest trace for a run
-diff --git a/docs/ROI-FIXES.md b/docs/ROI-FIXES.md
-index f5dadf3..e515425 100644
---- a/docs/ROI-FIXES.md
-+++ b/docs/ROI-FIXES.md
-@@ -27,10 +27,13 @@ Evidence from live e2e (Odoo monorepo + hub memory):
- | 11 | **F15** | Config error `pipeline_rc=1` (was 0 → false ✅ reaction) | XS | Honest UX | **Shipped** |
- | 12 | **F16** | Association deny → 😕 reaction (no OpenRouter spend) | XS | Visible deny | **Shipped** |
- | 13 | **F17** | Drop dead `RUNNER_TEMP` Hermes tree copy after cold install | XS | Faster cold path | **Shipped** |
--| 14 | F7 | Pin Hermes version string | S | Repro | Later |
--| 15 | F8 | Docker image with Hermes preinstalled | M | Fastest CI | Later |
--| 16 | F9 | Inline GitHub review comments | L | Product | Later |
--| 17 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
-+| 14 | **F18** | Redact secrets in **posted** review (`normalize-review.py` choke-point) | XS | 🔥 Trust — no keys on PR comments | **Shipped** |
-+| 15 | F7 | Pin Hermes version string (`--commit` / `LUFFY_HERMES_COMMIT`) | S | Repro | Next |
-+| 16 | F19 | Per-PR re-trigger cooldown (skip paid run after recent success) | S | Cost/abuse | Later |
-+| 17 | F20 | `scripts/install-luffy.sh` copy pack to target repo | S | Adoption | Later |
-+| 18 | F8 | Docker image with Hermes preinstalled | M | Fastest CI | Later |
-+| 19 | F9 | Inline GitHub review comments | L | Product | Later |
-+| 20 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
- 
- ### Sprint 1 (shipped)
- 
-@@ -44,6 +47,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
- 
- **F13–F17** correctness + cache + reaction honesty.
- 
-+### Sprint 4 (shipped)
-+
-+**F18** secret redaction on normalize → PR comment path (aligned with trace/hub scrub patterns).
-+
- ### readme-kit (shipped)
- 
- YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser removed.
-diff --git a/scripts/normalize-review.py b/scripts/normalize-review.py
-index 3c4a35c..1a8f2c3 100755
---- a/scripts/normalize-review.py
-+++ b/scripts/normalize-review.py
-@@ -30,6 +30,27 @@ SOFT_SECTIONS = (
-     "### What I checked",
- )
- 
-+# F18: scrub secrets before the body hits GitHub PR comments / distill.
-+# Keep patterns aligned with scripts/save-trace.sh + build-hub-payload.py.
-+_SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-+    (re.compile(r"sk-or-v1-[A-Za-z0-9_-]{10,}"), "[OPENROUTER_KEY_REDACTED]"),
-+    (re.compile(r"([REDACTED] r"\1[REDACTED]"),
-+    (
-+        re.compile(r"(api[_-]?key[\"']?\s*[:=]\s*[\"']?)([^\"'\s]+)", re.I),
-+        r"\1[REDACTED]",
-+    ),
-+    (re.compile(r"gh[pousr]_[A-Za-z0-9_]{20,}"), "[GITHUB_TOKEN_REDACTED]"),
-+    (re.compile(r"github_pat_[A-Za-z0-9_]{20,}"), "[GITHUB_TOKEN_REDACTED]"),
-+)
-+
-+
-+def redact_secrets(text: str) -> str:
-+    """Remove accidental API keys / tokens from model output before post."""
-+    out = text
-+    for rx, repl in _SECRET_PATTERNS:
-+        out = rx.sub(repl, out)
-+    return out
-+
- 
- def strip_outer_fence(text: str) -> str:
-     t = text.strip()
-@@ -125,7 +146,10 @@ def main(argv: list[str] | None = None) -> int:
- 
-     raw = args.input.read_text(errors="replace")
-     cleaned = strip_outer_fence(raw)
-+    # Redact before contract repair so fallback "raw agent output" is also scrubbed.
-+    cleaned = redact_secrets(cleaned)
-     final = ensure_contract(cleaned, str(args.pr))
-+    final = redact_secrets(final)
-     final = final.replace(
-         f"<!-- luffy-review pr={args.pr} -->",
-         f"<!-- luffy-review pr={args.pr} run={args.run_id} -->",
-diff --git a/tests/test_normalize_review.py b/tests/test_normalize_review.py
-index 800a12a..1dbacd9 100644
---- a/tests/test_normalize_review.py
-+++ b/tests/test_normalize_review.py
-@@ -76,6 +76,37 @@ class NormalizeReviewTests(unittest.TestCase):
-         self.assertIn("### Security audit", out)
-         self.assertIn("looks fine ship it", out)
- 
-+    def test_redacts_openrouter_key_in_body(self):
-+        # F18: posted PR comments must never carry sk-or keys the model echoed.
-+        leak = "sk-or-v1-" + ("a" * 40)
-+        raw = self._full_contract(summary=f"found key {leak} in logs")
-+        out = self.run_norm(raw)
-+        self.assertNotIn(leak, out)
-+        self.assertIn("[OPENROUTER_KEY_REDACTED]", out)
-+        self.assertIn("**Verdict:** APPROVE", out)
-+
-+    def test_redacts_openrouter_env_assignment(self):
-+        raw = self._full_contract(summary="export [REDACTED]
-+        out = self.run_norm(raw)
-+        self.assertNotIn("sk-secret-value-xyz", out)
-+        self.assertIn("[REDACTED] out)
-+
-+    def test_redacts_github_tokens(self):
-+        ghp = "ghp_" + ("B" * 36)
-+        pat = "github_pat_" + ("C" * 22)
-+        raw = self._full_contract(summary=f"token {ghp} and {pat}")
-+        out = self.run_norm(raw)
-+        self.assertNotIn(ghp, out)
-+        self.assertNotIn(pat, out)
-+        self.assertIn("[GITHUB_TOKEN_REDACTED]", out)
-+
-+    def test_redacts_secrets_in_contract_fallback_raw(self):
-+        leak = "sk-or-v1-" + ("d" * 40)
-+        out = self.run_norm(f"broken output with {leak}")
-+        self.assertNotIn(leak, out)
-+        self.assertIn("[OPENROUTER_KEY_REDACTED]", out)
-+        self.assertIn("### Raw agent output", out)
-+
-     def test_truncates_huge(self):
-         raw = self._full_contract(summary="x" * 70_000)
-         out = self.run_norm(raw)
+(no unstaged/uncommitted diff)
 ```
 
 ## existing knowledge files
@@ -300,9 +155,10 @@ index 800a12a..1dbacd9 100644
 ### claim index (do not restate these claims)
 - [DEV.md#Architecture] @luffy action assemble cacheartifact checkout comment concurrency context
 - [DEV.md#Architecture] artifact compos deterministic every inner llm-driven orchestr record
-- [DEV.md#Architecture] assemble-contextsh contractfencessizehtml distill-memorysh hub-ingest-runpy marker normalize-reviewpy one-shot post-review-commentsh
+- [DEV.md#Architecture] assemble-contextsh contractfencessizehtml distill-memorysh hermes-pinsh hub-ingest-runpy marker normalize-reviewpy one-shot
 - [DEV.md#Architecture] branch config default domain luffy luffy-hermes-home memory prompt
 - [DEV.md#Design decisions] 400000 45-minute allowlist author-associ cancel-in-progres concurrency control costabuse
+- [DEV.md#Design decisions] --commit --force-commit --skip-setup action cache default float install
 - [DEV.md#Design decisions] comment delet luffy luffy-review luffyreplaceprevious=0 marker match prior
 - [DEV.md#Design decisions] always-publish comment crash failure hermesmodel low-confidence openrouter produce
 - [DEV.md#Pitfalls] 403 cannot classic clone default dispatch githubtoken ingest
@@ -310,18 +166,17 @@ index 800a12a..1dbacd9 100644
 - [DEV.md#Pitfalls] again agent comment common embedd f18 github honour
 - [DEV.md#Pitfalls] 100000 budget default exceed growth maxmemorybyt memorymd otherwise
 - [DEV.md#Pitfalls] backlog broken cache class count dishonest historical sparse-checkout
+- [DEV.md#Patterns] apikey-style assignment choke-point driven generic ghpousr… githubpat… helper
+- [DEV.md#Patterns] adding again agent cannot contract-failure ensurecontract fallback normalize-reviewpy
+- [DEV.md#Patterns] acros added apart comment drift duplicated-but-align intentionally normalize-reviewpy
+- [DEV.md#Patterns] agentsoulmd delegat enforc guarantee intent mechanically model never
+- [DEV.md#Patterns] absent assert assertion both-sid broken-output fallback githubtokenredact includ
 - [memory/DEV.md#Architecture] central doubl every flatten history ingest latestjson memorymd
 - [memory/DEV.md#Architecture] build-hub-payloadpy commit default direct hub-ingest-runpy luffy-run memory optional
 - [memory/DEV.md#Architecture] cross-repo cross-run hermeshome memory per-job preload preload-hub-memorysh review
 - [memory/DEV.md#Architecture] behaviour default direct|dispatch|both disable env-configurable luffyhubmode luffyhubpublish=0 luffyhubrepo
 - [agent/DEV.md#Design decisions] added agentsoulmd already chang contract explicitly import invent
-- [agent/DEV.md#Design decisions] approve attempt ignore instruc model previou prompt prompt-injection
-- [agent/DEV.md#Design decisions] acceptable asymmetric block bugssecurity concrete design discipline elsewhere
-- [agent/DEV.md#Design decisions] 0–100 1–5 audit concrete effort every field finding
-- [agent/DEV.md#Design decisions] chatter comment contract directly document fence-wrapp markdown normalize-reviewpy
-- [USAGE.md#Setup] agent branch default githubworkflowsluffy-pr-reviewyml install script target workflow
-- [USAGE.md#Setup] content cross-repo luffyhubtoken memory openrouterapikey requir secret write
-- [USAGE.md#Setup] anthr
+- [agent/DEV.md#Design decisions] approve attempt ig
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -330,13 +185,12 @@ index 800a12a..1dbacd9 100644
 ## Architecture
 - Luffy is a gated GitHub Actions control plane, not a chat bot: `@luffy review this pr` → gate + per-PR concurrency → dual checkout → restore Hermes memory → assemble context → `hermes -z` → normalize → PR comment → distill memory → cache/artifacts.
 - Orchestration is deterministic shell (`scripts/run-luffy-review.sh` composes stages and records timings); only the inner review step is LLM-driven, so every run leaves reproducible artifacts.
-- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`), normalize-review.py (contract/fences/size/HTML marker), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
+- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
 - Dual workspace separates trust domains: `luffy/` holds SOUL + prompts + scripts from the default branch, `workspace/` holds only the PR head, `.luffy-hermes-home/` holds Hermes config + growing memory.
 
 ## Design decisions
 - Cost/abuse controls are layered: author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout.
-- Re-runs replace prior Luffy comments by deleting bodies matching the `<!-- luffy-review pr=N` marker before posting; set `LUFFY_REPLACE_PREVIOUS=0` to stack instead.
-- Failure UX is always-publish: missing OpenRouter secret, Hermes/model failure, and job crash before the review file each still produce a PR c
+- Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (default known-good SHA; `latest`/`main`/`floating`/empty = float), emits `install.sh` args (`--skip-setup --commit … --force-commit`), and supplies the Actions cache key 
 … [truncated; do not restate] …
 
 ### memory/DEV.md
@@ -360,12 +214,13 @@ index 800a12a..1dbacd9 100644
 ## Setup
 - Install on each target repo by copying `agent/`, `scripts/`, and `.github/workflows/luffy-pr-review.yml` onto that repo's **default branch** (workflow only runs from default branch).
 - Required secret: `OPENROUTER_API_KEY`. For cross-repo hub memory also add `LUFFY_HUB_TOKEN` (PAT with contents write on the hub).
-- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
+- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
 - Trigger a review by commenting `@luffy review this pr` (or `@luffy review`) on the PR.
 
 ## Debugging
 - Local dry-run (needs authenticated `gh`, network, and `.env` with `OPENROUTER_API_KEY`): `./scripts/review-local.sh owner/repo 123`; add `POST_COMMENT=1` to actually comment on the PR.
 - Two artifacts per run: `luffy-out-pr<N>-run<id>` (full `.luffy-out/` + memory snapshot, 14 days) and `luffy-trace-pr<N>-run<id>` (structured redacted trace, 90 days).
 - Fetch a trace with `gh run download <run-id> -R owner/repo -n luffy-trace-pr<N>-run<run-id>`.
-- Trace layout under `traces/pr{N}-run{RUN_ID}-a{ATTEMPT}/`: `meta.json`, `trace.json`, `prompt.md`, `context.md`, `pr.json`/`pr.diff`, `review.raw.md` (Hermes stdout) vs `review.md` (posted body), `hermes.stderr`, `timings.json`, `memory-before.md`/`memory-after.md` — diff raw vs normalized to isolate contract violations, and before/after memory to verify distill.
+- Trace layout under `traces/pr{N}-run{RUN_ID}-a{ATTEMPT}/`: `meta.json`, `trace.json`, `prompt.md`, `context.md`, `pr.json`/`pr.diff`, `review.raw.md` (Hermes stdout) vs `review.md` (posted body), `hermes.stderr`, `timings.json`, `memory-before.md`/`memory-after.md` — diff raw vs normalized to isolate contract violations, and before/after memory to veri
+… [truncated; do not restate] …
 

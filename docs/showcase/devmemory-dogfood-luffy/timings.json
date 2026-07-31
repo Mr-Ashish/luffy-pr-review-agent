@@ -1,7 +1,7 @@
 {
-  "assemble_s": 0.076,
-  "extract_s": 28.093,
-  "normalize_s": 0.001,
-  "apply_s": 0.073,
-  "total_s": 28.247
+  "assemble_s": 0.108,
+  "extract_s": 49.71,
+  "normalize_s": 0.002,
+  "apply_s": 0.459,
+  "total_s": 50.283
 }

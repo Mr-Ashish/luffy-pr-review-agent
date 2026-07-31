@@ -4,7 +4,34 @@
     "kind": "dev",
     "action": "merge",
     "section": "Patterns",
-    "bytes": 4151,
+    "bytes": 5749,
+    "applied": true,
+    "unit_path": "."
+  },
+  {
+    "path": "DEV.md",
+    "kind": "dev",
+    "action": "merge",
+    "section": "Pitfalls",
+    "bytes": 6679,
+    "applied": true,
+    "unit_path": "."
+  },
+  {
+    "path": "DEV.md",
+    "kind": "dev",
+    "action": "merge",
+    "section": "Design decisions",
+    "bytes": 7264,
+    "applied": true,
+    "unit_path": "."
+  },
+  {
+    "path": "USAGE.md",
+    "kind": "usage",
+    "action": "merge",
+    "section": "Common commands",
+    "bytes": 2611,
     "applied": true,
     "unit_path": "."
   }
