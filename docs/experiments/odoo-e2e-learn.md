@@ -13,9 +13,9 @@ Luffy SoT: this repo only.
 | [#3](https://github.com/Mr-Ashish/odoo/pull/3) | luffy-eval: #271153 tools Unicode XML control-char strip | odoo#271153 | 3 (py+test) | +88/−18 | OPEN |
 | [#4](https://github.com/Mr-Ashish/odoo/pull/4) | luffy-eval: #279776 stock, mrp replenishment horizon PERF | odoo#279776 | 7 (py+test) | +234/−22 | OPEN |
 | [#5](https://github.com/Mr-Ashish/odoo/pull/5) | luffy-eval: #279360 point_of_sale ticket screen responsiveness | odoo#279360 | 6 (JS/XML/SCSS) | +109/−122 | OPEN |
-| [#6](https://github.com/Mr-Ashish/odoo/pull/6) | luffy-eval: #279777 tools street_split regex + address fixtures | odoo#279777 | 14 (py+test+l10n fixtures) | +138/−100 | OPEN — needs F49 e2e score |
+| [#6](https://github.com/Mr-Ashish/odoo/pull/6) | luffy-eval: #279777 tools street_split regex + address fixtures | odoo#279777 | 14 (py+test+l10n fixtures) | +138/−100 | OPEN — F49 scored 34/50 |
 
-Corpus size: **6** open eval PRs (grew fire: ported odoo#279777).
+Corpus size: **6** open eval PRs (all have ≥1 score row; #6 baseline H24).
 
 ## Runs
 
@@ -32,8 +32,9 @@ Corpus size: **6** open eval PRs (grew fire: ported odoo#279777).
 | **2026-07-31 H19 F49 #4** | **#4** | **local / pr4-runlocal-a1** (`.luffy-out-e2e-pr4-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→9**; F45 skipped; APPROVE 95; ~$0.014 · 10 API · 58s; soul_blocked=0; chip `tool-reprompt-ok`; score **38/50** (was 31 post-F48) |
 | **2026-07-31 H22 F49 #5** | **#5** | **local / pr5-runlocal-a1** (`.luffy-out-e2e-pr5-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→8**; F45 skipped; APPROVE 92; ~$0.026 · 9 API · 56s; soul_blocked=0; chip `tool-reprompt-ok`; score **37/50** |
 | **2026-07-31 F50 offline** | **#2/#5** | **post-process F49 bodies** | n/a | local | **H20/F50:** #2 APPROVE→REQUEST CHANGES (test gap in Suggestions); #5 tests:no → RC; #4 clean; scores **42** / **40** |
+| **2026-07-31 H24 F49 #6** | **#6** | **local / pr6-runlocal-a1** (`.luffy-out-e2e-pr6-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→1**; F45 skipped; F50 no-op; APPROVE 95; ~$0.005 · 2 API · 32s hermes; soul_blocked=0; shallow `head` only; score **34/50** |
 
-Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`; F49 #2: `.luffy-out-e2e-pr2-f49/`; F49 #4: `.luffy-out-e2e-pr4-f49/`; F49 #5: `.luffy-out-e2e-pr5-f49/`.
+Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`; F49 #2: `.luffy-out-e2e-pr2-f49/`; F49 #4: `.luffy-out-e2e-pr4-f49/`; F49 #5: `.luffy-out-e2e-pr5-f49/`; F49 #6: `.luffy-out-e2e-pr6-f49/`.
 
 ## Introspect (F46)
 
@@ -94,9 +95,9 @@ Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luff
 
 ## Next learn targets
 
-- **H20** severity calibration (missing tests → blocking) — largest remaining D1 gap vs GHA on #2.
-- Source **6th** complex upstream PR (corpus stable at 5 scored).
-- H18 optional (first-pass tools / cost), not blocking.
+- **H26** tool-depth: re-prompt recovered but only 1 shallow `head` turn on #6 — nudge to read **changed line ranges** (not file heads).
+- **H25** source 7th complex upstream PR.
+- H18 optional (first-pass tools / cost); H20 shipped F50.
 
 ## Introspect (H19 / F49 live #4)
 
@@ -119,3 +120,11 @@ Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luff
 3. **Cost mid:** attempt-1 ~$0.002 + attempt-2 ~$0.026 · 9 API · 56s — between #4 (~$0.017) and #2 (~$0.065).
 4. **Coverage ok, depth soft:** agent found no UI tests and approved; did not stress responsive breakpoints, OWL lifecycle, or restaurant inheritance edge cases (D1/D3 ceiling).
 5. **Corpus fully scored:** all 5 eval PRs have best rows; next ROI is **H20** severity or **6th** upstream PR.
+
+## Introspect (H24 / F49 live #6)
+
+1. **F49 fourth recovery, weakest depth:** 14-file street_split; first pass tool_turns=0; re-prompt **0→1** (vs #2 23 / #4 9 / #5 8). F45 skipped; F50 correctly no-op (`tests:yes`).
+2. **Shallow tools = D8 hole:** one assistant turn with 4× parallel `head -80` — `misc.py` header only, **never** reads `street_split` ~L1925; claims in "What I checked" overstate workspace use (diff still in prompt).
+3. **Score 34/50:** lowest F49 row; APPROVE 95 + soft regex-maintainability nits; cheap (~$0.005 · 2 API · 32s hermes) but quality-capped by tool depth.
+4. **ROI signal:** raise H18/H26 from pure "first-pass tools" to **depth-after-reprompt** (rg/sed around diff hunks, not head).
+5. **Ops:** orchestrator cancelled mid publish_local; hermes+trace+review complete; pack-run-for-ui re-run offline OK.

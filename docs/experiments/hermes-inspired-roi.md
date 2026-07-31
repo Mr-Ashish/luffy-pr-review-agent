@@ -31,8 +31,9 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | H22 | Live F49 mini e2e + score odoo#5 (POS ticket screen) | S | Fresh corpus member needs baseline dims | **Done H22** (37/50; 0→8 tools) |
 | H21 | Source 5th complex odoo/odoo PR → luffy-eval corpus | S | Keep multi-PR evidence growing; prefer multi-module | **Done H21** (#5 odoo#279360) |
 | H23 | Source 6th+ complex odoo/odoo PR → luffy-eval corpus | S | Keep multi-PR evidence growing beyond 5 | **Done H23** (#6 odoo#279777) |
-| H24 | Live F49 mini e2e + score odoo#6 (street_split) | S | Fresh corpus member needs baseline dims (+ F50 if test-gap) | backlog |
+| H24 | Live F49 mini e2e + score odoo#6 (street_split) | S | Fresh corpus member needs baseline dims (+ F50 if test-gap) | **Done H24** (34/50; 0→1 tools) |
 | H25 | Source 7th+ complex odoo/odoo PR → luffy-eval corpus | S | Keep multi-PR evidence growing beyond 6 | backlog |
+| H26 | Tool-depth after F49: nudge read changed hunks not file heads | S | #6 0→1 with head-only missed street_split region; D8=2 | backlog P1 |
 
 ## Selection rule
 
@@ -71,3 +72,5 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 **H20 → F50** (2026-07-31): `severity_calibration.py` — APPROVE + self-reported test gap → REQUEST CHANGES (score cap 69) + SOUL/prompt rules. Offline: #2 F49 36→**42**/50; #5 F49 37→**40**/50; #4 no-op. Chip `sev-cal`. **Next: H23** 6th upstream complex PR (or live F50 mini re-run).
 
 **H23 corpus #6** (2026-07-31): ported odoo#279777 → [Mr-Ashish/odoo#6](https://github.com/Mr-Ashish/odoo/pull/6) (14 files: street_split regex + base_address_extended tests + l10n_dk_* fixtures; +138/−100). **Next: H24** F49 mini e2e + score #6.
+
+**H24 F49 #6** (2026-07-31): `.luffy-out-e2e-pr6-f49` — recovered tool_turns **0→1**; F50 no-op; APPROVE 95; ~$0.005 · 32s; score **34/50**. Weakest F49 depth (head-only). **Next: H26** tool-depth nudge or **H25** 7th upstream.
