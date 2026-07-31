@@ -37,6 +37,7 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | H27 | Live F51 mini re-score odoo#6 (street_split tool depth) | S | Measure D1/D8 lift vs H24 34/50 head-only | **Done H27** (39/50; 0→17 tools; +5 vs H24) |
 | **H28** | **Multi-lens checklist (single-pass security/tests/perf/API/…) ** | **S** | **D10 multi-lens thin after F51; PRODUCT_FEATURE** | **Shipped F52** (prompt+SOUL+normalize) |
 | H29 | Structured findings schema (severity+confidence+hunk cite) | S–M | Actionability + trust; merge multi-lens | backlog |
+| **H30** | **Linked issue context (Fixes/#N → gh issue title/body/comments)** | **S** | **D8 claim-to-fix; pr-agent ticket compliance pattern** | **Shipped F53** |
 
 ## Selection rule
 
@@ -83,3 +84,5 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 **H27** (2026-07-31): live F51 mini re-score #6 — `.luffy-out-e2e-pr6-f51`; tool_turns **0→17**; `rg`+`sed -n 1940,1980p` on street_split; score **39/50** (H24 was 34); ~$0.034 · 18 API · 80s. **Next: H28** multi-lens PRODUCT_FEATURE or **H25** 7th upstream corpus PR.
 
 **H28 → F52** (2026-07-31): multi-lens checklist in review template + SOUL + normalize soft section. Single-pass (no fan-out). **Next:** live re-score for D10 or H25 7th corpus PR.
+
+**H30 → F53** (2026-07-31): linked issue context — extract Fixes/#N (+ URL/cross/branch), fetch via `gh` or fixture, inject into assemble prompt/context; chip `issue-ctx`; toggle `LUFFY_ISSUE_CONTEXT`. **Next:** live e2e on issue-linked eval PR for D8, or H25 7th corpus, or next product (filler / incremental / thread / testplan).

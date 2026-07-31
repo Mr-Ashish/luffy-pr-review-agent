@@ -351,6 +351,24 @@ class PackRunForUiTests(unittest.TestCase):
             self.assertIn("sev-cal", sig.get("flags") or [])
             self.assertTrue(sig.get("any"))
 
+    def test_f53_issue_context_signal(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "run"
+            src.mkdir()
+            (src / "review-2.md").write_text("**Verdict:** COMMENT\n", encoding="utf-8")
+            (src / "linked-issue-context.env").write_text(
+                "enabled=1\ncount=1\nrefs=acme/widgets#42\nfetched=1\nskipped=\nreason=ok\n",
+                encoding="utf-8",
+            )
+            out = Path(td) / "bundle.json"
+            r = _run(["--dir", str(src), "-o", str(out), "--host", "local"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            sig = json.loads(out.read_text())["signals"]
+            self.assertTrue(sig.get("issue_context"))
+            self.assertEqual(sig.get("issue_context_count"), 1)
+            self.assertEqual(sig.get("issue_context_refs"), "acme/widgets#42")
+            self.assertIn("issue-ctx", sig.get("flags") or [])
+
 
 if __name__ == "__main__":
     unittest.main()
