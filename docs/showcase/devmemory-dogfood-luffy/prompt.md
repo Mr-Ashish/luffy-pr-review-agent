@@ -64,6 +64,12 @@ We built and operate Luffy, a comment-triggered PR review agent (Hermes + OpenRo
 - tool_turns=0 on multi-file PRs is a quality smell for agentic review product.
 - SOUL.md can be blocked by Hermes prompt_injection scanner — needs a P1 workaround.
 
+## F45 tool-turns gate (H12)
+When Hermes records tool_turns=0 on a multi-file non-docs PR, Luffy fail-closes:
+scripts/tool_turns_gate.py downgrades APPROVE to COMMENT, caps score at 55,
+injects F45 banner, writes tool-turns-gate.env. Docs-only and single-file exempt.
+LUFFY_TOOL_TURNS_GATE=off disables. Evidence from odoo e2e PR #2 mini vs GHA.
+
 
 ## Existing directories (allowed `path` values)
 
@@ -108,23 +114,16 @@ agent
 
 ### git status
 ```
-M docs/experiments/hermes-inspired-roi.md
- M docs/experiments/loop-no-work-streak.md
- M scripts/normalize-review.py
- M tests/test_normalize_review.py
 ?? .luffy-out-e2e-pr2-f44/
-?? docs/experiments/2026-07-31-f44-normalize-chat-chrome.md
-?? docs/experiments/odoo-e2e-benchmark.md
-?? docs/experiments/odoo-e2e-learn.md
 ```
 
 ### recent log
 ```
+59ed6aa feat(F45): fail-closed tool_turns=0 gate on multi-file code PRs (H12)
+fd252e6 feat(normalize): F44 strip hermes chat chrome + reject template echo
 a58eb3b docs(knowledge): dogfood F43 preflight cost + showcase
 8b74bf5 feat(cost): F43 hard preflight spend estimate before Hermes (H6)
 6aa9f3f docs(knowledge): dogfood F42 model tier + showcase
-d3c1c2d feat(cost): F42 auto model tier by PR size (H7)
-776fc4c docs(knowledge): dogfood F41 max_turns + showcase
 ```
 
 ### tree (sample)
@@ -208,6 +207,7 @@ tests/test_post_inline_comments.py
 tests/test_preflight_cost.py
 tests/test_review_to_openui.py
 tests/test_run_with_timeout.py
+tests/test_tool_turns_gate.py
 tests/test_trigger_review.py
 tests/test_usage_summary.py
 tests/test_webhook_auth.py
@@ -240,6 +240,7 @@ docs/experiments/2026-07-31-f41-max-turns.md
 docs/experiments/2026-07-31-f42-model-tier.md
 docs/experiments/2026-07-31-f43-preflight-cost.md
 docs/experiments/2026-07-31-f44-normalize-chat-chrome.md
+docs/experiments/2026-07-31-f45-tool-turns-gate.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-f9c-suggestions.md
@@ -323,409 +324,15 @@ scripts/run-luffy-review.sh
 scripts/run-with-timeout.py
 scripts/save-trace.sh
 scripts/sparse-pr-paths.sh
+scripts/tool_turns_gate.py
 scripts/trigger-review.sh
 scripts/usage-summary.py
 scripts/webhook_auth.py
-scripts/write-failure-review.sh
-assets/README.md
-assets/favicon-32.png
 ```
 
 ### git diff
 ```
-diff --git a/docs/experiments/hermes-inspired-roi.md b/docs/experiments/hermes-inspired-roi.md
-index 092f1d5..3080081 100644
---- a/docs/experiments/hermes-inspired-roi.md
-+++ b/docs/experiments/hermes-inspired-roi.md
-@@ -18,6 +18,10 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) 
- | H8 | Subagent fan-out for multi-file PRs | L | Parallel review streams; Modal cost + complexity | backlog |
- | H9 | Trajectory packaging for offline eval datasets | M | Quality regressions measurable | backlog (capture-hermes-loop partial) |
- | H10 | Soft skill nudge mid-loop (“prefer fewer tools”) | M | Hermes skill nudge pattern; needs hermes hooks | backlog |
-+| **H11** | **Strip hermes chat chrome + reject prompt-template echo in normalizer** | **S** | **F44 e2e: chat -q posted Query+template; contract false-positive** | **Shipped F44** |
-+| H12 | Fail closed when tool_turns=0 on multi-file non-docs PR (re-prompt or COMMENT) | S | #2 mini APPROVE missed known test gap; GHA/tools did not | **P0 next** |
-+| H13 | SOUL.md hermes prompt_injection false-positive workaround | S | F44 log: SOUL blocked — review discipline may not load | **P1** |
-+| H14 | Make hermes -z reliable; avoid chat -q fallback | M | -z rc=2 forced chat path that needs F44 scrubbing | backlog |
- 
- ## Selection rule
- 
-@@ -30,3 +34,5 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
- **H7 → F42** (2026-07-31): auto model tier (`LUFFY_MODEL_TIER=auto`) — cheap for tiny/docs, full otherwise.
- 
- **H6 → F43** (2026-07-31): hard preflight cost estimate — force_cheap then refuse when still over budget.
-+
-+**H11 → F44** (2026-07-31): normalizer extracts real review from hermes chat chrome; rejects placeholder verdict / template echo; promotes loose headings for parse-verdict.
-diff --git a/docs/experiments/loop-no-work-streak.md b/docs/experiments/loop-no-work-streak.md
-index 2e941a4..11a95fc 100644
---- a/docs/experiments/loop-no-work-streak.md
-+++ b/docs/experiments/loop-no-work-streak.md
-@@ -6,5 +6,5 @@ Track consecutive scheduled fires that found **no P0/P1** Luffy product work
- | Field | Value |
- |-------|------:|
- | streak | **0** |
--| last_fire | 2026-07-31 (F43 hard preflight cost estimate shipped) |
--| note | P1 cost work found and shipped → streak stays 0. |
-+| last_fire | 2026-07-31 (F44 hermes chat chrome normalizer + odoo e2e score) |
-+| note | E2e run + P0 normalizer shipped → streak stays 0. |
-diff --git a/scripts/normalize-review.py b/scripts/normalize-review.py
-index 9b94a5e..7fc7f8e 100755
---- a/scripts/normalize-review.py
-+++ b/scripts/normalize-review.py
-@@ -93,10 +93,200 @@ def strip_outer_fence(text: str) -> str:
-     return body.strip()
- 
- 
-+# F44: hermes chat -q echoes "Query: …" + the full prompt (including the
-+# required Markdown *template*) before the real model answer. The template
-+# already contains every REQUIRED_SNIPPET, so a naive contract check would
-+# treat the polluted blob as valid and post the prompt to GitHub.
-+_REVIEW_HEADING_RX = re.compile(
-+    r"(?:^|\n)(?:#{1,3}\s*)?(?:🏴‍☠️\s*)?Luffy Review\s*[—\-–]?\s*PR\s*#?\s*\d*",
-+    re.IGNORECASE,
-+)
-+_PLACEHOLDER_VERDICT_RX = re.compile(
-+    r"(?:\*\*)?Verdict:(?:\*\*)?\s*<[^>\n]+>",
-+    re.IGNORECASE,
-+)
-+_REAL_VERDICT_RX = re.compile(
-+    r"(?:\*\*)?Verdict:(?:\*\*)?\s*"
-+    r"(APPROVE|REQUEST\s*CHANGES|COMMENT|LGTM|CHANGES\s*REQUESTED)\b",
-+    re.IGNORECASE,
-+)
-+# Hermes TUI / CLI chrome — only lines that are *not* valid review content.
-+# Do NOT treat bare ─── rules as chrome: models often use them between findings.
-+_HERMES_CHROME_LINE_RX = re.compile(
-+    r"(?:"
-+    r"^Query:\s*"
-+    r"|^Initializing agent\b"
-+    r"|^Resume this session with:\s*"
-+    r"|^Session:\s+\S+"
-+    r"|^Duration:\s+"
-+    r"|^Messages:\s+\d+"
-+    r"|^[╭╰].*[╮╯]\s*$"  # full-width TUI box top/bottom
-+    r"|^╭─\s*⚕"  # Hermes panel header
-+    r"|^⚕\s*Hermes\b"
-+    r"|^⚠\s+tirith\b"
-+    r")",
-+    re.MULTILINE | re.IGNORECASE,
-+)
-+# Trailing session footer starts here — drop everything after
-+_HERMES_FOOTER_RX = re.compile(
-+    r"\n(?:Resume this session with:|Session:\s+\d{8}_\d+)",
-+    re.IGNORECASE,
-+)
-+_SECTION_ALIASES: tuple[tuple[re.Pattern[str], str], ...] = (
-+    (re.compile(r"^#{0,3}\s*Summary\s*$", re.I | re.M), "### Summary"),
-+    (re.compile(r"^#{0,3}\s*Walkthrough\s*$", re.I | re.M), "### Walkthrough"),
-+    (re.compile(r"^#{0,3}\s*Blocking\s*$", re.I | re.M), "### Blocking"),
-+    (re.compile(r"^#{0,3}\s*Key findings\s*$", re.I | re.M), "### Key findings"),
-+    (re.compile(r"^#{0,3}\s*Security audit\s*$", re.I | re.M), "### Security audit"),
-+    (re.compile(r"^#{0,3}\s*Suggestions\s*$", re.I | re.M), "### Suggestions"),
-+    (re.compile(r"^#{0,3}\s*Code suggestions\s*$", re.I | re.M), "### Code suggestions"),
-+    (re.compile(r"^#{0,3}\s*Nits\s*$", re.I | re.M), "### Nits"),
-+    (re.compile(r"^#{0,3}\s*Tests\s*&\s*risk\s*$", re.I | re.M), "### Tests & risk"),
-+    (re.compile(r"^#{0,3}\s*What I checked\s*$", re.I | re.M), "### What I checked"),
-+)
-+_META_LINE_ALIASES: tuple[tuple[re.Pattern[str], str], ...] = (
-+    (re.compile(r"^\*{0,2}Verdict:\*{0,2}\s*", re.I | re.M), "**Verdict:** "),
-+    (re.compile(r"^\*{0,2}Confidence:\*{0,2}\s*", re.I | re.M), "**Confidence:** "),
-+    (re.compile(r"^\*{0,2}Score:\*{0,2}\s*", re.I | re.M), "**Score:** "),
-+    (re.compile(r"^\*{0,2}Review effort:\*{0,2}\s*", re.I | re.M), "**Review effort:** "),
-+)
-+
-+
-+def _looks_like_template_only(text: str) -> bool:
-+    """True when the only verdict is the angle-bracket prompt placeholder."""
-+    if _PLACEHOLDER_VERDICT_RX.search(text) and not _REAL_VERDICT_RX.search(text):
-+        return True
-+    # Template body often keeps the angle brackets even when bold labels exist
-+    if _PLACEHOLDER_VERDICT_RX.search(text):
-+        # Real verdict may coexist if model answered then chrome kept template
-+        # — only "template only" when no concrete token outside placeholders.
-+        without_ph = _PLACEHOLDER_VERDICT_RX.sub("", text)
-+        if not _REAL_VERDICT_RX.search(without_ph):
-+            return True
-+    return False
-+
-+
-+def _candidate_score(chunk: str) -> int:
-+    """Higher = more likely the model’s actual review (not the prompt template)."""
-+    if not chunk or len(chunk) < 40:
-+        return -100
-+    score = 0
-+    if _PLACEHOLDER_VERDICT_RX.search(chunk):
-+        score -= 50
-+    if _REAL_VERDICT_RX.search(chunk):
-+        score += 40
-+    if "**Verdict:**" in chunk or re.search(r"^Verdict:\s*\w", chunk, re.M):
-+        score += 5
-+    for snip in ("### Summary", "### Blocking", "### Security audit", "### Tests & risk"):
-+        if snip in chunk:
-+            score += 3
-+    # Unbolded section labels from chat mode still count
-+    for label in ("Summary", "Blocking", "Security audit", "Tests & risk"):
-+        if re.search(rf"^#{{0,3}}\s*{re.escape(label)}\s*$", chunk, re.M | re.I):
-+            score += 2
-+    if "Required Markdown template" in chunk or "Trust boundary" in chunk:
-+        score -= 30
-+    if chunk.lstrip().startswith("Query:"):
-+        score -= 40
-+    # Prefer chunks that look finished (footer or Tests section)
-+    if "Luffy · Hermes Agent" in chunk or "### What I checked" in chunk:
-+        score += 5
-+    return score
-+
-+
-+def extract_agent_review(text: str) -> str:
-+    """F44: pull the real review out of hermes chat -q / TUI chrome + prompt echo.
-+
-+    When ``hermes -z`` fails, the chat fallback prints ``Query:`` + the full
-+    prompt (which embeds the Markdown *template* with every required snippet)
-+    before the agent answer. Posting that blob is a trust/ops failure.
-+    """
-+    t = text.strip()
-+    if not t:
-+        return t
-+
-+    # Fast path: clean one-shot output already looks like a review
-+    if (
-+        t.startswith("## ")
-+        and "Luffy Review" in t[:80]
-+        and not t.startswith("Query:")
-+        and not _looks_like_template_only(t)
-+        and _REAL_VERDICT_RX.search(t)
-+    ):
-+        return t
-+
-+    matches = list(_REVIEW_HEADING_RX.finditer(t))
-+    if not matches:
-+        # No heading — strip obvious chrome lines and return remainder
-+        lines = [ln for ln in t.splitlines() if not _HERMES_CHROME_LINE_RX.match(ln)]
-+        cleaned = "\n".join(lines).strip()
-+        return cleaned or t
-+
-+    best: str | None = None
-+    best_score = -10_000
-+    for i, m in enumerate(matches):
-+        start = m.start()
-+        # If match began at a newline, keep content from the heading line
-+        if start > 0 and t[start] == "\n":
-+            start += 1
-+        end = matches[i + 1].start() if i + 1 < len(matches) else len(t)
-+        chunk = t[start:end]
-+        # Drop Hermes session footer if present inside this slice
-+        foot = _HERMES_FOOTER_RX.search(chunk)
-+        if foot:
-+            chunk = chunk[: foot.start()]
-+        # Drop TUI chrome lines but keep in-body ─── separators between findings
-+        chunk_lines: list[str] = []
-+        for ln in chunk.splitlines():
-+            if _HERMES_CHROME_LINE_RX.match(ln):
-+                continue
-+            chunk_lines.append(ln)
-+        chunk = "\n".join(chunk_lines).strip()
-+        sc = _candidate_score(chunk)
-+        # Later candidates win ties (model answer usually last)
-+        if sc >= best_score:
-+            best_score = sc
-+            best = chunk
-+
-+    if best is None or best_score < 10:
-+        # Fall back to last heading slice even if weak — ensure_contract may repair
-+        last = matches[-1]
-+        start = last.start() + (1 if last.start() > 0 and t[last.start()] == "\n" else 0)
-+        best = t[start:].strip()
-+        foot = _HERMES_FOOTER_RX.search(best)
-+        if foot:
-+            best = best[: foot.start()].strip()
-+
-+    # Strip leading fence if model wrapped only the answer
-+    if best.startswith("```"):
-+        best = strip_outer_fence(best)
-+    return best
-+
-+
-+def normalize_loose_headings(text: str) -> str:
-+    """Promote chat-mode unbolded labels to the hard contract form."""
-+    out = text
-+    for rx, repl in _META_LINE_ALIASES:
-+        out = rx.sub(repl, out)
-+    for rx, repl in _SECTION_ALIASES:
-+        out = rx.sub(repl, out)
-+    # Ensure title has ##
-+    out = re.sub(
-+        r"^(?!#)((?:🏴‍☠️\s*)?Luffy Review\s*[—\-–].*)$",
-+        r"## \1",
-+        out,
-+        count=1,
-+        flags=re.M,
-+    )
-+    return out
-+
-+
- def ensure_contract(text: str, pr: str) -> str:
-     t = text.strip()
-+    # F44: reject prompt-template echo even if REQUIRED_SNIPPETS are present
-+    template_only = _looks_like_template_only(t)
-     missing = [s for s in REQUIRED_SNIPPETS if s not in t]
--    if not missing:
-+    if not missing and not template_only:
-         body = t
-         # Append missing soft headings only if completely absent (do not invent content)
-         for sec in SOFT_SECTIONS:
-@@ -104,6 +294,15 @@ def ensure_contract(text: str, pr: str) -> str:
-                 # leave as-is; soft sections are guidance for the model, not hard repair
-                 pass
-     else:
-+        reason = (
-+            "prompt/template echo or placeholder verdict (F44)"
-+            if template_only
-+            else f"missing: {', '.join(missing)}"
-+        )
-+        # Keep only a short raw snippet to avoid re-posting the full prompt
-+        raw_snip = t
-+        if len(raw_snip) > 4000:
-+            raw_snip = raw_snip[:4000].rstrip() + "\n…\n_(raw truncated by normalizer)_\n"
-         body = f"""## 🏴‍☠️ Luffy Review — PR #{pr}
- 
- **Verdict:** COMMENT
-@@ -112,7 +311,7 @@ def ensure_contract(text: str, pr: str) -> str:
- **Review effort:** 2/5
- 
- ### Summary
--Agent output did not match the review contract (missing: {', '.join(missing)}). Raw content preserved below.
-+Agent output did not match the review contract ({reason}). Raw content preserved below.
- 
- ### Walkthrough
- - Contract repair only — re-run for a full structured review
-@@ -145,7 +344,7 @@ None
- - Normalizer only
- 
- ### Raw agent output
--{t}
-+{raw_snip}
- """
- 
-     marker = f"<!-- luffy-review pr={pr}"
-@@ -178,6 +377,10 @@ def main(argv: list[str] | None = None) -> int:
- 
-     raw = args.input.read_text(errors="replace")
-     cleaned = strip_outer_fence(raw)
-+    # F44: drop hermes chat chrome + prompt echo before contract checks
-+    cleaned = extract_agent_review(cleaned)
-+    cleaned = normalize_loose_headings(cleaned)
-+    cleaned = strip_outer_fence(cleaned)
-     # Redact before contract repair so fallback "raw agent output" is also scrubbed.
-     cleaned = redact_secrets(cleaned)
-     final = ensure_contract(cleaned, str(args.pr))
-diff --git a/tests/test_normalize_review.py b/tests/test_normalize_review.py
-index 644a0f6..991ea4e 100644
---- a/tests/test_normalize_review.py
-+++ b/tests/test_normalize_review.py
-@@ -136,6 +136,104 @@ class NormalizeReviewTests(unittest.TestCase):
-         out = self.run_norm(self._full_contract(), diff_truncated=False)
-         self.assertNotIn("Diff truncated (F27)", out)
- 
-+    def test_f44_extracts_review_from_hermes_chat_chrome(self):
-+        # hermes chat -q echoes Query + prompt template (with placeholder verdict)
-+        # then the real answer (often unbolded headings).
-+        template = (
-+            "## 🏴‍☠️ Luffy Review — PR #2\n\n"
-+            "**Verdict:** < APPROVE | REQUEST CHANGES | COMMENT >\n"
-+            "**Confidence:** < low | medium | high >\n"
-+            "**Score:** <0-100>/100\n"
-+            "**Review effort:** <1-5>/5\n\n"
-+            "### Summary\n<fill>\n\n"
-+            "### Blocking\n- None\n\n"
-+            "### Security audit\nNo\n\n"
-+            "### Tests & risk\n- Risk: low\n"
-+        )
-+        real = (
-+            "🏴‍☠️ Luffy Review — PR #2\n\n"
-+            "Verdict: REQUEST CHANGES\n"
-+            "Confidence: high\n"
-+            "Score: 72/100\n"
-+            "Review effort: 3/5\n\n"
-+            "Summary\nMissing tests for format:false alias.\n\n"
-+            "Blocking\n"
-+            "- Add tests for integer/float format alias.\n\n"
-+            "Key findings\nNone\n\n"
-+            "Security audit\nNo\n\n"
-+            "Suggestions\n- None\n\n"
-+            "Code suggestions\nNone\n\n"
-+            "Nits\n- None\n\n"
-+            "Tests & risk\n"
-+            "- Relevant tests added/updated: no\n"
-+            "- Coverage: getFieldsSpec only\n"
-+            "- Risk: low — small\n"
-+            "- Rollback: easy\n\n"
-+            "What I checked\n- diff of field extractors\n"
-+        )
-+        raw = (
-+            "Query: # Task\n\nYou are reviewing a PR.\n\n"
-+            "## Required Markdown template\n\n"
-+            "```markdown\n"
-+            f"{template}\n"
-+            "```\n\n"
-+            "Initializing agent...\n"
-+            "╭─ ⚕ Hermes ───────────────────────────────╮\n"
-+            f"{real}\n"
-+            "────────────────────────────────────────\n"
-+        )
-+        out = self.run_norm(raw, pr="2")
-+        self.assertNotIn("Query:", out)
-+        self.assertNotIn("< APPROVE | REQUEST CHANGES | COMMENT >", out)
-+        self.assertNotIn("Required Markdown template", out)
-+        self.assertIn("**Verdict:** REQUEST CHANGES", out)
-+        self.assertIn("**Score:** 72/100", out)
-+        self.assertIn("### Summary", out)
-+        self.assertIn("Missing tests for format:false", out)
-+        self.assertIn("<!-- luffy-review pr=2 run=test -->", out)
-+        self.assertNotIn("contract repair", out.lower())
-+
-+    def test_f44_rejects_template_only_echo(self):
-+        raw = (
-+            "Query: # Task\n\n"
-+            "## 🏴‍☠️ Luffy Review — PR #9\n\n"
-+            "**Verdict:** < APPROVE | REQUEST CHANGES | COMMENT >\n"
-+            "**Confidence:** < low | medium | high >\n"
-+            "**Score:** <0-100>/100\n"
-+            "**Review effort:** <1-5>/5\n\n"
-+            "### Summary\n<template>\n\n"
-+            "### Blocking\n- None\n\n"
-+            "### Security audit\nNo\n\n"
-+            "### Tests & risk\n- Risk: unknown\n"
-+        )
-+        out = self.run_norm(raw, pr="9")
-+        self.assertIn("**Verdict:** COMMENT", out)
-+        self.assertIn("placeholder verdict (F44)", out)
-+        self.assertIn("contract repair", out.lower())
-+
-+    def test_f44_promotes_loose_headings_on_clean_body(self):
-+        raw = (
-+            "🏴‍☠️ Luffy Review — PR #5\n\n"
-+            "Verdict: APPROVE\n"
-+            "Confidence: medium\n"
-+            "Score: 88/100\n"
-+            "Review effort: 2/5\n\n"
-+            "Summary\nLooks good.\n\n"
-+            "Blocking\nNone\n\n"
-+            "Security audit\nNo\n\n"
-+            "Tests & risk\n"
-+            "- Relevant tests added/updated: yes\n"
-+            "- Coverage: unit\n"
-+            "- Risk: low — n/a\n"
-+            "- Rollback: easy\n\n"
-+            "What I checked\n- full diff\n"
-+        )
-+        out = self.run_norm(raw, pr="5")
-+        self.assertIn("**Verdict:** APPROVE", out)
-+        self.assertIn("### Summary", out)
-+        self.assertIn("### Security audit", out)
-+        self.assertNotIn("contract repair", out.lower())
-+
- 
- if __name__ == "__main__":
-     unittest.main()
+(no unstaged/uncommitted diff)
 ```
 
 ### existing knowledge + claim index (do not repeat / paraphrase these claims)
@@ -857,21 +464,20 @@ index 644a0f6..991ea4e 100644
 
 ## Run console
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
-- **F40–F43 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns / model-tier + `flags[]`) and `loop` metrics. Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip → `ops-signals.env`; F41 → `hermes-max-turns.env`; F42 → `model-tier.env`.
+- **F40–F45 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns / model-tier / preflight / **tool-turns-gate** + `flags[]`) and `loop` metrics. Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip → `ops-signals.env`; F41 → `hermes-max-turns.env`; F42 → `model-tier.env`; F45 → `tool-turns-gate.env`.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
 
 ## Trigger a review (F32)
 --model anthropic/claude-opus-5 --diff-bytes 200000 --file-count 20
+--path a.js --path b.js --env-out tool-turns-gate.env
 --path README.md --diff-bytes 400
 --review docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/review.md \
---diff docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/pr.diff
 
 ## Common commands
 - Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).
 - Hub-managed thin install (F10, no agent/scripts copy): `./scripts/install-luffy.sh --caller /path/to/target-repo`.
-- Build prebaked Hermes runner image: `./scripts/build-luffy-runner-image.sh` (optional `PUSH=1`).
-- Benchmark Hermes startup paths: `SKIP_CO
+- Build prebaked Hermes runner image: `./scripts/build-luffy-runner-image.sh` (option
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md

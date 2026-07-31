@@ -1,57 +1,23 @@
 diff --git a/DEV.md b/DEV.md
 --- a/DEV.md
 +++ b/DEV.md
-@@ -47,8 +47,6 @@
- - The helper never rewrites the child's exit code except timeout→124 (`125` is reserved for invalid usage / empty command), so normal Hermes failures still surface unchanged upstream.
- - F36 and F29 are complementary, not overlapping: F29's soft `LUFFY_MAX_COST_USD` annotates a run that already *finished*, while F36 is the only mechanism that stops a run that never finishes.
- - Timeout evidence lands in the trace as `hermes-timeout.env` and `hermes-timeout-seconds.txt`, so a 124 can be distinguished from a model/contract failure after the fact.
--- **F41 max turns:** Hermes-inspired iteration budget (`agent.max_turns` / `--max-turns` / `HERMES_MAX_ITERATIONS`). Default **40** (Hermes product default is 500 — unsafe for CI cost). Resolver `scripts/max_turns.py`; `run-hermes-review.sh` passes `--max-turns`, rewrites `HERMES_HOME/config.yaml`, writes `hermes-max-turns.env`, detects budget exhaustion via log strings. Complements F36 (time) and F29 (post-hoc $): F41 stops *tool-call thrash* that still finishes under the wall-clock. Pack exposes `signals.max_turns_hit` + `loop.{tool_call_turns,message_count,max_turns}` for the Run Console.
--- **F43 preflight cost:** hard estimate before Hermes using diff bytes + model $/MTok proxy (`scripts/preflight_cost.py`). When `LUFFY_MAX_COST_USD` is set (shared with F29), default action **force_cheap** downgrades to `LUFFY_MODEL_CHEAP`; if still over (or `LUFFY_PREFLIGHT_ACTION=refuse`) writes COMMENT stub and **skips** Hermes entirely (`exit 0` from `run-hermes-review.sh`). No budget → estimate-only telemetry. Escape: `LUFFY_PREFLIGHT_FORCE=1`. Complements F29 (post-hoc alert) and F42 (size tier without a dollar cap).
- - **F42 auto model tier:** opt-in `LUFFY_MODEL_TIER=auto` picks cheap (`LUFFY_MODEL_CHEAP`, default `openai/gpt-4.1-mini`) for docs-only or tiny PRs (`≤ LUFFY_TIER_MAX_FILES` and `≤ LUFFY_TIER_MAX_BYTES`), else full (`LUFFY_MODEL_FULL` / `LUFFY_MODEL` / opus-5). Truncated diffs always get full. Default mode **off** preserves F26 single-model behaviour. Pure helper `scripts/model_tier.py`; `run-hermes-review.sh` re-resolves after `meta.env`; pack signals `model_tier*` + chips `model-cheap`/`model-full`.
+@@ -73,6 +73,9 @@
+ - Bare `───` horizontal rules are deliberately **not** treated as TUI chrome (models use them between findings); only explicit chrome lines (`Query:`, `Initializing agent`, `Session:`, `Duration:`, `Messages:`, `╭…╮`/`╰…╯` boxes, `⚕ Hermes`, `⚠ tirith`) are dropped, and the session footer truncates the slice.
+ - Contract-repair fallback truncates the preserved raw body to 4000 chars (`_(raw truncated by normalizer)_`) so a rejected prompt echo can never be re-posted in full to GitHub.
  
- - Exactly **one** managed label is applied per run and the other three managed labels from a prior run are removed, so a PR never carries two contradictory Luffy verdicts: `APPROVE→{prefix}:approve`, `REQUEST_CHANGES→{prefix}:request-changes`, `COMMENT→{prefix}:comment`, `UNKNOWN`/pipeline failure→`{prefix}:error`.
-@@ -69,6 +67,11 @@
- - `0` / `off` is a supported value meaning "no cap" — treat unset and disabled as different states when reading a run's config.
- - Knob surfaces are per-host: GitHub Actions uses `vars.LUFFY_MAX_TURNS`, Modal uses env `LUFFY_MAX_TURNS`; `scripts/max_turns.py` is included in the install pack so adopted repos get the same resolver.
- - Design was lifted from Hermes' own conversation loop (`agent.max_turns` / `--max-turns` / `HERMES_MAX_ITERATIONS` in NousResearch/hermes-agent); the running list of such borrowings lives in `docs/experiments/hermes-inspired-roi.md`.
++- **F44 normalize (chat-chrome):** `scripts/normalize-review.py` no longer assumes the review step ran through `hermes -z`; it extracts the real review out of `hermes chat -q` TUI chrome, because the review path can degrade to the chat fallback and would otherwise publish raw wrapper output.
++- F44 **promotes unbolded `Verdict:` / `Summary` headings** to the bold contract form so downstream `parse-verdict.py` and the contract checks keep matching when the model drops the bold markers.
 +
-+- Contract validity is no longer "all REQUIRED_SNIPPETS present": `_looks_like_template_only()` rejects output whose only verdict is the angle-bracket placeholder (`Verdict: < APPROVE | … >`), so a prompt echo fails the contract instead of passing it. Repair reason is stamped as `prompt/template echo or placeholder verdict (F44)`.
-+- Candidate selection is scored, not positional: `_candidate_score()` slices on `Luffy Review — PR #n` headings and penalises placeholder verdicts (-50), `Required Markdown template` / `Trust boundary` text (-30) and a leading `Query:` (-40) while rewarding a concrete verdict (+40); ties go to the *last* candidate since the model answer trails the echo.
-+- Bare `───` horizontal rules are deliberately **not** treated as TUI chrome (models use them between findings); only explicit chrome lines (`Query:`, `Initializing agent`, `Session:`, `Duration:`, `Messages:`, `╭…╮`/`╰…╯` boxes, `⚕ Hermes`, `⚠ tirith`) are dropped, and the session footer truncates the slice.
-+- Contract-repair fallback truncates the preserved raw body to 4000 chars (`_(raw truncated by normalizer)_`) so a rejected prompt echo can never be re-posted in full to GitHub.
- 
  ## Pitfalls
  
-@@ -114,6 +117,9 @@
- - Budget-exhaustion detection is **log-string matching**, not an exit code: `run-hermes-review.sh` / `scripts/max_turns.py` look for `Iteration budget exhausted`, `max_iterations_reached`, and `Reached maximum iterations`. A Hermes upgrade that rewords any of these silently degrades `signals.max_turns_hit` to false while the run still gets truncated — re-check the three patterns whenever the Hermes pin moves.
- - `run-bundle.loop` (not the raw Hermes log) is the intended operator surface for loop behaviour: read `tool_call_turns`, `message_count`, `step_count`, `max_turns` from the bundle rather than re-parsing stdout.
+ - `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403), so the hub publish default is `mode=direct` (clone hub → ingest → push `main`); the dispatch path needs a classic PAT on the target repo.
+@@ -120,6 +123,9 @@
+ - `hermes -z` is not reliable: an observed `-z` rc=2 on odoo PR #2 forced the `hermes chat -q` path, which is exactly the polluted-output case F44 scrubs. Anything that assumes one-shot mode always wins will regress (tracked as H14).
+ - `tool_turns=0` on a multi-file PR is a quality smell for an *agentic* review product, not a cheap win: the no-tool mini run on PR #2 returned APPROVE while an earlier GHA tool-using review caught the real gap (missing `format:false` tests). **F45/H12** fail-closes: `scripts/tool_turns_gate.py` downgrades APPROVE→COMMENT, caps score at 55, injects an F45 banner, writes `tool-turns-gate.env` (chip `tool-turns-gate`). Docs-only / single-file exempt; `LUFFY_TOOL_TURNS_GATE=off` disables.
  
-+- `hermes -z` is not reliable: an observed `-z` rc=2 on odoo PR #2 forced the `hermes chat -q` path, which is exactly the polluted-output case F44 scrubs. Anything that assumes one-shot mode always wins will regress (tracked as H14).
-+- `tool_turns=0` on a multi-file PR is a quality smell for an *agentic* review product, not a cheap win: the no-tool mini run on PR #2 returned APPROVE while an earlier GHA tool-using review caught the real gap (missing `format:false` tests). Treat zero-tool multi-file reviews as suspect (H12: fail closed / re-prompt / downgrade to COMMENT).
++- The normalizer is a **trust boundary**, not a formatter: never accept a body as a valid review contract just because expected snippets/headings appear in it — prompt echo contains all of them. Contract checks must assert the placeholder-free form.
++- `hermes -z` can fail at runtime and fall back to `hermes chat -q` (observed on a cheap run over Mr-Ashish/odoo PR #2); pre-F44 that path would have posted the **entire prompt** as the PR review comment.
 +
  ## Patterns
  
  - **F27 truncation banner** is mechanical (not model-dependent): `assemble-context` sets `DIFF_TRUNCATED` in `meta.env` → `run-hermes-review.sh` passes `--diff-truncated` → `inject_diff_truncated_banner()` inserts a blockquote before `**Verdict:**`. Idempotent if the model already wrote a similar note. Raising `MAX_DIFF_BYTES` is the operator control; the banner is honesty, not a skip.
-
-diff --git a/USAGE.md b/USAGE.md
---- a/USAGE.md
-+++ b/USAGE.md
-@@ -262,6 +262,8 @@
- - Set the cap per host: repo variable `LUFFY_MAX_TURNS` for GitHub Actions, env `LUFFY_MAX_TURNS` for Modal; use `0` or `off` to disable the cap entirely when debugging a long legitimate review.
- - F41 regression gate: `pytest` (204 passing at 50c4712), `bash -n scripts/run-hermes-review.sh`, and `cd ui/review-console && npm run pack-fixture && npm run build` — the shell syntax check and fixture re-pack are what catch the config-rewrite and bundle-shape halves.
- 
-+- Multi-PR e2e corpus for scoring review quality: `Mr-Ashish/odoo` PRs #1–#3 (PRs titled `luffy-eval …`); per-run output for the F44 investigation was kept under `.luffy-out-e2e-pr2-f44/` with the write-up in `docs/experiments/odoo-e2e-benchmark.md` / `odoo-e2e-learn.md`.
-+
- ## Troubleshooting
- 
- - Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` (`mode=pack|caller`, `source_sha`) and compare with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`. For `mode=caller`, runtime tracks hub `main`, not the stamp alone.
-
-diff --git a/agent/DEV.md b/agent/DEV.md
---- a/agent/DEV.md
-+++ b/agent/DEV.md
-@@ -32,3 +32,5 @@
- - **F42:** `run-hermes-review.sh` may select cheap vs full model via `scripts/model_tier.py` when `LUFFY_MODEL_TIER=auto` (docs/tiny → cheap). Does not change SOUL/prompt content.
- 
- - **F43:** preflight cost may skip Hermes or force cheap model when `LUFFY_MAX_COST_USD` is tight — SOUL/prompt unchanged; stub review is COMMENT.
-+
-+- `agent/SOUL.md` can be **blocked by Hermes' own prompt_injection scanner** (its trust-model section quotes injection strings like "ignore previous instructions"), which means the reviewer contract and finding discipline may silently not load for a run. Check the Hermes log for a SOUL-blocked line when review quality/format degrades unexpectedly; a phrasing workaround is tracked as H13 (P1).
