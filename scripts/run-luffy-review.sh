@@ -137,6 +137,46 @@ if [[ -f "$SCRIPTS/memory-health.sh" ]]; then
   bash "$SCRIPTS/memory-health.sh" summary >"$OUT_DIR/memory-health.md" 2>/dev/null || true
 fi
 
+# F31: auto-pack Run Console bundle (soft — never fails the review)
+# Prefer TRACE_DIR (has meta.json + review.md); fall back to OUT_DIR.
+if [[ -f "$SCRIPTS/pack-run-for-ui.py" ]]; then
+  PACK_SRC=""
+  if [[ -n "${TRACE_DIR:-}" && -d "${TRACE_DIR:-}" ]]; then
+    PACK_SRC="$TRACE_DIR"
+  elif [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
+    PACK_SRC="$(cat "$OUT_DIR/latest-trace-dir.txt")"
+  fi
+  if [[ -z "$PACK_SRC" || ! -d "$PACK_SRC" ]]; then
+    PACK_SRC="$OUT_DIR"
+  fi
+  PACK_ARGS=(
+    python3 "$SCRIPTS/pack-run-for-ui.py"
+    --dir "$PACK_SRC"
+    -o "$OUT_DIR/run-bundle.json"
+    --soft
+  )
+  if [[ -f "$OUT_DIR/memory-health.env" ]]; then
+    PACK_ARGS+=(--memory-health "$OUT_DIR/memory-health.env")
+  fi
+  if [[ -n "${TRACE_DIR:-}" && -d "${TRACE_DIR:-}" ]]; then
+    PACK_ARGS+=(--also "$TRACE_DIR/run-bundle.json")
+  fi
+  # Host auto-detect inside pack (GITHUB_ACTIONS / MODAL_* / LUFFY_HOST)
+  stage pack_ui_bundle "${PACK_ARGS[@]}" || true
+  if [[ -f "$OUT_DIR/run-bundle.json" ]]; then
+    echo "RUN_BUNDLE=$OUT_DIR/run-bundle.json"
+    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+      {
+        echo "### Luffy Run Console bundle (F31)"
+        echo ""
+        echo "- **path:** \`$OUT_DIR/run-bundle.json\` (also in trace artifact if present)"
+        echo "- Load in \`ui/review-console\` via **Load bundle** (or \`npm run pack-fixture\` for fixtures)."
+        echo ""
+      } >>"$GITHUB_STEP_SUMMARY"
+    fi
+  fi
+fi
+
 if [[ "${POST_COMMENT:-0}" == "1" && -f "${REVIEW_FILE:-}" ]]; then
   stage post_comment "$SCRIPTS/post-review-comment.sh" "$REVIEW_FILE" "${PR_NUMBER:-}" || ORCH_RC=$?
 fi
@@ -149,6 +189,9 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
       echo "trace_dir=$(cat "$OUT_DIR/latest-trace-dir.txt")"
     fi
+    if [[ -f "$OUT_DIR/run-bundle.json" ]]; then
+      echo "run_bundle=$OUT_DIR/run-bundle.json"
+    fi
     if [[ -f "$OUT_DIR/memory-health.env" ]]; then
       # surface key lines for workflow consumers
       grep -E '^(MEMORY_SOURCE|LOCAL_PUBLISH|HUB_PUBLISH)=' "$OUT_DIR/memory-health.env" || true
@@ -160,6 +203,9 @@ echo "REVIEW_FILE=${REVIEW_FILE:-}"
 echo "LUFFY_STATUS=$LUFFY_STATUS"
 if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
   echo "TRACE_DIR=$(cat "$OUT_DIR/latest-trace-dir.txt")"
+fi
+if [[ -f "$OUT_DIR/run-bundle.json" ]]; then
+  echo "RUN_BUNDLE=$OUT_DIR/run-bundle.json"
 fi
 if [[ -f "$OUT_DIR/memory-health.env" ]]; then
   echo "--- memory-health ---"

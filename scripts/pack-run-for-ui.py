@@ -6,6 +6,9 @@ Usage:
     --dir docs/showcase/e2e-odoo-pr3-opus5-agentic-loop \\
     -o ui/review-console/public/fixtures/run-bundle.json
 
+  # F31 pipeline (soft): pack TRACE_DIR after each review
+  python3 scripts/pack-run-for-ui.py --dir \"$TRACE_DIR\" -o \"$OUT_DIR/run-bundle.json\"
+
 Optional overrides:
   --comment-url URL  --host modal|gha|local
 """
@@ -14,8 +17,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -88,6 +94,74 @@ def parse_review(md: str) -> dict:
     }
 
 
+def detect_host(explicit: str | None = None) -> str:
+    """Resolve host label for the Run Console (gha | modal | local)."""
+    if explicit in ("gha", "modal", "local"):
+        return explicit
+    env_host = (os.environ.get("LUFFY_HOST") or "").strip().lower()
+    if env_host in ("gha", "modal", "local"):
+        return env_host
+    if os.environ.get("MODAL_TASK_ID") or os.environ.get("MODAL_ENVIRONMENT"):
+        return "modal"
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        return "gha"
+    return "local"
+
+
+def _resolve_review_md(dir_path: Path) -> str:
+    """Prefer review.md; fall back to review-<pr>.md under OUT_DIR layouts."""
+    direct = read_text(dir_path / "review.md")
+    if direct:
+        return direct
+    candidates = sorted(
+        p
+        for p in dir_path.glob("review-*.md")
+        if ".raw." not in p.name and p.is_file()
+    )
+    if candidates:
+        return read_text(candidates[0]) or ""
+    return ""
+
+
+def prepare_pack_dir(dir_path: Path, *, extra_env_file: Path | None = None) -> Path:
+    """Return a directory ready for pack() — copy memory-health if needed.
+
+    If memory-health.env is only under OUT_DIR (not TRACE_DIR), soft-copy into a
+    temp overlay so the bundle includes F30 health without mutating the trace.
+    When the source already has everything, return dir_path unchanged.
+    """
+    mh_src = None
+    if extra_env_file and extra_env_file.is_file():
+        mh_src = extra_env_file
+    elif (dir_path / "memory-health.env").is_file():
+        return dir_path
+    # Look next to common OUT_DIR layouts: parent of traces/<id>
+    sibling = dir_path.parent.parent / "memory-health.env"
+    if mh_src is None and sibling.is_file() and dir_path.parent.name == "traces":
+        mh_src = sibling
+    parent_mh = dir_path.parent / "memory-health.env"
+    if mh_src is None and parent_mh.is_file():
+        mh_src = parent_mh
+    if mh_src is None or (dir_path / "memory-health.env").is_file():
+        return dir_path
+    # Overlay: temp dir with symlink/copy of files is heavy; just copy mh into
+    # source when writable, else temp overlay with key files.
+    try:
+        shutil.copy2(mh_src, dir_path / "memory-health.env")
+        return dir_path
+    except OSError:
+        pass
+    tmp = Path(tempfile.mkdtemp(prefix="luffy-pack-"))
+    for p in dir_path.iterdir():
+        dest = tmp / p.name
+        if p.is_dir():
+            shutil.copytree(p, dest, dirs_exist_ok=True)
+        else:
+            shutil.copy2(p, dest)
+    shutil.copy2(mh_src, tmp / "memory-health.env")
+    return tmp
+
+
 def pack(dir_path: Path, *, comment_url: str = "", host: str = "gha") -> dict:
     meta = read_json(dir_path / "meta.json") or {}
     timings = read_json(dir_path / "timings.json") or {}
@@ -96,8 +170,12 @@ def pack(dir_path: Path, *, comment_url: str = "", host: str = "gha") -> dict:
     ) or {}
     pr = read_json(dir_path / "pr.json") or {}
     trace = read_json(dir_path / "trace.json") or {}
-    review_md = read_text(dir_path / "review.md") or ""
+    review_md = _resolve_review_md(dir_path)
     review_raw = read_text(dir_path / "review.raw.md", 80_000)
+    if not review_raw:
+        raws = sorted(dir_path.glob("review-*.raw.md"))
+        if raws:
+            review_raw = read_text(raws[0], 80_000)
     prompt = read_text(dir_path / "prompt.md", 40_000)
     context = read_text(dir_path / "context.md", 40_000)
     diff = read_text(dir_path / "pr.diff", 120_000)
@@ -231,24 +309,62 @@ def pack(dir_path: Path, *, comment_url: str = "", host: str = "gha") -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--dir", type=Path, required=True, help="Run directory")
+    ap.add_argument("--dir", type=Path, required=True, help="Run / TRACE_DIR directory")
     ap.add_argument("-o", "--out", type=Path, required=True)
     ap.add_argument("--comment-url", default="")
-    ap.add_argument("--host", default="gha", choices=("gha", "modal", "local"))
-    args = ap.parse_args()
-    if not args.dir.is_dir():
-        print(f"not a directory: {args.dir}", file=sys.stderr)
-        return 1
-    bundle = pack(args.dir, comment_url=args.comment_url, host=args.host)
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(bundle, indent=2) + "\n", encoding="utf-8")
-    print(args.out)
-    print(
-        f"trace={bundle['run']['trace_id']} verdict={bundle['result'].get('verdict')} "
-        f"files={len(bundle['trace']['artifacts'])}",
-        file=sys.stderr,
+    ap.add_argument(
+        "--host",
+        default=None,
+        choices=("gha", "modal", "local"),
+        help="Host label (default: auto-detect from env)",
     )
-    return 0
+    ap.add_argument(
+        "--memory-health",
+        type=Path,
+        default=None,
+        help="Optional path to memory-health.env (F30) if not inside --dir",
+    )
+    ap.add_argument(
+        "--also",
+        type=Path,
+        action="append",
+        default=[],
+        help="Extra output path(s) to write the same bundle (e.g. TRACE_DIR/run-bundle.json)",
+    )
+    ap.add_argument(
+        "--soft",
+        action="store_true",
+        help="Exit 0 even when pack fails (pipeline must not fail reviews)",
+    )
+    args = ap.parse_args()
+    try:
+        if not args.dir.is_dir():
+            raise FileNotFoundError(f"not a directory: {args.dir}")
+        host = detect_host(args.host)
+        pack_dir = prepare_pack_dir(args.dir, extra_env_file=args.memory_health)
+        bundle = pack(pack_dir, comment_url=args.comment_url, host=host)
+        if not bundle["result"].get("review_md") and not bundle["result"].get("verdict"):
+            print("pack: no review.md found — writing minimal bundle", file=sys.stderr)
+        outs = [args.out, *args.also]
+        written = []
+        for out in outs:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps(bundle, indent=2) + "\n", encoding="utf-8")
+            written.append(out)
+        for w in written:
+            print(w)
+        print(
+            f"host={host} trace={bundle['run']['trace_id']} "
+            f"verdict={bundle['result'].get('verdict') or '—'} "
+            f"files={len(bundle['trace']['artifacts'])}",
+            file=sys.stderr,
+        )
+        return 0
+    except Exception as e:  # noqa: BLE001
+        print(f"pack-run-for-ui failed: {e}", file=sys.stderr)
+        if args.soft:
+            return 0
+        return 1
 
 
 if __name__ == "__main__":

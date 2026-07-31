@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""F31: pack-run-for-ui auto-bundle for the Run Console."""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "scripts" / "pack-run-for-ui.py"
+SHOWCASE = ROOT / "docs" / "showcase" / "e2e-odoo-pr3-opus5-agentic-loop"
+
+
+def _run(args: list[str], env: dict | None = None) -> subprocess.CompletedProcess:
+    e = {**os.environ, **(env or {})}
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), *args],
+        capture_output=True,
+        text=True,
+        cwd=str(ROOT),
+        env=e,
+    )
+
+
+class PackRunForUiTests(unittest.TestCase):
+    def test_pack_showcase(self):
+        self.assertTrue(SHOWCASE.is_dir(), "showcase fixture missing")
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "run-bundle.json"
+            r = _run(["--dir", str(SHOWCASE), "-o", str(out), "--host", "gha"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertTrue(out.is_file())
+            bundle = json.loads(out.read_text())
+            self.assertEqual(bundle["schema_version"], 1)
+            self.assertEqual(bundle["host"], "gha")
+            self.assertTrue(bundle["result"].get("verdict") or bundle["result"].get("review_md"))
+            self.assertIn("cost", bundle)
+            self.assertIn("timings", bundle)
+            self.assertIn("trace", bundle)
+
+    def test_also_writes_second_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "a.json"
+            also = Path(td) / "sub" / "b.json"
+            r = _run(
+                [
+                    "--dir",
+                    str(SHOWCASE),
+                    "-o",
+                    str(out),
+                    "--also",
+                    str(also),
+                    "--host",
+                    "local",
+                ]
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertTrue(out.is_file())
+            self.assertTrue(also.is_file())
+            self.assertEqual(json.loads(out.read_text())["host"], "local")
+
+    def test_memory_health_inject(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "run"
+            src.mkdir()
+            (src / "review.md").write_text(
+                "## Luffy Review — PR #9\n\n**Verdict:** COMMENT\n**Score:** 70/100\n\n"
+                "### Summary\nok\n",
+                encoding="utf-8",
+            )
+            (src / "meta.json").write_text(
+                json.dumps(
+                    {
+                        "trace_id": "pr9-test",
+                        "repo": "acme/x",
+                        "pr_number": "9",
+                        "status": "success",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            mh = Path(td) / "memory-health.env"
+            mh.write_text(
+                "MEMORY_SOURCE=local\nLOCAL_PUBLISH=ok\nHUB_PUBLISH=skipped\n",
+                encoding="utf-8",
+            )
+            out = Path(td) / "bundle.json"
+            r = _run(
+                [
+                    "--dir",
+                    str(src),
+                    "-o",
+                    str(out),
+                    "--memory-health",
+                    str(mh),
+                    "--host",
+                    "gha",
+                ]
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            bundle = json.loads(out.read_text())
+            self.assertEqual(bundle["result"]["verdict"], "COMMENT")
+            self.assertEqual(bundle["memory"]["health"].get("MEMORY_SOURCE"), "local")
+            self.assertEqual(bundle["memory"]["health"].get("LOCAL_PUBLISH"), "ok")
+
+    def test_soft_missing_dir(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "x.json"
+            r = _run(
+                ["--dir", str(Path(td) / "nope"), "-o", str(out), "--soft"]
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertFalse(out.exists())
+
+    def test_detect_host_env(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "b.json"
+            r = _run(
+                ["--dir", str(SHOWCASE), "-o", str(out)],
+                env={
+                    "LUFFY_HOST": "modal",
+                    "GITHUB_ACTIONS": "",
+                    "MODAL_TASK_ID": "",
+                },
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(json.loads(out.read_text())["host"], "modal")
+
+    def test_review_pr_number_fallback(self):
+        """OUT_DIR layout uses review-<n>.md instead of review.md."""
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "out"
+            src.mkdir()
+            (src / "review-42.md").write_text(
+                "**Verdict:** APPROVE\n**Score:** 90/100\n\n### Summary\nship it\n",
+                encoding="utf-8",
+            )
+            out = Path(td) / "b.json"
+            r = _run(["--dir", str(src), "-o", str(out), "--host", "local"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            b = json.loads(out.read_text())
+            self.assertEqual(b["result"]["verdict"], "APPROVE")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -39,6 +39,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 17 (F28):** repo-local `.luffy/` memory is the default SoT; hub publish is opt-in
 - **Sprint 18 (F29):** soft max cost budget via `vars.LUFFY_MAX_COST_USD` (footer + job summary + warning; never fails the run)
 - **Sprint 19 (F30):** memory health job summary + loud local-publish failure; README local-first
+- **Sprint 20 (F31):** every run auto-writes `run-bundle.json` for the Run Console (artifact + job summary); soft-fail
 
 ## Repo-local memory (F28 default)
 

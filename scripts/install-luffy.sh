@@ -108,6 +108,7 @@ RUNTIME_SCRIPTS=(
   install-luffy.sh
   memory-health.sh
   normalize-review.py
+  pack-run-for-ui.py
   parse-verdict.py
   post-review-comment.sh
   preload-hub-memory.sh

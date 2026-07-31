@@ -88,9 +88,10 @@ Hub implementation file: `.github/workflows/luffy-review-reusable.yml` (`on: wor
 Luffy’s PR comment remains Markdown. The **Run Console** (`ui/review-console/`) is the full-run ops surface (Impeccable Operate / Neo kinpaku):
 
 ```text
-.luffy-out / showcase dir
-    → scripts/pack-run-for-ui.py  →  run-bundle.json
-    → Vite app tabs: PR · result · findings · diff · trace · loop · cost · memory · artifacts
+review pipeline (GHA / Modal / local)
+    → F31 soft stage pack_ui_bundle
+    → .luffy-out/run-bundle.json (+ traces/<id>/run-bundle.json)
+    → Vite app Load bundle → tabs: PR · result · findings · diff · trace · loop · cost · memory · artifacts
 ```
 
-Optional OpenUI Lang export remains via `scripts/review-to-openui.py`. See [OPENUI-INTEGRATION.md](OPENUI-INTEGRATION.md).
+Host label: auto (`GITHUB_ACTIONS` → `gha`, Modal env → `modal`, else `local`) or `LUFFY_HOST`. Manual: `scripts/pack-run-for-ui.py`. Optional OpenUI Lang export: `scripts/review-to-openui.py`. See [OPENUI-INTEGRATION.md](OPENUI-INTEGRATION.md).

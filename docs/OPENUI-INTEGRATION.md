@@ -208,5 +208,6 @@ pr-review-agent/
 | 2 Review console shell | **superseded** by full **Run Console** (Impeccable Operate / kinpaku) |
 | 2b Full run UI | **done** — PR · result · findings · diff · trace · loop · cost · memory · artifacts |
 | 3 Real artifacts | **done** (`pack-run-for-ui.py` → `run-bundle.json`, Load bundle) |
+| 3b Auto-pack every run (F31) | **done** — orchestrator soft-writes `.luffy-out/run-bundle.json` (+ trace copy); Modal returns `run_bundle` |
 | 4 Trigger + e2e odoo | pending (wire Modal/local trigger from UI) |
-| 5 Docs complete | **done** for Phases 0–3 (README/ARCHITECTURE/USAGE/OPENUI/MODAL) |
+| 5 Docs complete | **done** for Phases 0–3 + F31 (README/ARCHITECTURE/USAGE/OPENUI/MODAL) |

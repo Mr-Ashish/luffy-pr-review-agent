@@ -25,7 +25,7 @@ from pathlib import Path
 import modal
 
 APP_NAME = "luffy-pr-review"
-LUFFY_MODAL_VERSION = "0.3.1-cheap"
+LUFFY_MODAL_VERSION = "0.3.2-cheap"
 HERMES_PIN = "53559aaf86b84dadae83cd9bb605ca476f9a0606"
 # OpenRouter — keep Modal compute cheap AND LLM spend low
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
@@ -297,6 +297,7 @@ def review_pr(
         "TRIGGER_COMMENT": "modal cheap e2e",
         "MAX_DIFF_BYTES": "200000",  # smaller context = fewer tokens
         "LUFFY_TOOLSETS": "",  # empty may fall back; prefer terminal but costlier
+        "LUFFY_HOST": "modal",  # F31 Run Console host label
         "PATH": os.environ.get(
             "PATH",
             "/root/.local/bin:/root/.hermes/bin:/usr/local/bin:/usr/bin:/bin",
@@ -343,6 +344,33 @@ def review_pr(
     if review_path and review_path.is_file():
         preview = review_path.read_text(errors="replace")[:1200]
 
+    # F31: surface Run Console bundle path (orchestrator writes run-bundle.json)
+    run_bundle = out_dir / "run-bundle.json"
+    if not run_bundle.is_file() and (pack / "scripts" / "pack-run-for-ui.py").is_file():
+        # Soft fallback if older orchestrator missed pack stage
+        latest = out_dir / "latest-trace-dir.txt"
+        pack_src = Path(latest.read_text().strip()) if latest.is_file() else out_dir
+        _run(
+            [
+                "python3",
+                str(pack / "scripts" / "pack-run-for-ui.py"),
+                "--dir",
+                str(pack_src if pack_src.is_dir() else out_dir),
+                "-o",
+                str(run_bundle),
+                "--host",
+                "modal",
+                "--soft",
+            ],
+            env=env,
+        )
+        if run_bundle.is_file() and vol_dest.exists():
+            try:
+                shutil.copy2(run_bundle, vol_dest / "run-bundle.json")
+                trace_vol.commit()
+            except Exception:  # noqa: BLE001
+                pass
+
     return {
         "ok": orch_rc == 0 and bool(review_path),
         "bit": 3,
@@ -355,6 +383,7 @@ def review_pr(
         "orch_rc": orch_rc,
         "post_rc": post_rc,
         "review_path": str(review_path) if review_path else None,
+        "run_bundle": str(run_bundle) if run_bundle.is_file() else None,
         "review_preview": preview,
         "orch_stderr_tail": (proc.stderr or "")[-1500:],
         "orch_stdout_tail": (proc.stdout or "")[-800:],

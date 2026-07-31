@@ -43,7 +43,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 27 | **F28** | Repo-local `.luffy/` memory (primary); hub publish opt-in only | S | 🔥 Product memory lives on the target; no hub required | **Shipped** (`publish-run-local.sh`, ingest layout=local, preload local-first) |
 | 28 | **F29** | Soft max cost budget (`LUFFY_MAX_COST_USD`) after F21 usage | XS | 🔥 Cost ops — overage alert on comment + job summary | **Shipped** (`usage-summary.py budget`) |
 | 29 | **F30** | Memory health visibility + README F28 truth (no silent local publish fail) | XS | 🔥 Ops — learning loss no longer invisible | **Shipped** (`memory-health.sh`, job summary) |
-| 30 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 30 | **F31** | Auto-emit `run-bundle.json` every review for Run Console | XS | 🔥 UI ops — real GHA/Modal runs openable without manual pack | **Shipped** (`pack-run-for-ui.py` in orchestrator) |
+| 31 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -120,6 +121,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 19 (shipped)
 
 **F30** memory health + architecture honesty: `scripts/memory-health.sh` records `MEMORY_SOURCE` / `LOCAL_PUBLISH` / `HUB_PUBLISH` into `.luffy-out/memory-health.env`; failed local push emits `::warning::` + job-summary **Memory health** table (does not fail the review). README/public diagrams aligned to F28 local-first (hub opt-in). Install `--caller` tip: pin `uses:` SHA.
+
+### Sprint 20 (shipped)
+
+**F31** auto Run Console bundle: after each review the orchestrator soft-runs `scripts/pack-run-for-ui.py` → `.luffy-out/run-bundle.json` (+ copy under the trace dir). Host label auto-detects `gha` / `modal` / `local` (`LUFFY_HOST` override). Included in existing `luffy-out` + trace artifacts; job summary **Luffy Run Console bundle (F31)**. Modal `review_pr` sets `LUFFY_HOST=modal` and returns `run_bundle`. Soft-fail only — never fails the review. Load via `ui/review-console` **Load bundle**.
 
 ### readme-kit (shipped)
 

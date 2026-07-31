@@ -66,3 +66,4 @@ modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/g
 - Pipeline scripts under `scripts/` stay the product SoT.
 - Do not run Hermes inside the webhook HTTP handler — always `spawn`.
 - Fat traces → Modal Volume / object storage (not Actions artifacts).
+- **F31:** `review_pr` sets `LUFFY_HOST=modal`; orchestrator writes `run-bundle.json` under `.luffy-out` (and the volume copy). Return dict includes `run_bundle` path when present.
