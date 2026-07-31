@@ -341,24 +341,23 @@ assets/         brand mark + favicon
 .github/workflows/
 ```
 
-## OpenUI review console (optional)
+## Run console (ops UI)
 
-Interactive OpenUI rendering of Luffy reviews (not GitHub-native — hosted viewer).
+Full Luffy run viewer: **PR · verdict · findings · diff · trace · agent loop · cost · memory · artifacts**.
+
+Design: [Impeccable](https://github.com/pbakaus/impeccable) Operate mode + Neo kinpaku (`ui/review-console/DESIGN.md`).
 
 ```bash
-# Convert a review.md → OpenUI Lang (no LLM)
-python3 scripts/review-to-openui.py \
-  --review docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/review.md \
-  --usage docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/hermes-usage.json \
-  --timings docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/timings.json \
-  -o docs/showcase/openui-luffy/review.openui
+# Pack a showcase or .luffy-out directory
+python3 scripts/pack-run-for-ui.py \
+  --dir docs/showcase/e2e-odoo-pr3-opus5-agentic-loop \
+  -o ui/review-console/public/fixtures/run-bundle.json
 
-# View in console
-cd ui/review-console && npm install && npm run copy-fixture && npm run dev
+cd ui/review-console && npm install && npm run dev
 # http://localhost:5177
 ```
 
-Plan: [docs/OPENUI-INTEGRATION.md](docs/OPENUI-INTEGRATION.md). OpenUI clone reference: `/tmp/openui`.
+Optional OpenUI Lang export: `scripts/review-to-openui.py`. Plan: [docs/OPENUI-INTEGRATION.md](docs/OPENUI-INTEGRATION.md).
 
 ## Docs
 

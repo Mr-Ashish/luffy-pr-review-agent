@@ -1,23 +1,28 @@
-# Luffy Review Console (OpenUI)
+# Luffy Run Console
 
-Interactive viewer for Luffy PR reviews using [OpenUI](https://github.com/thesysdev/openui).
+Ops UI for a full Luffy run: **PR · result · findings · diff · trace · agent loop · cost · memory · artifacts**.
 
-## Phase 2 — static fixture
+Design follows **Impeccable** Operate mode + Neo kinpaku tokens (`PRODUCT.md`, `DESIGN.md`; source `/tmp/impeccable`).
+
+## Run
 
 ```bash
-cd ui/review-console
+# Pack a showcase / .luffy-out directory into the fixture
+npm run pack-fixture
+
 npm install
-npm run copy-fixture
-npm run dev     # http://localhost:5177
-npm run build   # verify production build
+npm run dev    # http://localhost:5177
+npm run build
 ```
 
-Fixture source: `docs/showcase/openui-luffy/review.openui` (from `scripts/review-to-openui.py`).
+Load any `run-bundle.json` via **Load bundle** in the UI.
 
-## Stack
+## Pack a run
 
-- Vite + React
-- `@openuidev/react-lang` `<Renderer />`
-- `@openuidev/react-ui` `openuiChatLibrary`
-
-See `docs/OPENUI-INTEGRATION.md` for the full phased plan.
+```bash
+python3 scripts/pack-run-for-ui.py \
+  --dir docs/showcase/e2e-odoo-pr3-opus5-agentic-loop \
+  --host gha \
+  --comment-url https://github.com/Mr-Ashish/odoo/pull/3 \
+  -o ui/review-console/public/fixtures/run-bundle.json
+```

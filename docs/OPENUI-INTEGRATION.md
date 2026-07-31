@@ -205,7 +205,8 @@ pr-review-agent/
 |-------|--------|
 | 0 Research & plan | **done** |
 | 1 Converter + tests + fixture | **done** (`scripts/review-to-openui.py`, showcase fixture) |
-| 2 Review console shell | **done** (`ui/review-console`, `npm run build` green) |
-| 3 Real artifacts | **partial** (paste + load `.openui` in console; converter for any review.md) |
+| 2 Review console shell | **superseded** by full **Run Console** (Impeccable Operate / kinpaku) |
+| 2b Full run UI | **done** — PR · result · findings · diff · trace · loop · cost · memory · artifacts |
+| 3 Real artifacts | **done** (`pack-run-for-ui.py` → `run-bundle.json`, Load bundle) |
 | 4 Trigger + e2e odoo | pending (wire Modal/local trigger from UI) |
 | 5 Docs complete | **done** for Phases 0–3 (README/ARCHITECTURE/USAGE/OPENUI/MODAL) |

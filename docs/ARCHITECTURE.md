@@ -83,13 +83,14 @@ Vars: `LUFFY_MEMORY_MODE` (`local` default | `hub` | `both`), `LUFFY_MEMORY_PATH
 
 Hub implementation file: `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`, inputs `luffy_repository` + `luffy_ref`).
 
-## OpenUI review console (optional UI)
+## Run console (ops UI)
 
-Luffy’s PR comment remains Markdown. An optional **Review Console** (`ui/review-console/`) renders the same review as **OpenUI Lang** (Thesys OpenUI):
+Luffy’s PR comment remains Markdown. The **Run Console** (`ui/review-console/`) is the full-run ops surface (Impeccable Operate / Neo kinpaku):
 
 ```text
-review.md (+ usage/timings)  →  scripts/review-to-openui.py  →  .openui
-                                                              →  Vite/React Renderer
+.luffy-out / showcase dir
+    → scripts/pack-run-for-ui.py  →  run-bundle.json
+    → Vite app tabs: PR · result · findings · diff · trace · loop · cost · memory · artifacts
 ```
 
-Phase plan and component map: [OPENUI-INTEGRATION.md](OPENUI-INTEGRATION.md). Does not replace GHA/Modal pipelines.
+Optional OpenUI Lang export remains via `scripts/review-to-openui.py`. See [OPENUI-INTEGRATION.md](OPENUI-INTEGRATION.md).

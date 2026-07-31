@@ -2,11 +2,13 @@
 
 > How to work with this repository.
 
-## OpenUI console
+## Run console
 
-- Convert review to OpenUI Lang: `python3 scripts/review-to-openui.py --review path/to/review.md -o out.openui` (optional `--usage` / `--timings` / `--memory-health`).
-- Interactive viewer: `cd ui/review-console && npm install && npm run copy-fixture && npm run dev` → http://localhost:5177
-- Plan: `docs/OPENUI-INTEGRATION.md`. Fixture: `docs/showcase/openui-luffy/`.
+- Pack a run: `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json`
+- UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177
+- Tabs: Overview, PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
+- Optional OpenUI Lang: `python3 scripts/review-to-openui.py --review review.md -o out.openui`
+- Design: Impeccable (`/tmp/impeccable`) · `ui/review-console/PRODUCT.md` + `DESIGN.md`
 
 ## Common commands
 
