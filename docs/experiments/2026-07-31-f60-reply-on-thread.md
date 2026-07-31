@@ -1,7 +1,7 @@
 # F60 — Reply on thread
 
 **Date:** 2026-07-31  
-**Status:** shipping  
+**Status:** shipped (MERGED PR #10)  
 **Tag:** PRODUCT_FEATURE | DETERMINISTIC
 
 ## Problem

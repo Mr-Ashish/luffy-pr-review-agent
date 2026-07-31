@@ -8,7 +8,7 @@
 | ID | Feature | Type | Notes |
 |----|---------|------|-------|
 | F44–F59 | Agent quality + product suite | agent_quality, product | through incremental |
-| F60 | Reply on thread | product | **this PR** — `reply_on_thread.py` + F9 split |
+| F60 | Reply on thread | product | **MERGED** PR #10 — `reply_on_thread.py` + F9 split |
 
 ## IN_PROGRESS
 
@@ -29,7 +29,7 @@
 - **left_count:** 6
 - **progress_pct:** ~85%
 - **eta:** 2–4 fires
-- **active_worktrees:** f60-reply-on-thread
+- **active_worktrees:** none (F60 merged PR #10)
 - **federated_memory_note:** local milvus compounds; hub deferred
 - **agent_design_note:** F60 pure code I/O + match; prompt untouched
 - **meta_loop_note:** corpus≥3 → product F60
@@ -37,4 +37,4 @@
 
 ## Status line
 
-`features_built_count=17 types_built=agent_quality,product left_count=6 progress_pct=85 eta=2-4fires active_worktrees=1 federated_memory_note=local_x3 milvus_corpus=3`
+`features_built_count=17 types_built=agent_quality,product left_count=6 progress_pct=85 eta=2-4fires active_worktrees=0 federated_memory_note=local_x3 milvus_corpus=3`
