@@ -418,21 +418,32 @@ jobs:
           fi
           "$LUFFY_ROOT/scripts/post-review-comment.sh" "$REVIEW_FILE" "$PR_NUMBER"
 
-      - name: React result
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && github.event_name == 'issue_comment' && always()
+      # F22: verdict-aware reaction + commit status on PR head + job-summary section.
+      # Replaces pipeline-only +1/-1 so REQUEST CHANGES no longer looks like "success".
+      - name: Report verdict (F22)
+        id: verdict
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && always()
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+          OUT_DIR: ${{ github.workspace }}/luffy/.luffy-out
+          LUFFY_ROOT: ${{ github.workspace }}/luffy
           PIPELINE_RC: ${{ steps.review.outputs.pipeline_rc }}
+          # Only react on the trigger comment for issue_comment events
+          REACTION_COMMENT_ID: ${{ github.event_name == 'issue_comment' && github.event.comment.id || '' }}
+          LUFFY_COMMIT_STATUS: ${{ vars.LUFFY_COMMIT_STATUS || '1' }}
+          LUFFY_STATUS_CONTEXT: ${{ vars.LUFFY_STATUS_CONTEXT || 'luffy/review' }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
         run: |
-          CONTENT="+1"
-          if [[ "${PIPELINE_RC:-1}" != "0" ]]; then
-            CONTENT="-1"
-          fi
-          gh api --method POST \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
-            -f content="$CONTENT" || true
+          set -euo pipefail
+          chmod +x "$LUFFY_ROOT/scripts/report-verdict.sh" 2>/dev/null || true
+          chmod +x "$LUFFY_ROOT/scripts/"*.sh 2>/dev/null || true
+          REVIEW_FILE="$(ls -t "$OUT_DIR"/review-*.md 2>/dev/null | grep -v '\.raw\.md$' | head -1 || true)"
+          bash "$LUFFY_ROOT/scripts/report-verdict.sh" "${REVIEW_FILE:-}" "${PIPELINE_RC:-1}"
 
       - name: Ensure trace package exists
         if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && always()

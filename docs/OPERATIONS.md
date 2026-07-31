@@ -30,6 +30,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 8 (F20):** `scripts/install-luffy.sh` one-command pack install into target repos
 - **Sprint 9 (F21):** cost/usage line on PR comments + job summary from `hermes-usage.json`
 - **Sprint 10 (F10):** reusable `workflow_call` job + `install-luffy.sh --caller` hub-managed thin install
+- **Sprint 11 (F22):** verdict-aware reaction + commit status `luffy/review` + job-summary verdict section
 
 ## Central hub memory (cross-repo)
 

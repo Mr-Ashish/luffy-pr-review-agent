@@ -106,9 +106,11 @@ RUNTIME_SCRIPTS=(
   hub-ingest-run.py
   install-luffy.sh
   normalize-review.py
+  parse-verdict.py
   post-review-comment.sh
   preload-hub-memory.sh
   publish-run-to-hub.sh
+  report-verdict.sh
   review-local.sh
   run-hermes-review.sh
   run-luffy-review.sh

@@ -53,3 +53,22 @@ devmemory extract --fixture sample-auth-module --apply
 - Installer output is entirely on stderr; capture it with `./scripts/install-luffy.sh /path/to/repo 2>&1 | tee install.log` and grep for `exists (skip` / `WARN missing` before committing the pack.
 - Preview exactly what would be written (including the stamp) with `--dry-run`; lines are prefixed `DRY  <from> → <to>`.
 - Interpret exit codes: `1` is a usage/validation error (missing dest, bad `--source`, missing F10 workflow files, or install into the Luffy source tree without `--force`). Existing target files are skipped with a stderr notice unless you pass `--force` (exit still `0`).
+
+## F22 verdict signals
+
+After each run Luffy derives a **verdict signal** from the posted review body:
+
+| Verdict | Trigger reaction | Commit status `luffy/review` |
+|---------|------------------|------------------------------|
+| APPROVE | `+1` | `success` |
+| REQUEST CHANGES | `-1` | `failure` |
+| COMMENT | `eyes` | `success` |
+| Pipeline failed | `-1` | `error` |
+
+- CLI: `python3 scripts/parse-verdict.py review.md --pipeline-rc 0` (kv lines)
+- Summary: `… --format summary` (Markdown for job summary)
+- Wrapper: `scripts/report-verdict.sh review.md [pipeline_rc]` (reaction + status + summary)
+- Disable commit status: repo var `LUFFY_COMMIT_STATUS=0`
+- Status context override: `LUFFY_STATUS_CONTEXT` (default `luffy/review`)
+- Branch protection can require status check context **`luffy/review`** so REQUEST CHANGES blocks merge when configured.
+

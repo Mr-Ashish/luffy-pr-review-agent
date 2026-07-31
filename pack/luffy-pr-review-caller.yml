@@ -4,7 +4,7 @@
 # No agent/ or scripts/ copy required; runtime is checked out from the hub on each run.
 #
 # Required secret on this repo: OPENROUTER_API_KEY
-# Optional: LUFFY_HUB_TOKEN, vars LUFFY_MODEL / LUFFY_HERMES_COMMIT / LUFFY_COOLDOWN_SECONDS / LUFFY_RUNNER_IMAGE
+# Optional: LUFFY_HUB_TOKEN, vars LUFFY_MODEL / LUFFY_HERMES_COMMIT / LUFFY_COOLDOWN_SECONDS / LUFFY_RUNNER_IMAGE / LUFFY_COMMIT_STATUS
 # Trigger: @luffy review this pr
 
 name: Luffy PR Review
@@ -24,6 +24,7 @@ permissions:
   pull-requests: write
   issues: write
   actions: write
+  statuses: write  # F22 commit status context luffy/review
 
 concurrency:
   group: luffy-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.run_id }}

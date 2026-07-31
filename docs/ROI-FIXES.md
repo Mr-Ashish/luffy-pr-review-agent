@@ -34,7 +34,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 18 | **F8** | Prebaked Hermes runner image + startup benchmark | M | 🔥 Fast CI startup | **Shipped** (docker/ + build workflow + benchmark script) |
 | 19 | **F21** | Surface OpenRouter cost/tokens on PR comment + job summary | XS | 🔥 Cost visibility | **Shipped** (`usage-summary.py`) |
 | 20 | **F10** | Reusable `workflow_call` + thin hub caller | M | 🔥 Multi-repo DX | **Shipped** (`luffy-review-reusable.yml`, `--caller`) |
-| 21 | F9 | Inline GitHub review comments | L | Product | Later |
+| 21 | **F22** | Verdict-aware done signal (reaction + commit status + job summary) | XS | 🔥 Trust UX — REQUEST CHANGES no longer looks like ✅ | **Shipped** (`parse-verdict.py`, `report-verdict.sh`) |
+| 22 | F9 | Inline GitHub review comments | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -75,6 +76,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 10 (shipped)
 
 **F10** reusable packaging: `luffy-review-reusable.yml` holds the full review job (`workflow_call` + `luffy_repository` / `luffy_ref` inputs). Thin `luffy-pr-review.yml` triggers and calls it. `install-luffy.sh --caller` installs only `pack/luffy-pr-review-caller.yml` pointing at hub `@main` (no agent/scripts copy — free upgrades). Default pack mode still copies agent/scripts + both workflow files for self-contained targets.
+
+### Sprint 11 (shipped)
+
+**F22** verdict-aware done signal: parse `**Verdict:**` from the posted review → trigger-comment reaction (`+1` / `-1` / `eyes`) and PR-head commit status `luffy/review` (`success` / `failure` / `error`). Pipeline failures stay `error`+`-1`. Job summary gets a **Luffy verdict (F22)** section. Opt-out: `vars.LUFFY_COMMIT_STATUS=0`. Required-status checks can require context `luffy/review`.
 
 ### readme-kit (shipped)
 
