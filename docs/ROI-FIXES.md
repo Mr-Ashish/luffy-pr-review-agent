@@ -28,8 +28,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 12 | **F16** | Association deny → 😕 reaction (no OpenRouter spend) | XS | Visible deny | **Shipped** |
 | 13 | **F17** | Drop dead `RUNNER_TEMP` Hermes tree copy after cold install | XS | Faster cold path | **Shipped** |
 | 14 | **F18** | Redact secrets in **posted** review (`normalize-review.py` choke-point) | XS | 🔥 Trust — no keys on PR comments | **Shipped** |
-| 15 | F7 | Pin Hermes version string (`--commit` / `LUFFY_HERMES_COMMIT`) | S | Repro | Next |
-| 16 | F19 | Per-PR re-trigger cooldown (skip paid run after recent success) | S | Cost/abuse | Later |
+| 15 | **F7** | Pin Hermes install (`scripts/hermes-pin.sh` + `LUFFY_HERMES_COMMIT` + cache key `v4-<pin>`) | S | 🔥 Repro CI | **Shipped** |
+| 16 | F19 | Per-PR re-trigger cooldown (skip paid run after recent success) | S | Cost/abuse | Next |
 | 17 | F20 | `scripts/install-luffy.sh` copy pack to target repo | S | Adoption | Later |
 | 18 | F8 | Docker image with Hermes preinstalled | M | Fastest CI | Later |
 | 19 | F9 | Inline GitHub review comments | L | Product | Later |
@@ -50,6 +50,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 4 (shipped)
 
 **F18** secret redaction on normalize → PR comment path (aligned with trace/hub scrub patterns).
+
+### Sprint 5 (shipped)
+
+**F7** pin Hermes via `LUFFY_HERMES_COMMIT` (default known-good SHA in `scripts/hermes-pin.sh` + workflow env); install uses `install.sh --skip-setup --commit … --force-commit`; Actions cache key `luffy-hermes-bin-*-v4-<pin>`; set var to `latest`/`main` to float. Trace includes `hermes-pin.txt`.
 
 ### readme-kit (shipped)
 

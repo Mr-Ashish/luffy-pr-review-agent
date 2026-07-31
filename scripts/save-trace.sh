@@ -69,6 +69,7 @@ copy_if "$OUT_DIR/review-${PR_NUMBER}.md" "$TRACE_DIR/review.md"
 copy_if "$OUT_DIR/hermes-${PR_NUMBER}.stderr" "$TRACE_DIR/hermes.stderr"
 copy_if "$OUT_DIR/hermes-usage.json" "$TRACE_DIR/hermes-usage.json"
 copy_if "$OUT_DIR/hermes-run.log" "$TRACE_DIR/hermes-run.log"
+copy_if "$OUT_DIR/hermes-pin.txt" "$TRACE_DIR/hermes-pin.txt"
 
 # Full agentic loop package (prompts / steps / tool calls / usage)
 if [[ -d "$OUT_DIR/agent-loop" ]]; then

@@ -3,6 +3,7 @@
 # Trigger: @luffy review this pr
 # Required secret: OPENROUTER_API_KEY
 # Optional: LUFFY_MODEL (default anthropic/claude-opus-5), LUFFY_HUB_TOKEN, LUFFY_HUB_REPO
+# Optional: LUFFY_HERMES_COMMIT (pin Hermes; default in scripts/hermes-pin.sh; latest|main = floating)
 
 name: Luffy PR Review
 
@@ -40,6 +41,9 @@ jobs:
       )
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # F7: pin Hermes for repro; vars.LUFFY_HERMES_COMMIT overrides (latest|main = floating)
+    env:
+      LUFFY_HERMES_COMMIT: ${{ vars.LUFFY_HERMES_COMMIT || '53559aaf86b84dadae83cd9bb605ca476f9a0606' }}
 
     steps:
       - name: Resolve PR number & gate
@@ -175,7 +179,26 @@ jobs:
           fetch-depth: 1
           ref: refs/pull/${{ steps.gate.outputs.pr_number }}/head
 
-      # F2/F14: cache Hermes install (stable key; save only on miss — avoid per-run thrash)
+      # F2/F14/F7: cache Hermes install keyed by pin (save only on miss)
+      - name: Resolve Hermes cache suffix
+        if: steps.gate.outputs.matched == 'true'
+        id: hermes_pin
+        run: |
+          set -euo pipefail
+          # Prefer pack helper when luffy/ is checked out; else mirror hermes-pin.sh
+          if [[ -x luffy/scripts/hermes-pin.sh ]]; then
+            SUF="$(LUFFY_HERMES_COMMIT="${LUFFY_HERMES_COMMIT:-}" luffy/scripts/hermes-pin.sh cache-suffix | tr -d '\n')"
+          else
+            RAW="${LUFFY_HERMES_COMMIT:-}"
+            if [[ -z "$RAW" || "$RAW" == "latest" || "$RAW" == "main" || "$RAW" == "floating" ]]; then
+              SUF="latest"
+            else
+              SUF="${RAW:0:12}"
+            fi
+          fi
+          echo "suffix=$SUF" >> "$GITHUB_OUTPUT"
+          echo "::notice::Hermes cache pin suffix=$SUF commit=${LUFFY_HERMES_COMMIT:-default}"
+
       - name: Restore Hermes install cache
         if: steps.gate.outputs.matched == 'true'
         id: hermes_cache
@@ -185,8 +208,9 @@ jobs:
           path: |
             ~/.local
             ~/.hermes
-          key: luffy-hermes-bin-${{ runner.os }}-v3
+          key: luffy-hermes-bin-${{ runner.os }}-v4-${{ steps.hermes_pin.outputs.suffix }}
           restore-keys: |
+            luffy-hermes-bin-${{ runner.os }}-v4-
             luffy-hermes-bin-${{ runner.os }}-
 
       - name: React eyes
@@ -219,6 +243,8 @@ jobs:
           LUFFY_HUB_TOKEN: ${{ secrets.LUFFY_HUB_TOKEN }}
           LUFFY_HUB_REPO: ${{ vars.LUFFY_HUB_REPO }}
           LUFFY_HUB_PUBLISH: ${{ vars.LUFFY_HUB_PUBLISH }}
+          # F7: job-level env already sets default; re-export for pipeline scripts
+          LUFFY_HERMES_COMMIT: ${{ env.LUFFY_HERMES_COMMIT }}
         run: |
           set -euo pipefail
           if [[ -z "${LUFFY_HUB_TOKEN:-}" ]]; then
@@ -339,7 +365,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      # F14: only write cache on miss (stable key). Exact hits skip save.
+      # F14/F7: only write cache on miss (pin-keyed). Exact hits skip save.
       - name: Save Hermes install cache
         if: >
           steps.gate.outputs.matched == 'true' && always() &&
@@ -350,4 +376,4 @@ jobs:
           path: |
             ~/.local
             ~/.hermes
-          key: luffy-hermes-bin-${{ runner.os }}-v3
+          key: luffy-hermes-bin-${{ runner.os }}-v4-${{ steps.hermes_pin.outputs.suffix }}

@@ -7,6 +7,7 @@
 #   OUT_DIR, PROMPT_PATH (or meta.env)
 #   LUFFY_MODEL / OPENROUTER_MODEL  (default: anthropic/claude-opus-5)
 #   LUFFY_TOOLSETS  (optional hermes -t value; default: terminal for workspace tools)
+#   LUFFY_HERMES_COMMIT  pin SHA (default in hermes-pin.sh); empty/latest/main = floating
 #   PR_NUMBER
 set -euo pipefail
 
@@ -22,6 +23,7 @@ HERMES_HOME="${HERMES_HOME:-$LUFFY_ROOT/.luffy-hermes-home}"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$LUFFY_ROOT}"
 MODEL="${LUFFY_MODEL:-${OPENROUTER_MODEL:-anthropic/claude-opus-5}}"
 TOOLSETS="${LUFFY_TOOLSETS:-terminal}"
+PIN_HELPER="$LUFFY_ROOT/scripts/hermes-pin.sh"
 
 mkdir -p "$OUT_DIR" "$HERMES_HOME/memories" "$HERMES_HOME/logs"
 
@@ -42,17 +44,57 @@ export HERMES_TUI_TOOL_PROGRESS="${HERMES_TUI_TOOL_PROGRESS:-verbose}"
 export PYTHONUNBUFFERED=1
 
 # ---------------------------------------------------------------------------
-# Ensure Hermes (install path is cached by the workflow when possible)
+# F7: Ensure Hermes (pinned install; path cached by workflow when possible)
 # ---------------------------------------------------------------------------
+_hermes_install_head() {
+  local d
+  for d in \
+    "${HOME}/.hermes/hermes-agent" \
+    "${HERMES_INSTALL_DIR:-}" \
+    "${HOME}/.local/share/hermes-agent"; do
+    [[ -n "$d" && -d "$d/.git" ]] || continue
+    git -C "$d" rev-parse HEAD 2>/dev/null && return 0
+  done
+  return 1
+}
+
 ensure_hermes() {
   export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
+  chmod +x "$PIN_HELPER" 2>/dev/null || true
+
+  local pin head
+  pin="$("$PIN_HELPER" resolve 2>/dev/null | tr -d '\n' || true)"
+  printf '%s\n' "${pin:-floating}" >"$OUT_DIR/hermes-pin.txt" || true
+
   if command -v hermes >/dev/null 2>&1; then
-    notice "hermes (cached/present): $(command -v hermes)"
-    hermes --version 2>/dev/null || true
-    return
+    head="$(_hermes_install_head || true)"
+    if [[ -z "$pin" ]]; then
+      notice "hermes (cached/present, floating): $(command -v hermes)"
+      hermes --version 2>/dev/null || true
+      return
+    fi
+    if "$PIN_HELPER" matches "$head"; then
+      notice "hermes (cached/present, pin=$pin head=${head:-unknown}): $(command -v hermes)"
+      hermes --version 2>/dev/null || true
+      return
+    fi
+    # Version string may still mention short pin when git dir missing
+    local ver
+    ver="$(hermes --version 2>/dev/null || true)"
+    if [[ -n "$ver" && "$ver" == *"${pin:0:8}"* ]]; then
+      notice "hermes version matches pin ${pin:0:8}: $(command -v hermes)"
+      return
+    fi
+    notice "hermes present but pin mismatch (want $pin head=${head:-n/a}); reinstalling..."
+  else
+    notice "Installing Hermes Agent (cold, pin=${pin:-floating})..."
   fi
-  notice "Installing Hermes Agent (cold)..."
-  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+
+  local args
+  # shellcheck disable=SC2207
+  args=( $("$PIN_HELPER" install-args) )
+  notice "hermes install.sh args: ${args[*]}"
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- "${args[@]}"
   export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
   # shellcheck disable=SC1091
   [[ -f "${HOME}/.bashrc" ]] && source "${HOME}/.bashrc" || true
@@ -67,7 +109,9 @@ ensure_hermes() {
     fi
   done
   command -v hermes >/dev/null 2>&1 || die "hermes not found after install"
-  notice "hermes installed: $(command -v hermes)"
+  head="$(_hermes_install_head || true)"
+  notice "hermes installed: $(command -v hermes) head=${head:-unknown} pin=${pin:-floating}"
+  hermes --version 2>/dev/null || true
 }
 
 ensure_hermes

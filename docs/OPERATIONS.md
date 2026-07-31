@@ -5,7 +5,8 @@
 1. Put this project (or at least `agent/`, `scripts/`, `.github/workflows/luffy-pr-review.yml`) on the **default branch** of a GitHub repo.
 2. Repository secret: `OPENROUTER_API_KEY`
 3. Optional variable: `LUFFY_MODEL` (default in scripts: `openai/gpt-5-mini`)
-4. On a PR, comment: `@luffy review this pr`
+4. Optional variable: `LUFFY_HERMES_COMMIT` — pin Hermes to a git SHA (default baked into workflow + `scripts/hermes-pin.sh`); set `latest` or `main` to float on install.sh tip
+5. On a PR, comment: `@luffy review this pr`
 
 ## High-ROI fixes
 
@@ -13,7 +14,9 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 
 - **Sprint 1 (F1–F6):** shallow+sparse checkout, Hermes install cache, hub memory preload, drop broken home cache, reactions, shallow hub clone  
 - **Sprint 2 (F11–F12):** author association allowlist, replace previous Luffy PR comment  
-- **Sprint 3 (F13–F17):** sparse count bugfix, stable Hermes cache key, honest fail reaction, deny 😕, drop dead install copy
+- **Sprint 3 (F13–F17):** sparse count bugfix, stable Hermes cache key, honest fail reaction, deny 😕, drop dead install copy  
+- **Sprint 4 (F18):** secret redaction on posted review body  
+- **Sprint 5 (F7):** pin Hermes install via `LUFFY_HERMES_COMMIT` + `scripts/hermes-pin.sh` (cache key v4)
 
 ## Central hub memory (cross-repo)
 
