@@ -7,7 +7,7 @@
 
 ## Transcript / notes
 
-# Luffy dogfood — F25 pin SoT
+# Luffy dogfood — F26 default model
 
 ## OPERATIONS
 # Luffy operations
@@ -24,7 +24,7 @@
    # optional: --force, --with-hub-ingest, --with-runner-build
    ```
 2. Repository secret: `OPENROUTER_API_KEY`
-3. Optional variable: `LUFFY_MODEL` (default in scripts: `openai/gpt-5-mini`)
+3. Optional variable: `LUFFY_MODEL` (default in scripts: `anthropic/claude-opus-5` — F26; set e.g. `openai/gpt-5-mini` to cut cost)
 4. Optional variable: `LUFFY_HERMES_COMMIT` — pin Hermes to a git SHA (default from `scripts/hermes-pin.sh` only — F25); set `latest` or `main` to float on install.sh tip
 5. On a PR, comment: `@luffy review this pr`
 
@@ -46,6 +46,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 12 (F23):** formal GitHub PR Review event from verdict (Reviews panel); opt-out `vars.LUFFY_PR_REVIEW=0`
 - **Sprint 13 (F24):** dismiss prior Luffy PR reviews on re-run (APPROVED/CHANGES_REQUESTED); shares `LUFFY_REPLACE_PREVIOUS`
 - **Sprint 14 (F25):** Hermes pin single source of truth — bump only `scripts/hermes-pin.sh`; workflows resolve empty var via `default`
+- **Sprint 15 (F26):** default model SoT `anthropic/claude-opus-5` in `run-hermes-review.sh`; docs/.env.example aligned; cheaper via `vars.LUFFY_MODEL`
 
 ## Central hub memory (cross-repo)
 
@@ -208,7 +209,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 22 | **F23** | Formal GitHub PR Review event from verdict (Reviews panel) | XS | 🔥 Trust UX — APPROVE/REQUEST_CHANGES/COMMENT as real PR reviews | **Shipped** (`review_event` + `report-verdict.sh`) |
 | 23 | **F24** | Dismiss prior Luffy PR reviews on re-run (Reviews hygiene) | XS | 🔥 Trust UX — re-@luffy no longer stacks APPROVE/REQUEST_CHANGES | **Shipped** (`dismiss-prior-pr-reviews.sh`) |
 | 24 | **F25** | Hermes pin single source of truth (no workflow hardcoded SHA) | XS | 🔥 Ops/repro — bump pin in one place | **Shipped** (workflows call `hermes-pin.sh default`) |
-| 25 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 25 | **F26** | Align default model docs + code (`anthropic/claude-opus-5` SoT) | XS | 🔥 Trust/cost — ops docs no longer understate spend | **Shipped** (`DEFAULT_LUFFY_MODEL`) |
+| 26 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -266,6 +268,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 
 **F25** Hermes pin single source of truth: remove hardcoded `DEFAULT_HERMES_COMMIT` from workflow `env:` fallbacks. Empty/unset `vars.LUFFY_HERMES_COMMIT` → after pack checkout, write pin from `scripts/hermes-pin.sh default` into `$GITHUB_ENV`. Explicit `latest`/`main`/`floating` still float. Same for `build-luffy-runner.yml`. Bump pin only in `hermes-pin.sh` (Dockerfile ARG may lag for standalone builds).
 
+### Sprint 15 (shipped)
+
+**F26** default model alignment: `DEFAULT_LUFFY_MODEL=anthropic/claude-opus-5` in `run-hermes-review.sh` is SoT; OPERATIONS/USAGE/.env.example no longer claim `gpt-5-mini` as the script default. Workflow leaves empty `vars.LUFFY_MODEL` unset so the script default applies (no second hardcoded fallback). Effective model → `.luffy-out/luffy-model.txt`.
+
 ### readme-kit (shipped)
 
 YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser removed.
@@ -314,9 +320,7 @@ YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser r
 - `MEMORY.md` rotates when it exceeds `MAX_MEMORY_BYTES` (default 100000); unbounded growth would otherwise blow the prompt budget.
 - Historical bug classes worth watching (per the ranked ROI backlog): broken Hermes home cache key, sparse-checkout path count bug, and dishonest success reactions on failed runs.
 
-- Default model diverges by layer: `scripts/run-hermes-review.sh` falls back to `anthropic/claude-opus-5` while the ops docs advertise `openai/gpt-5-mini` as the default. Anyone reasoning about cost from the docs alone will be wrong for local/dry runs — set `LUFFY_MODEL` explicitly instead of relying on either default.
-- Pin verification degrades to a substring check: when the install tree has no `.git`, `ensure_hermes` accepts the binary if `hermes --version` merely contains the pin's first 8 chars. A cached install without git metadata can therefore pass the pin gate on weak evidence — check `hermes-pin.txt` in the trace when a run's behaviour looks off for the pinned SHA.
-- F25 fixed pin duplication: workflows must **not** embed `|| '<sha>'` fallbacks. Bump only `DEFAULT_HERMES_COMMIT` in `scripts/hermes-pin.sh`. Caveat: `docker/luffy-runner/
+- F26 aligned the default model: `DEFAULT_LUFFY_MODEL=anthropic/claude-opus-5` in `scrip
 
 … [session truncated] …
 

@@ -1,9 +1,9 @@
-# Run run-20260731T183834-04dbd6
+# Run run-20260731T184211-6cc470
 
 - session: `dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
 - units: 0
-- summary: The session transcript is a snapshot of already-committed docs (OPERATIONS.md, ROI-FIXES.md, DEV.md) covering F25 Hermes pin single-source-of-truth plus the F1–F24 backlog. Every durable claim — hermes-pin.sh as SoT, empty-var resolution into $GITHUB_ENV, the Dockerfile ARG lag caveat, hub direct-vs-dispatch tokens, verdict/dismiss trust UX, install modes, and cost controls — is already present in DEV.md, USAGE.md, memory/DEV.md, pack/DEV.md, agent/DEV.md and docker/luffy-runner/*.md. No new architecture, decision, pitfall, or command surfaced.
-- at: 2026-07-31T13:08:47Z
-- timings: {"assemble_s": 0.101, "extract_s": 12.356, "normalize_s": 0.001}
+- summary: The session is the F26 default-model dogfood pass: OPERATIONS/ROI-FIXES/DEV excerpts restating that `DEFAULT_LUFFY_MODEL=anthropic/claude-opus-5` in `run-hermes-review.sh` is the single source of truth, that docs/.env.example were realigned, and that an empty `vars.LUFFY_MODEL` is left unset so the script default applies. All of this is already recorded in DEV.md (F26/F25 design-decision bullets) and USAGE.md (Setup optional variables), so no new durable knowledge was extracted.
+- at: 2026-07-31T13:12:29Z
+- timings: {"assemble_s": 0.099, "extract_s": 17.348, "normalize_s": 0.001}
