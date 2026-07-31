@@ -104,7 +104,9 @@ RUNTIME_SCRIPTS=(
   cooldown-check.sh
   dismiss-prior-pr-reviews.sh
   distill-memory.sh
+  feature_toggles.py
   hermes-pin.sh
+  linked_issue_context.py
   hub-ingest-run.py
   install-luffy.sh
   memory-health.sh

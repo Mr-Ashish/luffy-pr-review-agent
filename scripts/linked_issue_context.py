@@ -73,7 +73,12 @@ def _int_env(name: str, default: int) -> int:
 
 
 def enabled() -> bool:
-    return _truthy(os.environ.get("LUFFY_ISSUE_CONTEXT"), default=True)
+    """LUFFY_ISSUE_CONTEXT via F55 registry when available."""
+    try:
+        from feature_toggles import is_enabled as _toggle_enabled  # type: ignore
+        return bool(_toggle_enabled("issue_context"))
+    except Exception:
+        return _truthy(os.environ.get("LUFFY_ISSUE_CONTEXT"), default=True)
 
 
 def _ref_key(repo: str, number: int) -> str:

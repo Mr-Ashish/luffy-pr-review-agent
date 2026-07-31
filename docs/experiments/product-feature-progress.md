@@ -1,6 +1,6 @@
 # Product feature progress
 
-**Updated:** 2026-07-31 (F54 fix-it prompts)  
+**Updated:** 2026-07-31 (F55 feature toggles)  
 **Loop:** 019fb948dbe8 orchestrator
 
 ## SHIPPED
@@ -16,19 +16,20 @@
 | F51 | Tool depth | agent_quality | shipped |
 | F52 | Multi-lens | product | PR #2 merged |
 | F53 | Linked issue context | product | PR #3 merged |
-| F54 | Fix-it prompt per inline comment | product | **MERGED** PR #4 — `LUFFY_FIXIT_PROMPTS` |
+| F54 | Fix-it prompt per inline comment | product | PR #4 merged |
+| F55 | Feature toggle system | product | **this fire** — registry + file + CLI |
 
 ## IN_PROGRESS
 
 | ID | Feature | Notes |
 |----|---------|-------|
-| — | Feature toggle system (unified) | env toggles exist; OpenFeature-style registry still open |
 | — | Review lens recipes / named packs | multi-lens base in F52; recipes backlog |
-| — | Live e2e issue-ctx + fixit quality | measure Actionability/Inline after F54 merge |
+| — | Live e2e issue-ctx + fixit quality | measure Actionability/Inline after F54 |
+| — | Toggle migration (remaining scripts) | F55 core shipped; gradual consumer adopt |
 
 ## LEFT (priority product backlog)
 
-1. FEATURE TOGGLE SYSTEM (unified registry)
+1. ~~FEATURE TOGGLE SYSTEM (unified registry)~~ → **F55**
 2. ~~FIX-IT PROMPT PER INLINE COMMENT~~ → **F54**
 3. REVIEW LENS RECIPES + NAMED PROMPT PACKS
 4. REVIEW LENSES multi-dim (extend F52)
@@ -46,14 +47,14 @@
 
 ## Counts
 
-- **features_built_count:** 11 (F44–F54, skipping F47 numbering gap if any)
-- **types_built:** agent_quality, product (actionability, multi-lens, issue-ctx, fixit)
-- **left_count:** 13 (items 1,3–15 above; item 2 done)
-- **progress_pct:** ~46% of 15-item product backlog (7 product-ish of 15 if counting F52–F54 + partials ≈ 46)
-- **eta:** 6–10 more productive fires for top-5 remaining (toggles, recipes, filler, mermaid, incremental)
-- **active_worktrees:** none (F54 merged)
-- **federated_memory_note:** not started this fire; `.luffy` local + hub publish paths exist from prior work; FP outcomes / shared learning still gated
+- **features_built_count:** 12 (F44–F55)
+- **types_built:** agent_quality, product (actionability, multi-lens, issue-ctx, fixit, toggles)
+- **left_count:** 12 (items 3–15; 1–2 done)
+- **progress_pct:** ~53% of 15-item product backlog (8 product-ish of 15 ≈ 53)
+- **eta:** 5–9 more productive fires for top remaining (recipes, filler, mermaid, incremental, federated)
+- **active_worktrees:** f55-feature-toggles
+- **federated_memory_note:** still deferred; registry now has `hub_publish`/`local_publish` keys for gated compound learning
 
 ## Status line
 
-`features_built_count=11 types_built=agent_quality,product left_count=13 progress_pct=46 eta=6-10fires active_worktrees=0 federated_memory_note=deferred`
+`features_built_count=12 types_built=agent_quality,product left_count=12 progress_pct=53 eta=5-9fires active_worktrees=1 federated_memory_note=keys_registered_deferred`

@@ -13,6 +13,8 @@
 
 ## Design decisions
 
+- **F55 feature toggles:** `scripts/feature_toggles.py` is the single registry for product/quality/ops gates (`fixit_prompts`, `issue_context`, inline, labels, …). Precedence **env > `.luffy/toggles.json` (or `LUFFY_TOGGLES_FILE`) > default**. CLI `list|get|enabled|dump|product|shell` is the agent/operator tool surface; judgment stays out of the registry. New product flags add a `ToggleSpec` + tests, then wire consumers via `is_enabled()` / `get_value()`.
+
 - **F35 ops footer:** `ops_footer.py` appends a deep-link line on the posted PR comment (Actions run URL from `GITHUB_*` env + run-bundle Load tip; optional `LUFFY_CONSOLE_URL`). Wired in `post-review-comment.sh` before `gh pr comment`. Soft, opt-out `LUFFY_OPS_FOOTER=0`. Completes OpenUI 4b without requiring a hosted console.
 - **F9/F9b inline comments:** `post-inline-comments.py` parses findings/blocking from review Markdown. **F9b** prefers `` `path:LINE` `` (or free-text line hints) when LINE is a changed `+` line in `pr.diff`; else nearest changed line; else first added line. Prompt/SOUL request `path:LINE` only for lines the model actually saw. Never invent lines for GitHub (invalid line → 422). Cap with `LUFFY_INLINE_MAX` / severity; re-runs can stack COMMENT reviews.
 - **F33/F34 webhook auth:** `scripts/webhook_auth.py` is pure stdlib (HMAC-SHA256 GitHub signature + bearer/`X-Luffy-Token`). `review_webhook` authorizes **before** parse/spawn. **F34 fail-closed:** neither `LUFFY_WEBHOOK_SECRET` nor `LUFFY_WEBHOOK_TOKEN` → denied unless `LUFFY_WEBHOOK_ALLOW_OPEN=1` (dev escape). Do not put secrets in the repo; fold into Modal secrets.

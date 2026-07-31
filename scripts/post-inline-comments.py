@@ -23,6 +23,7 @@ Env:
   LUFFY_INLINE_SUGGESTIONS=1 (default) | 0/off to skip F9c
   LUFFY_SUGGESTION_MAX=3
   LUFFY_FIXIT_PROMPTS=1 (default) | 0/off to skip F54 fix-it agent prompts
+  (bools resolved via F55 scripts/feature_toggles.py + optional .luffy/toggles.json)
   GH_TOKEN / GITHUB_TOKEN for post
   LUFFY_INLINE_FIXTURE=path.json  — write planned payload instead of API (tests)
 
@@ -39,6 +40,15 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+# F55: shared toggle resolution (env > .luffy/toggles.json > default)
+try:
+    from feature_toggles import is_enabled as _toggle_enabled  # type: ignore
+except ImportError:  # pragma: no cover - script dir on path for CLI
+    import sys as _sys
+
+    _sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from feature_toggles import is_enabled as _toggle_enabled  # type: ignore
 
 
 SEVERITY_RANK = {
@@ -380,8 +390,8 @@ _FENCE_RE = re.compile(
 
 
 def suggestions_enabled_from_env() -> bool:
-    v = (os.environ.get("LUFFY_INLINE_SUGGESTIONS") or "1").strip().lower()
-    return v not in ("0", "false", "off", "no")
+    """LUFFY_INLINE_SUGGESTIONS via F55 registry (default on)."""
+    return bool(_toggle_enabled("inline_suggestions"))
 
 
 def suggestion_max_from_env() -> int:
@@ -550,9 +560,8 @@ def find_contiguous_added_block(
 
 
 def fixit_prompts_enabled_from_env() -> bool:
-    """LUFFY_FIXIT_PROMPTS=1 (default) | 0/off."""
-    v = (os.environ.get("LUFFY_FIXIT_PROMPTS") or "1").strip().lower()
-    return v not in ("0", "false", "off", "no")
+    """LUFFY_FIXIT_PROMPTS via F55 registry (default on)."""
+    return bool(_toggle_enabled("fixit_prompts"))
 
 
 def _slug_commit_subject(issue: str, path: str) -> str:
@@ -725,8 +734,8 @@ def plan_suggestions(
 
 
 def enabled_from_env() -> bool:
-    v = (os.environ.get("LUFFY_INLINE_COMMENTS") or "1").strip().lower()
-    return v not in ("0", "false", "off", "no")
+    """LUFFY_INLINE_COMMENTS via F55 registry (default on)."""
+    return bool(_toggle_enabled("inline_comments"))
 
 
 def severity_set_from_env() -> set[str]:
