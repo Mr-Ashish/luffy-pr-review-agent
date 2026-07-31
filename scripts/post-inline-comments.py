@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""F9/F9b: post path-anchored inline GitHub PR review comments.
+"""F9/F9b/F9c: post path-anchored inline GitHub PR review comments.
 
 Maps Key findings (+ Blocking bullets) onto lines in pr.diff:
   F9  — first *added* line per file (fallback)
   F9b — prefer path:line / L### hints when that line is a changed `+` line
         (else nearest changed line, else first)
+  F9c — ### Code suggestions → GitHub ```suggestion``` apply blocks
+        (multi-line when the suggestion's `-` lines match PR `+` lines)
 
 Usage:
   python3 scripts/post-inline-comments.py plan \\
@@ -17,6 +19,8 @@ Env:
   LUFFY_INLINE_COMMENTS=1 (default) | 0/off to skip
   LUFFY_INLINE_MAX=6
   LUFFY_INLINE_SEVERITY=critical,high   (comma list; empty = all)
+  LUFFY_INLINE_SUGGESTIONS=1 (default) | 0/off to skip F9c
+  LUFFY_SUGGESTION_MAX=3
   GH_TOKEN / GITHUB_TOKEN for post
   LUFFY_INLINE_FIXTURE=path.json  — write planned payload instead of API (tests)
 
@@ -282,6 +286,8 @@ def plan_comments(
     *,
     max_n: int = 6,
     severities: set[str] | None = None,
+    include_suggestions: bool | None = None,
+    suggestion_max: int | None = None,
 ) -> list[dict[str, Any]]:
     allow = severities if severities is not None else set()
     added = added_lines_by_path(diff_text)
@@ -327,8 +333,281 @@ def plan_comments(
                 "source": f["source"],
                 "line_hint": hint,
                 "anchor": anchor,
+                "kind": "finding",
             }
         )
+        if len(planned) >= max_n:
+            break
+
+    # F9c: GitHub apply-suggestion blocks from ### Code suggestions
+    if include_suggestions is None:
+        include_suggestions = suggestions_enabled_from_env()
+    if include_suggestions:
+        smax = suggestion_max if suggestion_max is not None else suggestion_max_from_env()
+        for sc in plan_suggestions(review_md, diff_text, max_n=smax):
+            planned.append(sc)
+    return planned
+
+
+# ---------------------------------------------------------------------------
+# F9c: Code suggestions → GitHub ```suggestion``` apply blocks
+# ---------------------------------------------------------------------------
+
+# Trailing (`path`) or (path) — path is last parenthetical (title may contain `code`)
+_TITLE_PATH_RE = re.compile(
+    r"^####\s+(.+?)\s+\(`?([^)`\n]+)`?\)\s*$",
+    re.M,
+)
+_FENCE_RE = re.compile(
+    r"```(?P<lang>diff|suggestion|patch)?\s*\n(?P<body>.*?)```",
+    re.M | re.S | re.I,
+)
+
+
+def suggestions_enabled_from_env() -> bool:
+    v = (os.environ.get("LUFFY_INLINE_SUGGESTIONS") or "1").strip().lower()
+    return v not in ("0", "false", "off", "no")
+
+
+def suggestion_max_from_env() -> int:
+    try:
+        return max(1, min(10, int(os.environ.get("LUFFY_SUGGESTION_MAX") or "3")))
+    except ValueError:
+        return 3
+
+
+def parse_code_suggestions(review_md: str) -> list[dict[str, Any]]:
+    """Parse ### Code suggestions into {title, path, minus, plus, kind} dicts."""
+    m = re.search(
+        r"^### Code suggestions\s*\n(.*?)(?=^### |\Z)",
+        review_md,
+        re.M | re.S,
+    )
+    if not m:
+        return []
+    body = m.group(1)
+    if re.match(r"^\s*None\b", body.strip(), re.I):
+        return []
+
+    # Split on #### headings
+    parts = re.split(r"(?=^#### )", body, flags=re.M)
+    out: list[dict[str, Any]] = []
+    for part in parts:
+        part = part.strip()
+        if not part.startswith("####"):
+            continue
+        first = part.splitlines()[0]
+        tm = _TITLE_PATH_RE.match(first)
+        if not tm:
+            # try path only in backticks at end: #### title `path`
+            tm2 = re.match(r"^####\s+(.+?)\s+`([^`]+)`\s*$", first)
+            if not tm2:
+                continue
+            title, path_raw = tm2.group(1), tm2.group(2)
+        else:
+            title, path_raw = tm.group(1), tm.group(2)
+        path = normalize_path(path_raw)
+        if not path:
+            continue
+        fm = _FENCE_RE.search(part)
+        if not fm:
+            continue
+        lang = (fm.group("lang") or "").lower()
+        fbody = fm.group("body")
+        minus: list[str] = []
+        plus: list[str] = []
+        if lang in ("diff", "patch", ""):
+            for raw in fbody.splitlines():
+                if raw.startswith("+") and not raw.startswith("+++"):
+                    plus.append(raw[1:])
+                elif raw.startswith("-") and not raw.startswith("---"):
+                    minus.append(raw[1:])
+                elif raw.startswith("\\"):
+                    continue
+                elif lang == "" and not minus and not plus:
+                    # bare fence without +/- → treat as pure suggestion body
+                    plus.append(raw)
+                # context lines (no prefix) ignored for mapping
+        elif lang == "suggestion":
+            plus = fbody.splitlines()
+            # no minus — cannot multi-map; plan_suggestions may still pin to first line
+        if not plus and not minus:
+            continue
+        out.append(
+            {
+                "title": title.strip()[:200],
+                "path": path,
+                "minus": minus,
+                "plus": plus,
+                "lang": lang or "diff",
+            }
+        )
+    return out
+
+
+def added_line_contents_by_path(diff_text: str) -> dict[str, list[tuple[int, str]]]:
+    """Map path → [(new_line_no, content_without_plus), ...] for all `+` lines."""
+    result: dict[str, list[tuple[int, str]]] = {}
+    current: str | None = None
+    new_line = 0
+    in_hunk = False
+    for raw in diff_text.splitlines():
+        if raw.startswith("diff --git "):
+            current = None
+            in_hunk = False
+            m = re.search(r" b/(.+)$", raw)
+            if m:
+                path = m.group(1)
+                if path.startswith("b/"):
+                    path = path[2:]
+                current = path
+                result.setdefault(current, [])
+            continue
+        if raw.startswith("+++ "):
+            p = raw[4:].strip()
+            if p != "/dev/null":
+                if p.startswith("b/"):
+                    p = p[2:]
+                current = p
+                result.setdefault(current, [])
+            continue
+        if raw.startswith("@@"):
+            mm = re.search(r"\+(\d+)(?:,\d+)?", raw)
+            if mm:
+                new_line = int(mm.group(1))
+                in_hunk = True
+            else:
+                in_hunk = False
+            continue
+        if not in_hunk or current is None:
+            continue
+        if raw.startswith("+") and not raw.startswith("+++"):
+            result.setdefault(current, []).append((new_line, raw[1:]))
+            new_line += 1
+        elif raw.startswith("-") and not raw.startswith("---"):
+            pass
+        else:
+            new_line += 1
+    return result
+
+
+def find_contiguous_added_block(
+    path: str,
+    minus_lines: list[str],
+    contents: dict[str, list[tuple[int, str]]],
+) -> tuple[int, int] | None:
+    """Locate minus_lines as a contiguous sequence of PR `+` lines. Return (start, end)."""
+    if not minus_lines:
+        return None
+    # normalize trailing whitespace for matching
+    target = [ln.rstrip("\n\r") for ln in minus_lines]
+    rows = contents.get(path) or []
+    # also try resolve_path keys
+    if not rows:
+        for k in contents:
+            if k.endswith("/" + path) or k.endswith(path) or path.endswith(k):
+                rows = contents[k]
+                path = k
+                break
+    hay = [c.rstrip("\n\r") for _, c in rows]
+    n, m = len(hay), len(target)
+    if m == 0 or n < m:
+        return None
+    for i in range(n - m + 1):
+        if hay[i : i + m] == target:
+            start = rows[i][0]
+            end = rows[i + m - 1][0]
+            return start, end
+    # fuzzy: strip all whitespace
+    t2 = [re.sub(r"\s+", " ", t.strip()) for t in target]
+    h2 = [re.sub(r"\s+", " ", h.strip()) for h in hay]
+    for i in range(n - m + 1):
+        if h2[i : i + m] == t2:
+            start = rows[i][0]
+            end = rows[i + m - 1][0]
+            return start, end
+    return None
+
+
+def format_suggestion_body(title: str, plus_lines: list[str]) -> str:
+    # GitHub apply block — no language tag extras inside
+    inner = "\n".join(plus_lines)
+    # GitHub forbids trailing fence issues; ensure single trailing newline before close
+    body = f"**Suggestion (F9c):** {title}\n\n```suggestion\n{inner}\n```\n\n<!-- luffy-suggestion -->"
+    return body[:65000]
+
+
+def plan_suggestions(
+    review_md: str,
+    diff_text: str,
+    *,
+    max_n: int = 3,
+) -> list[dict[str, Any]]:
+    """Plan F9c multi-line suggestion comments."""
+    specs = parse_code_suggestions(review_md)
+    contents = added_line_contents_by_path(diff_text)
+    added = added_lines_by_path(diff_text)
+    planned: list[dict[str, Any]] = []
+    seen: set[tuple[str, int, int]] = set()
+
+    for spec in specs:
+        path = str(spec["path"])
+        resolved = resolve_path(path, contents) or resolve_path(path, added)
+        if resolved is None:
+            continue
+        path = resolved
+        minus: list[str] = list(spec.get("minus") or [])
+        plus: list[str] = list(spec.get("plus") or [])
+        title = str(spec.get("title") or "code suggestion")
+
+        start_line: int | None = None
+        end_line: int | None = None
+        anchor = "none"
+
+        if minus:
+            block = find_contiguous_added_block(path, minus, contents)
+            if block:
+                start_line, end_line = block
+                anchor = "exact_minus" if start_line != end_line else "exact_minus_1"
+        if start_line is None:
+            # Fallback: pin to first added line (single-line suggestion only if 1 + line)
+            lines = added.get(path) or []
+            if not lines:
+                continue
+            start_line = end_line = lines[0]
+            anchor = "first"
+            # Without minus mapping, only safe if we replace a single known line:
+            # use first + line content as implicit minus when plus is replacement-sized
+            if not minus and plus:
+                # single-line replace of first added line
+                end_line = start_line
+            elif not plus:
+                continue
+
+        if not plus:
+            # deletion-only suggestion: empty suggestion body
+            plus = [""]
+
+        key = (path, int(start_line), int(end_line or start_line))
+        if key in seen:
+            continue
+        seen.add(key)
+
+        comment: dict[str, Any] = {
+            "path": path,
+            "line": int(end_line or start_line),
+            "side": "RIGHT",
+            "body": format_suggestion_body(title, plus),
+            "severity": "suggestion",
+            "source": "code_suggestions",
+            "kind": "suggestion",
+            "anchor": anchor,
+            "title": title,
+        }
+        if start_line is not None and end_line is not None and start_line != end_line:
+            comment["start_line"] = int(start_line)
+            comment["start_side"] = "RIGHT"
+        planned.append(comment)
         if len(planned) >= max_n:
             break
     return planned
@@ -365,25 +644,38 @@ def post_review(
     if not comments:
         return {"ok": True, "posted": 0, "skipped": "no comments"}
 
+    n_find = sum(1 for c in comments if c.get("kind") != "suggestion")
+    n_sug = sum(1 for c in comments if c.get("kind") == "suggestion")
+    bits = []
+    if n_find:
+        bits.append(f"{n_find} finding note(s)")
+    if n_sug:
+        bits.append(f"{n_sug} apply-suggestion(s) (F9c)")
     body = (
-        "## 🏴‍☠️ Luffy inline findings (F9)\n\n"
-        f"{len(comments)} path-anchored note(s) on the first changed line "
-        "per file (see full review comment for context).\n\n"
+        "## 🏴‍☠️ Luffy inline findings (F9/F9c)\n\n"
+        + (", ".join(bits) if bits else f"{len(comments)} note(s)")
+        + " — path-anchored on changed lines "
+        "(see full PR comment for context).\n\n"
         f"<!-- luffy-inline-review pr={pr} -->"
     )
+    api_comments: list[dict[str, Any]] = []
+    for c in comments:
+        item: dict[str, Any] = {
+            "path": c["path"],
+            "line": c["line"],
+            "side": c.get("side") or "RIGHT",
+            "body": c["body"],
+        }
+        # F9c multi-line
+        if c.get("start_line") is not None and int(c["start_line"]) != int(c["line"]):
+            item["start_line"] = int(c["start_line"])
+            item["start_side"] = c.get("start_side") or "RIGHT"
+        api_comments.append(item)
     payload = {
         "commit_id": commit,
         "event": event,
         "body": body,
-        "comments": [
-            {
-                "path": c["path"],
-                "line": c["line"],
-                "side": c.get("side") or "RIGHT",
-                "body": c["body"],
-            }
-            for c in comments
-        ],
+        "comments": api_comments,
     }
 
     # Fixture path first — offline tests need no token
@@ -481,6 +773,8 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "ok": True,
                     "count": len(comments),
+                    "findings": sum(1 for c in comments if c.get("kind") != "suggestion"),
+                    "suggestions": sum(1 for c in comments if c.get("kind") == "suggestion"),
                     "comments": comments,
                     "files_in_diff": len(first_added_lines(diff_text)),
                 },

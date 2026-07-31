@@ -53,7 +53,7 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 37 | **F36** | Hermes review wall-clock timeout (kill hung agent loops) | XS | 🔥 Cost — stop runaway OpenRouter until job/Modal cap | **Shipped** (`run-with-timeout.py`, default 1500s) |
 | 38 | **F37** | Verdict → PR labels (`luffy:approve` etc.) | XS | 🔥 Ops — boards/search/automation without parsing comments | **Shipped** (`apply-verdict-labels.py`) |
 | 39 | **F38** | Path-glob free skip (docs-only / filtered PRs) | XS | 🔥 Cost — no OpenRouter when every path matches skip globs | **Shipped** (`path-skip-check.py`, opt-in) |
-| 40 | F9c | Multi-line review threads / suggestion blocks | M | Product polish | Later |
+| 40 | **F9c** | Multi-line GitHub apply-suggestion blocks from Code suggestions | S | 🔥 Product — one-click apply on Files changed | **Shipped** (`post-inline-comments.py` suggestions) |
 
 ### Sprint 1 (shipped)
 
@@ -170,6 +170,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 29 (shipped)
 
 **F38** path-glob free skip: when `vars.LUFFY_SKIP_PATH_GLOBS` is set (`docs` preset or comma globs) and **every** changed path matches, skip Hermes/OpenRouter (no monorepo checkout). Default **off** (empty var). Force: `@luffy review force` / `workflow_dispatch`. Stub COMMENT + rocket + F37 labels; job summary **Luffy path skip (F38)**. Helper: `scripts/path-skip-check.py`.
+
+### Sprint 30 (shipped)
+
+**F9c** GitHub apply-suggestion blocks: parse `### Code suggestions` (`#### title (`path`)` + ```diff```), map the suggestion’s `-` lines onto contiguous PR `+` lines, post multi-line inline comments with a ```suggestion``` fence (one-click apply in Files changed). Cap `vars.LUFFY_SUGGESTION_MAX` (default 3); opt-out `vars.LUFFY_INLINE_SUGGESTIONS=0`. Shares F9 soft-fail + fixture path.
 
 ### readme-kit (shipped)
 

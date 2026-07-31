@@ -56,7 +56,10 @@ class PostInlineCommentsTests(unittest.TestCase):
         for c in data["comments"]:
             self.assertIn("line", c)
             self.assertGreater(c["line"], 0)
-            self.assertIn("luffy-inline", c["body"])
+            if c.get("kind") == "suggestion":
+                self.assertIn("luffy-suggestion", c["body"])
+            else:
+                self.assertIn("luffy-inline", c["body"])
 
     def test_severity_filter(self):
         r = _run(
@@ -70,12 +73,14 @@ class PostInlineCommentsTests(unittest.TestCase):
                 "critical",
                 "--max",
                 "10",
-            ]
+            ],
+            env={"LUFFY_INLINE_SUGGESTIONS": "0"},
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         data = json.loads(r.stdout)
         for c in data["comments"]:
             self.assertEqual(c["severity"], "critical")
+
 
     def test_post_fixture(self):
         with tempfile.TemporaryDirectory() as td:
@@ -225,5 +230,100 @@ No
             self.assertEqual(c["anchor"], "nearest")
             self.assertEqual(c["line_hint"], 20)
 
+    def test_f9c_showcase_suggestions(self):
+        r = _run(
+            [
+                "plan",
+                "--review",
+                str(SHOWCASE / "review.md"),
+                "--diff",
+                str(SHOWCASE / "pr.diff"),
+                "--severity",
+                "all",
+                "--max",
+                "6",
+            ],
+            env={"LUFFY_INLINE_SUGGESTIONS": "1", "LUFFY_SUGGESTION_MAX": "3"},
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        data = json.loads(r.stdout)
+        self.assertGreaterEqual(data.get("suggestions") or 0, 1)
+        sugs = [c for c in data["comments"] if c.get("kind") == "suggestion"]
+        self.assertTrue(sugs)
+        for c in sugs:
+            self.assertIn("```suggestion", c["body"])
+            self.assertIn("luffy-suggestion", c["body"])
+            self.assertIn(c["anchor"], ("exact_minus", "exact_minus_1", "first"))
+        # multi-line for xml_utils surrogatepass block
+        multi = [c for c in sugs if c.get("start_line") and c["start_line"] != c["line"]]
+        self.assertTrue(multi, f"expected multi-line suggestion, got {sugs}")
+
+    def test_f9c_synthetic_multiline(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            review = d / "review.md"
+            diff = d / "pr.diff"
+            review.write_text(
+                """### Key findings
+None
+
+### Code suggestions
+
+#### Replace foo (`src/c.py`)
+```diff
+-old_one
+-old_two
++new_one
++new_two
++new_three
+```
+""",
+                encoding="utf-8",
+            )
+            diff.write_text(
+                """diff --git a/src/c.py b/src/c.py
+--- a/src/c.py
++++ b/src/c.py
+@@ -1,1 +10,3 @@
+ context
++old_one
++old_two
++old_three
+""",
+                encoding="utf-8",
+            )
+            r = _run(
+                ["plan", "--review", str(review), "--diff", str(diff), "--severity", "*"],
+                env={"LUFFY_INLINE_SUGGESTIONS": "1"},
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            data = json.loads(r.stdout)
+            sugs = [c for c in data["comments"] if c.get("kind") == "suggestion"]
+            self.assertEqual(len(sugs), 1)
+            c = sugs[0]
+            self.assertEqual(c["path"], "src/c.py")
+            self.assertEqual(c["start_line"], 11)
+            self.assertEqual(c["line"], 12)
+            self.assertIn("new_one", c["body"])
+            self.assertIn("```suggestion", c["body"])
+
+    def test_f9c_disabled(self):
+        r = _run(
+            [
+                "plan",
+                "--review",
+                str(SHOWCASE / "review.md"),
+                "--diff",
+                str(SHOWCASE / "pr.diff"),
+                "--severity",
+                "all",
+            ],
+            env={"LUFFY_INLINE_SUGGESTIONS": "0"},
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        data = json.loads(r.stdout)
+        self.assertEqual(data.get("suggestions") or 0, 0)
+
 if __name__ == "__main__":
     unittest.main()
+

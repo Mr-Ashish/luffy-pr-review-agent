@@ -75,10 +75,10 @@ python3 scripts/ops_footer.py append --review .luffy-out/review-3.md
 
 Optional hosted console: `LUFFY_CONSOLE_URL=https://…`. Opt-out: `LUFFY_OPS_FOOTER=0`.
 
-### Inline comments (F9 / F9b)
+### Inline comments (F9 / F9b / F9c)
 
 ```bash
-# Plan only (no API) — JSON includes line_hint + anchor (exact|nearest|first)
+# Plan only (no API) — findings + F9c suggestions (kind=suggestion, ```suggestion body)
 python3 scripts/post-inline-comments.py plan \
   --review docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/review.md \
   --diff docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/pr.diff
@@ -88,7 +88,10 @@ python3 scripts/post-inline-comments.py post \
   --review review.md --diff pr.diff --repo owner/name --pr 3 --commit "$HEAD_SHA"
 ```
 
-Key findings File column may use `` `path:LINE` `` when LINE is a new line from the diff (F9b). Opt-out: `vars.LUFFY_INLINE_COMMENTS=0`. Severity/max: `LUFFY_INLINE_SEVERITY`, `LUFFY_INLINE_MAX`.
+Key findings File column may use `` `path:LINE` `` when LINE is a new line from the diff (F9b).
+Code suggestions with ```diff``` → multi-line GitHub apply blocks (F9c).
+Opt-out: `vars.LUFFY_INLINE_COMMENTS=0` (all) or `vars.LUFFY_INLINE_SUGGESTIONS=0` (F9c only).
+Caps: `LUFFY_INLINE_MAX`, `LUFFY_SUGGESTION_MAX`.
 
 ### Webhook auth (F33/F34)
 

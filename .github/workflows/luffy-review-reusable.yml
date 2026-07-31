@@ -609,6 +609,9 @@ jobs:
           LUFFY_INLINE_SEVERITY: ${{ vars.LUFFY_INLINE_SEVERITY || 'critical,high,blocking' }}
           LUFFY_INLINE_MAX: ${{ vars.LUFFY_INLINE_MAX || '6' }}
           LUFFY_INLINE_DIFF: ${{ github.workspace }}/luffy/.luffy-out/pr.diff
+          # F9c: GitHub apply-suggestion blocks from ### Code suggestions
+          LUFFY_INLINE_SUGGESTIONS: ${{ vars.LUFFY_INLINE_SUGGESTIONS || '1' }}
+          LUFFY_SUGGESTION_MAX: ${{ vars.LUFFY_SUGGESTION_MAX || '3' }}
           # F37: verdict PR labels (luffy:approve|request-changes|comment|error)
           LUFFY_PR_LABELS: ${{ vars.LUFFY_PR_LABELS || '1' }}
           LUFFY_LABEL_PREFIX: ${{ vars.LUFFY_LABEL_PREFIX || 'luffy' }}

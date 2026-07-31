@@ -8,7 +8,7 @@
 # - Optionally posts a commit status on the PR head SHA (LUFFY_COMMIT_STATUS)
 # - F23: Optionally submits a formal PR Review event (LUFFY_PR_REVIEW)
 # - F24: Dismisses prior Luffy PR reviews (same marker) before posting a new one
-# - F9:  Path-anchored inline comments on first changed lines (LUFFY_INLINE_COMMENTS)
+# - F9/F9c: Path-anchored inline findings + apply-suggestion blocks (LUFFY_INLINE_*)
 # - F37: Verdict-aware PR labels (luffy:approve|request-changes|comment|error)
 #
 # Usage:

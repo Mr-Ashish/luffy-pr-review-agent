@@ -49,6 +49,26 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 27 (F36):** Hermes wall-clock timeout (default 1500s; kill hung loops)
 - **Sprint 28 (F37):** Verdict → PR labels (`luffy:approve` / `request-changes` / `comment` / `error`)
 - **Sprint 29 (F38):** Path-glob free skip (opt-in docs-only / filtered PRs — no OpenRouter)
+- **Sprint 30 (F9c):** GitHub apply-suggestion blocks from `### Code suggestions`
+
+## Apply-suggestion blocks (F9c)
+
+When the review includes `### Code suggestions` with a ```diff``` fence, Luffy posts
+inline comments containing a GitHub ```suggestion``` block so authors can **Apply**
+in the Files changed UI.
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_INLINE_SUGGESTIONS` | `1` | `0` disables F9c (findings F9/F9b still run) |
+| `LUFFY_SUGGESTION_MAX` | `3` | Max suggestion comments per run |
+
+Mapping: suggestion `-` lines must match a contiguous run of PR `+` lines (same
+file). Multi-line → `start_line`/`line` on RIGHT. Soft-fail with F9.
+
+```bash
+python3 scripts/post-inline-comments.py plan \
+  --review review.md --diff pr.diff   # JSON: suggestions count + kind=suggestion
+```
 
 ## Path-glob free skip (F38)
 
@@ -122,7 +142,7 @@ Posted review gets an italic ops line (after cost footer when present):
 | `LUFFY_OPS_FOOTER` | `1` | `0` disables |
 | `LUFFY_CONSOLE_URL` | empty | Optional hosted Run Console base URL |
 
-## Inline comments (F9 / F9b)
+## Inline comments (F9 / F9b / F9c)
 
 After the formal F23 review, Luffy may post a second COMMENT review with **inline** notes. Anchors (F9b):
 
@@ -130,13 +150,17 @@ After the formal F23 review, Luffy may post a second COMMENT review with **inlin
 2. else nearest changed line on that file → **nearest**
 3. else first added line → **first** (F9)
 
+**F9c:** also posts apply-suggestion blocks from `### Code suggestions` (see section above).
+
 | Var | Default | Meaning |
 |-----|---------|---------|
-| `LUFFY_INLINE_COMMENTS` | `1` | `0`/`off` disables |
+| `LUFFY_INLINE_COMMENTS` | `1` | `0`/`off` disables all inline (findings + suggestions) |
 | `LUFFY_INLINE_SEVERITY` | `critical,high,blocking` | Comma list; `all` = no filter |
-| `LUFFY_INLINE_MAX` | `6` | Cap per run |
+| `LUFFY_INLINE_MAX` | `6` | Cap finding notes per run |
+| `LUFFY_INLINE_SUGGESTIONS` | `1` | F9c apply blocks |
+| `LUFFY_SUGGESTION_MAX` | `3` | Cap suggestion notes per run |
 
-Offline plan: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff` (see `anchor` / `line_hint` in JSON).
+Offline plan: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff` (see `anchor` / `line_hint` / `kind` in JSON).
 
 ## Repo-local memory (F28 default)
 
