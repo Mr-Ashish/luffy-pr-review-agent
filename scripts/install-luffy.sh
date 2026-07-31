@@ -112,6 +112,7 @@ RUNTIME_SCRIPTS=(
   ops_footer.py
   pack-run-for-ui.py
   parse-verdict.py
+  path-skip-check.py
   post-inline-comments.py
   post-review-comment.sh
   preload-hub-memory.sh

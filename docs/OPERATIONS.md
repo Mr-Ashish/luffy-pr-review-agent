@@ -48,6 +48,22 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 26 (F35):** PR comment ops footer with Actions run link + run-bundle tip
 - **Sprint 27 (F36):** Hermes wall-clock timeout (default 1500s; kill hung loops)
 - **Sprint 28 (F37):** Verdict → PR labels (`luffy:approve` / `request-changes` / `comment` / `error`)
+- **Sprint 29 (F38):** Path-glob free skip (opt-in docs-only / filtered PRs — no OpenRouter)
+
+## Path-glob free skip (F38)
+
+Skip paid review when **every** changed file matches skip globs (docs/changelog PRs).
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_SKIP_PATH_GLOBS` | empty (off) | `docs` = built-in docs preset; or comma globs e.g. `*.md,docs/**` |
+
+Force paid run: `@luffy review force` or `workflow_dispatch`. Fail-open on script errors.
+
+```bash
+python3 scripts/path-skip-check.py --path README.md --path docs/a.md --globs docs  # exit 2 skip
+python3 scripts/path-skip-check.py --path src/x.py --path README.md --globs docs   # exit 0 allow
+```
 
 ## Verdict PR labels (F37)
 

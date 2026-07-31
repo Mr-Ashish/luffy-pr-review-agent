@@ -22,6 +22,20 @@ modal run modal_app/app.py --bit 4 --repo owner/repo --pr 123   # dry enqueue pl
 
 Run Console **Run** tab copies the same commands + sample webhook JSON. Modal webhook (after `modal deploy`) accepts `{repo,pr,model,post_comment}` or GitHub `@luffy review` issue_comment on a PR — spawns only.
 
+### Path-glob free skip (F38)
+
+```bash
+# Opt-in repo var (empty = disabled):
+#   vars.LUFFY_SKIP_PATH_GLOBS=docs
+# or custom: *.md,docs/**,CHANGELOG*
+
+python3 scripts/path-skip-check.py --paths-file pr-paths.txt   # uses env globs
+python3 scripts/path-skip-check.py --path README.md --globs docs; echo $?  # 2 = skip
+```
+
+When all paths match: rocket reaction, stub COMMENT (no OpenRouter), F37 `luffy:comment`.
+Force: `@luffy review force`.
+
 ### Verdict PR labels (F37)
 
 ```bash

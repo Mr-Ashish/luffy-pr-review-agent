@@ -52,7 +52,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 36 | **F35** | PR comment ops deep-link (Actions run + run-bundle tip) | XS | 🔥 Ops — open the run without hunting logs | **Shipped** (`ops_footer.py`) |
 | 37 | **F36** | Hermes review wall-clock timeout (kill hung agent loops) | XS | 🔥 Cost — stop runaway OpenRouter until job/Modal cap | **Shipped** (`run-with-timeout.py`, default 1500s) |
 | 38 | **F37** | Verdict → PR labels (`luffy:approve` etc.) | XS | 🔥 Ops — boards/search/automation without parsing comments | **Shipped** (`apply-verdict-labels.py`) |
-| 39 | F9c | Multi-line review threads / suggestion blocks | M | Product polish | Later |
+| 39 | **F38** | Path-glob free skip (docs-only / filtered PRs) | XS | 🔥 Cost — no OpenRouter when every path matches skip globs | **Shipped** (`path-skip-check.py`, opt-in) |
+| 40 | F9c | Multi-line review threads / suggestion blocks | M | Product polish | Later |
 
 ### Sprint 1 (shipped)
 
@@ -165,6 +166,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 28 (shipped)
 
 **F37** verdict PR labels: after F22/F23 signals, `apply-verdict-labels.py` ensures and applies one managed label — `luffy:approve` / `luffy:request-changes` / `luffy:comment` / `luffy:error` — and removes the other three. Pipeline failures always get `error` (never green-wash). Soft-fail; opt-out `vars.LUFFY_PR_LABELS=0`; prefix override `vars.LUFFY_LABEL_PREFIX`. Job summary **Luffy PR labels (F37)**. Completes trust/ops signal stack for boards and search.
+
+### Sprint 29 (shipped)
+
+**F38** path-glob free skip: when `vars.LUFFY_SKIP_PATH_GLOBS` is set (`docs` preset or comma globs) and **every** changed path matches, skip Hermes/OpenRouter (no monorepo checkout). Default **off** (empty var). Force: `@luffy review force` / `workflow_dispatch`. Stub COMMENT + rocket + F37 labels; job summary **Luffy path skip (F38)**. Helper: `scripts/path-skip-check.py`.
 
 ### readme-kit (shipped)
 

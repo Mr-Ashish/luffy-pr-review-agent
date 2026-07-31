@@ -8,11 +8,12 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 
 ```text
 @luffy review this pr
-    → gate + concurrency
+    → gate + concurrency + cooldown (F19)
+    → sparse path list → path-glob free skip (F38, opt-in)
     → dual checkout (luffy/ + workspace/)
     → preload MEMORY (.luffy/ first, hub opt-in)
-    → assemble-context → hermes -z → normalize → PR comment
-    → distill MEMORY.md → save-trace (fat artifact)
+    → assemble-context → hermes -z (F36 timeout) → normalize → PR comment
+    → verdict signals (F22/F23/F9/F37) → distill MEMORY.md → save-trace
     → publish slim pack → target .luffy/ (default)
     → hub memory only if LUFFY_MEMORY_MODE=hub|both or LUFFY_HUB_PUBLISH=1
 ```

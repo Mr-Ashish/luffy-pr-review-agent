@@ -287,9 +287,121 @@ jobs:
             echo "sparse=" >> "$GITHUB_OUTPUT"
           fi
 
+      # F38: skip paid OpenRouter when every changed path matches skip globs (opt-in)
+      - name: Path skip gate (F38)
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true'
+        id: pathskip
+        env:
+          LUFFY_ROOT: ${{ github.workspace }}/luffy
+          LUFFY_SKIP_PATH_GLOBS: ${{ vars.LUFFY_SKIP_PATH_GLOBS }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          echo "allowed=true" >> "$GITHUB_OUTPUT"
+          echo "reason=default" >> "$GITHUB_OUTPUT"
+          # Force: @luffy review force (same as F19)
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "reason=workflow_dispatch" >> "$GITHUB_OUTPUT"
+            echo "::notice::F38 path-skip: bypassed (workflow_dispatch)"
+            exit 0
+          fi
+          if printf '%s' "${COMMENT_BODY:-}" | grep -Eiq '@luffy[[:space:]]+review([[:space:]]+this[[:space:]]+pr)?[[:space:]]+force\b|[[:space:]]force[[:space:]]*$'; then
+            echo "reason=force_comment" >> "$GITHUB_OUTPUT"
+            echo "::notice::F38 path-skip: bypassed (@luffy … force)"
+            exit 0
+          fi
+          # Empty var → disabled (fail-open paid)
+          if [[ -z "${LUFFY_SKIP_PATH_GLOBS:-}" ]]; then
+            echo "reason=disabled" >> "$GITHUB_OUTPUT"
+            echo "::notice::F38 path-skip: disabled (set vars.LUFFY_SKIP_PATH_GLOBS=docs to enable)"
+            exit 0
+          fi
+          SCRIPT="$LUFFY_ROOT/scripts/path-skip-check.py"
+          PATHS_FILE="${{ github.workspace }}/pr-paths.txt"
+          if [[ ! -f "$SCRIPT" ]]; then
+            echo "::warning::F38 path-skip-check.py missing; allowing paid run"
+            echo "reason=missing_script" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          set +e
+          OUT="$(python3 "$SCRIPT" --paths-file "$PATHS_FILE" 2>/tmp/luffy-pathskip.err)"
+          RC=$?
+          set -e
+          if [[ -s /tmp/luffy-pathskip.err ]]; then
+            cat /tmp/luffy-pathskip.err >&2 || true
+          fi
+          while IFS= read -r line; do
+            [[ -z "$line" || "$line" != *=* ]] && continue
+            echo "$line" >> "$GITHUB_OUTPUT"
+          done <<<"$OUT"
+          if [[ $RC -eq 2 ]]; then
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            SAMPLE="$(printf '%s\n' "$OUT" | awk -F= '/^sample=/{print $2}' | tail -1)"
+            echo "::notice::F38 path-skip — all changed paths match globs; skipping paid review (sample: ${SAMPLE:-?})"
+            {
+              echo "### Luffy path skip (F38)"
+              echo "- Skipped paid OpenRouter review: every changed path matched \`LUFFY_SKIP_PATH_GLOBS\`"
+              echo "- Sample: \`${SAMPLE:-n/a}\`"
+              echo "- Override: comment \`@luffy review force\`, or clear \`vars.LUFFY_SKIP_PATH_GLOBS\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [[ $RC -ne 0 ]]; then
+            echo "::warning::F38 path-skip check failed (rc=$RC); fail-open allow"
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+            echo "reason=check_error" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::notice::F38 path-skip: allow ($(printf '%s\n' "$OUT" | awk -F= '/^reason=/{print $2}' | tail -1))"
+
+      - name: React path-skip
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'false' && github.event_name == 'issue_comment'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content='rocket' || true
+
+      - name: Path-skip stub review (F38)
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'false'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+          LUFFY_ROOT: ${{ github.workspace }}/luffy
+          OUT_DIR: ${{ github.workspace }}/luffy/.luffy-out
+          LUFFY_PR_LABELS: ${{ vars.LUFFY_PR_LABELS || '1' }}
+          LUFFY_LABEL_PREFIX: ${{ vars.LUFFY_LABEL_PREFIX || 'luffy' }}
+          LUFFY_COMMIT_STATUS: ${{ vars.LUFFY_COMMIT_STATUS || '1' }}
+          LUFFY_PR_REVIEW: ${{ vars.LUFFY_PR_REVIEW || '1' }}
+          LUFFY_INLINE_COMMENTS: '0'
+          REACTION_COMMENT_ID: ${{ github.event_name == 'issue_comment' && github.event.comment.id || '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT_DIR"
+          SAMPLE="${{ steps.pathskip.outputs.sample }}"
+          GLOBS="${{ steps.pathskip.outputs.globs }}"
+          bash "$LUFFY_ROOT/scripts/write-failure-review.sh" "$PR_NUMBER" "$OUT_DIR" \
+            "Path-skip (F38): every changed file matched skip globs (\`${GLOBS:-docs}\`) — no OpenRouter spend. Sample: ${SAMPLE:-n/a}. Re-run with \`@luffy review force\` to review anyway." \
+            "None — intentional free skip for docs/filtered paths. Use \`@luffy review force\` to pay for a full review."
+          # Rewrite verdict-friendly stub: write-failure is COMMENT — good for labels
+          REVIEW="$(ls -t "$OUT_DIR"/review-*.md 2>/dev/null | head -1 || true)"
+          if [[ -n "$REVIEW" && -f "$LUFFY_ROOT/scripts/post-review-comment.sh" ]]; then
+            POST_COMMENT=1 bash "$LUFFY_ROOT/scripts/post-review-comment.sh" "$REVIEW" || true
+          fi
+          chmod +x "$LUFFY_ROOT/scripts/report-verdict.sh" 2>/dev/null || true
+          bash "$LUFFY_ROOT/scripts/report-verdict.sh" "${REVIEW:-}" 0 || true
+
       # F1: shallow PR head + sparse from the start (avoid downloading whole monorepo)
       - name: Checkout PR head (sparse shallow)
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.sparse.outputs.use_sparse == 'true'
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true' && steps.sparse.outputs.use_sparse == 'true'
         uses: actions/checkout@v4
         with:
           path: workspace
@@ -299,7 +411,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Checkout PR head (full shallow fallback)
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.sparse.outputs.use_sparse != 'true'
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true' && steps.sparse.outputs.use_sparse != 'true'
         uses: actions/checkout@v4
         with:
           path: workspace
@@ -308,7 +420,7 @@ jobs:
 
       # F8: skip Hermes install cache when runner image already has hermes
       - name: Detect prebaked Hermes
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true'
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true'
         id: prebaked
         run: |
           set -euo pipefail
@@ -324,7 +436,7 @@ jobs:
 
       # F2/F14/F7/F25: cache Hermes install keyed by pin (save only on miss)
       - name: Resolve Hermes cache suffix
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.prebaked.outputs.yes != 'true'
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true' && steps.prebaked.outputs.yes != 'true'
         id: hermes_pin
         run: |
           set -euo pipefail
@@ -347,7 +459,7 @@ jobs:
           echo "::notice::Hermes cache pin suffix=$SUF commit=${LUFFY_HERMES_COMMIT:-default}"
 
       - name: Restore Hermes install cache
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.prebaked.outputs.yes != 'true'
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true' && steps.prebaked.outputs.yes != 'true'
         id: hermes_cache
         uses: actions/cache@v4
         continue-on-error: true
@@ -361,7 +473,7 @@ jobs:
             luffy-hermes-bin-${{ runner.os }}-
 
       - name: React eyes
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && github.event_name == 'issue_comment'
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true' && github.event_name == 'issue_comment'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -372,7 +484,7 @@ jobs:
             -f content='eyes' || true
 
       - name: Run Luffy pipeline
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true'
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true'
         id: review
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -449,7 +561,7 @@ jobs:
           set -e
 
       - name: Post review comment (always if matched)
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && always()
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true' && always()
         env:
           GITHUB_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -476,7 +588,7 @@ jobs:
       # Replaces pipeline-only +1/-1 so REQUEST CHANGES no longer looks like "success".
       - name: Report verdict (F22)
         id: verdict
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && always()
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true' && always()
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -511,7 +623,7 @@ jobs:
           bash "$LUFFY_ROOT/scripts/report-verdict.sh" "${REVIEW_FILE:-}" "${PIPELINE_RC:-1}"
 
       - name: Ensure trace package exists
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && always()
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true' && always()
         env:
           LUFFY_ROOT: ${{ github.workspace }}/luffy
           OUT_DIR: ${{ github.workspace }}/luffy/.luffy-out
@@ -559,7 +671,7 @@ jobs:
           fi
 
       - name: Upload run trace artifact
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && always()
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true' && always()
         uses: actions/upload-artifact@v4
         with:
           name: luffy-trace-pr${{ steps.gate.outputs.pr_number }}-run${{ github.run_id }}
@@ -568,7 +680,7 @@ jobs:
           retention-days: 90
 
       - name: Upload full out bundle (debug)
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && always()
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.pathskip.outputs.allowed == 'true' && always()
         uses: actions/upload-artifact@v4
         with:
           name: luffy-out-pr${{ steps.gate.outputs.pr_number }}-run${{ github.run_id }}
@@ -583,6 +695,7 @@ jobs:
         if: >
           steps.gate.outputs.matched == 'true' &&
           steps.cooldown.outputs.allowed == 'true' &&
+          steps.pathskip.outputs.allowed == 'true' &&
           steps.prebaked.outputs.yes != 'true' &&
           always() &&
           steps.hermes_cache.outputs.cache-hit != 'true'
