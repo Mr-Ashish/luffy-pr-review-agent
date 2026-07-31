@@ -1,31 +1,31 @@
-# Agent loop · `run-20260731T175144-078abc`
+# Agent loop · `run-20260731T175536-cd3a82`
 
 - **model:** `anthropic/claude-opus-5`
 - **hermes_rc:** 0
-- **units:** 5
-- **at:** 2026-07-31T12:22:39Z
+- **units:** 3
+- **at:** 2026-07-31T12:26:24Z
 
 ## Summary
 
-Two genuinely new areas beyond the claim index: (1) the uncommitted F8 prebaked-runner escape hatch in ensure_hermes plus the docker/ image + benchmark tooling, and (2) the mechanism-level contract of scripts/cooldown-check.sh (exit codes, fail-open, success-vs-failure comment detection, fixture/clock injection, gh --paginate multi-array pitfall). Existing F19/F7 design-level claims were not restated.
+The session's F8 prebaked-runner work is largely already captured in root DEV.md/USAGE.md, but the image-side contract and GHCR wiring for docker/luffy-runner is not yet documented at that path: the Dockerfile's prebaked markers, pin-derived tagging, build-script smoke gate, and the package-visibility prerequisite for using the image as an Actions container.
 
 ## Usage
 
 ```json
 {
-  "estimated_cost_usd": 0.3560725,
+  "estimated_cost_usd": 0.22376175,
   "cost_status": "estimated",
   "cost_source": "provider_models_api",
   "input_tokens": 2,
-  "output_tokens": 4333,
-  "cache_read_tokens": 0,
-  "cache_write_tokens": 39638,
-  "reasoning_tokens": 522,
-  "total_tokens": 43973,
+  "output_tokens": 3724,
+  "cache_read_tokens": 20016,
+  "cache_write_tokens": 19303,
+  "reasoning_tokens": 406,
+  "total_tokens": 43045,
   "api_calls": 1,
   "model": "anthropic/claude-opus-5",
   "provider": "openrouter",
-  "session_id": "20260731_175145_c23f28",
+  "session_id": "20260731_175538_213f06",
   "completed": true,
   "failed": false,
   "service_tier": null
@@ -36,11 +36,11 @@ Two genuinely new areas beyond the claim index: (1) the uncommitted F8 prebaked-
 
 ```json
 {
-  "assemble_s": 0.077,
-  "extract_s": 53.908,
+  "assemble_s": 0.101,
+  "extract_s": 47.319,
   "normalize_s": 0.002,
-  "apply_s": 0.508,
-  "total_s": 54.5
+  "apply_s": 0.025,
+  "total_s": 47.45
 }
 ```
 

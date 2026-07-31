@@ -4,44 +4,26 @@
     "kind": "dev",
     "action": "merge",
     "section": "Design decisions",
-    "bytes": 960,
+    "bytes": 1604,
     "applied": true,
     "unit_path": "docker/luffy-runner"
   },
   {
-    "path": "DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Patterns",
-    "bytes": 7725,
-    "applied": true,
-    "unit_path": "."
-  },
-  {
-    "path": "DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Pitfalls",
-    "bytes": 8409,
-    "applied": true,
-    "unit_path": "."
-  },
-  {
-    "path": "USAGE.md",
+    "path": "docker/luffy-runner/USAGE.md",
     "kind": "usage",
     "action": "merge",
-    "section": "Debugging",
-    "bytes": 3011,
+    "section": "Setup",
+    "bytes": 941,
     "applied": true,
-    "unit_path": "."
+    "unit_path": "docker/luffy-runner"
   },
   {
-    "path": "docker/USAGE.md",
+    "path": "docker/luffy-runner/USAGE.md",
     "kind": "usage",
     "action": "merge",
-    "section": "Common commands",
-    "bytes": 719,
+    "section": "Troubleshooting",
+    "bytes": 1507,
     "applied": true,
-    "unit_path": "docker"
+    "unit_path": "docker/luffy-runner"
   }
 ]

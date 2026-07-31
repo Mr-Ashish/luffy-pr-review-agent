@@ -1,6 +1,6 @@
 ```json
 {
-  "summary": "Two genuinely new areas beyond the claim index: (1) the uncommitted F8 prebaked-runner escape hatch in ensure_hermes plus the docker/ image + benchmark tooling, and (2) the mechanism-level contract of scripts/cooldown-check.sh (exit codes, fail-open, success-vs-failure comment detection, fixture/clock injection, gh --paginate multi-array pitfall). Existing F19/F7 design-level claims were not restated.",
+  "summary": "The session's F8 prebaked-runner work is largely already captured in root DEV.md/USAGE.md, but the image-side contract and GHCR wiring for docker/luffy-runner is not yet documented at that path: the Dockerfile's prebaked markers, pin-derived tagging, build-script smoke gate, and the package-visibility prerequisite for using the image as an Actions container.",
   "session_ids": ["dogfood-luffy-session"],
   "units": [
     {
@@ -8,63 +8,39 @@
       "path": "docker/luffy-runner",
       "action": "merge",
       "section": "Design decisions",
-      "content": "- F8 prebaked runner: `ensure_hermes` in `scripts/run-hermes-review.sh` short-circuits the whole install/cache path when `LUFFY_HERMES_PREBAKED=1` **or** a `/root/.hermes-pin` / `$HOME/.hermes-pin` marker file exists *and* `hermes` is already on PATH — it just logs `command -v hermes` + `hermes --version` and returns.\n- The pin file is still resolved and written to `$OUT_DIR/hermes-pin.txt` *before* the prebaked check, so traces record the intended pin even on runs that never invoke `install.sh`.\n- Image is built from `docker/luffy-runner/Dockerfile` via `scripts/build-luffy-runner-image.sh`, published by `.github/workflows/build-luffy-runner.yml`, and its startup win is measured with `scripts/benchmark-hermes-startup.sh` — the image is the artifact that must carry the marker file, otherwise runners silently fall back to the slow cold-install path.",
+      "content": "- The image's job is to satisfy a two-signal contract that CI probes, not to run Luffy itself: it sets `LUFFY_HERMES_PREBAKED=1` and writes the resolved SHA to `/root/.hermes-pin`, and bakes `PATH=/root/.local/bin:/root/.hermes/bin`. `ensure_hermes` short-circuits when either signal is present *and* `hermes` is on PATH, so a broken/renamed marker silently falls back to a cold install instead of failing loudly.\n- Base is plain `ubuntu:24.04` plus the minimum Hermes needs (`ca-certificates curl git python3 python3-venv bash build-essential`); Hermes is installed at build time with `install.sh --skip-setup --commit \"${HERMES_COMMIT}\" --force-commit`, i.e. the same pinned, non-interactive install path CI uses (F7).\n- The pin is an `ARG HERMES_COMMIT` with a hardcoded default that must track `scripts/hermes-pin.sh` DEFAULT — `scripts/build-luffy-runner-image.sh` resolves the pin via `scripts/hermes-pin.sh default` (overridable with `HERMES_COMMIT=…`) and passes it as `--build-arg`, so the Dockerfile default only matters for raw `docker build` invocations.\n- Tagging is pin-derived, not semver: `ghcr.io/<owner>/luffy-hermes-runner:<first-12-chars-of-pin>` plus `:latest`, which makes the image ref self-documenting about which Hermes commit is inside.\n- The build script gates publication on a smoke run (`docker run --rm <tag> hermes --version`) before any push, and only pushes when `PUSH=1`; the GHCR workflow (`.github/workflows/build-luffy-runner.yml`) rebuilds on pin/Dockerfile changes.",
       "evidence": [
-        "# F8: prebaked Docker/custom runner (image sets LUFFY_HERMES_PREBAKED=1 or /.hermes-pin)",
-        "if [[ \"${LUFFY_HERMES_PREBAKED:-}\" == \"1\" || -f /root/.hermes-pin || -f \"${HOME}/.hermes-pin\" ]]",
-        "F8 | Prebaked Hermes runner image + startup benchmark | M | Shipped (docker/ + build workflow + benchmark script)"
-      ],
-      "confidence": "high"
-    },
-    {
-      "kind": "dev",
-      "path": ".",
-      "action": "merge",
-      "section": "Patterns",
-      "content": "- Gate helpers follow a stdout-contract pattern: `scripts/cooldown-check.sh` prints `allowed=`, `reason=`, `age_s=`, `remaining_s=` key=value lines that the workflow parses straight into `$GITHUB_OUTPUT`, and signals decisions through exit codes — `0` allow, `2` cooldown active (skip paid run), `1` hard error.\n- Exit `1` is deliberately **fail-open**: the workflow logs `::warning::F19 cooldown check failed (rc=$RC); fail-open allow` and sets `allowed=true`, so a GitHub API hiccup never blocks reviews (the trade-off is it can also leak a paid run).\n- \"Successful review\" is inferred from the posted comment, not from job state: body must contain the `<!-- luffy-review pr=N` marker **and** match none of the `FAIL_SNIPPETS` (missing secret, config error, \"luffy failed to produce a review\", …), which is what makes failure stubs retryable immediately.\n- The script is designed for hermetic tests: `LUFFY_COOLDOWN_FIXTURE` supplies a JSON array of `{created_at, body}` comments (no network) and `NOW_EPOCH` pins the clock — see `tests/test_cooldown_check.py`.",
-      "evidence": [
-        "#   0  allow run\n#   2  cooldown active (skip paid review)\n#   1  hard error (workflow should soft-fail open → allow)",
-        "FAIL_SNIPPETS = (\"luffy failed to produce a review\", \"missing required secret\", …)",
-        "LUFFY_COOLDOWN_FIXTURE     path to JSON array of {created_at,body} comments (tests; no network)"
-      ],
-      "confidence": "high"
-    },
-    {
-      "kind": "dev",
-      "path": ".",
-      "action": "merge",
-      "section": "Pitfalls",
-      "content": "- `gh api --paginate` can emit **several concatenated JSON arrays** (one per page), so a plain `json.loads` on its output fails; `cooldown-check.sh` walks the buffer with `json.JSONDecoder().raw_decode` and extends a single list. Reuse that loop for any new paginated `gh api --jq` consumer instead of assuming one array.\n- A non-integer `LUFFY_COOLDOWN_SECONDS` is treated as **disabled** (`reason=disabled_invalid`, warning only) rather than an error — a typo in the repo variable silently removes the spend guard.\n- Clock skew is clamped, not trusted: a comment timestamp newer than `now` yields `age=0`, which means a bad clock maximises the cooldown rather than bypassing it.",
-      "evidence": [
-        "# gh --paginate may emit multiple JSON arrays\ndec = json.JSONDecoder()",
-        "echo \"::warning::LUFFY_COOLDOWN_SECONDS='${RAW_CD}' not an integer; treating as disabled\"",
-        "if age < 0:\n    age = 0"
+        "ENV DEBIAN_FRONTEND=noninteractive LUFFY_HERMES_PREBAKED=1 PATH=\"/root/.local/bin:/root/.hermes/bin:${PATH}\"",
+        "printf '%s\\n' \"${HERMES_COMMIT}\" >/root/.hermes-pin",
+        "PIN=\"$(\"$ROOT/scripts/hermes-pin.sh\" default | tr -d '\\n')\"; SHORT=\"${PIN:0:12}\"",
+        "log \"Smoke: hermes --version in image\"; docker run --rm \"$TAG_PIN\" hermes --version",
+        "# Pin must match scripts/hermes-pin.sh DEFAULT (or pass HERMES_COMMIT=...)."
       ],
       "confidence": "high"
     },
     {
       "kind": "usage",
-      "path": ".",
+      "path": "docker/luffy-runner",
       "action": "merge",
-      "section": "Debugging",
-      "content": "- Reproduce a cooldown decision offline (no `gh`, no network): `LUFFY_COOLDOWN_FIXTURE=/tmp/comments.json NOW_EPOCH=1753963200 bash scripts/cooldown-check.sh 1` — fixture is a JSON array of `{created_at, body}` objects; read the `allowed=`/`reason=`/`remaining_s=` lines and the exit code (0 allow, 2 skip, 1 error).\n- Force an allow while debugging without touching repo variables: `LUFFY_COOLDOWN_FORCE=1 bash scripts/cooldown-check.sh <pr>` (prints `reason=force`); on a real PR the operator-facing equivalents are `@luffy review force` and `workflow_dispatch`.\n- When a trigger comment produces a rocket reaction and no review, check the job summary section \"Luffy cooldown (F19)\" for the remaining seconds before suspecting the gate or the model.",
+      "section": "Setup",
+      "content": "- Order of operations to adopt the prebaked runner: (1) publish the image (`PUSH=1 ./scripts/build-luffy-runner-image.sh` or the **Build Luffy Hermes runner** workflow), (2) make the GHCR package readable by Actions — public package, or explicitly grant the consuming repo access, (3) set repo variable `LUFFY_RUNNER_IMAGE` to the pin-tagged ref (e.g. `ghcr.io/mr-ashish/luffy-hermes-runner:53559aaf86b8`), (4) re-trigger `@luffy review`.\n- The workflow resolves the container as `${{ vars.LUFFY_RUNNER_IMAGE != '' && vars.LUFFY_RUNNER_IMAGE || null }}`, so leaving the variable unset (or empty) is the supported default path: host `ubuntu-latest` + pin-keyed Hermes install cache. There is no separate on/off flag.\n- Verify an image locally before wiring it into CI: `docker run --rm ghcr.io/mr-ashish/luffy-hermes-runner:latest hermes --version`.",
       "evidence": [
-        "LUFFY_COOLDOWN_FORCE=1     always allow (operator override)",
-        "NOW_EPOCH                  optional fixed clock for tests",
-        "echo \"### Luffy cooldown (F19)\""
+        "Ensure the package is readable by Actions (public package, or grant the repo access).",
+        "container: ${{ vars.LUFFY_RUNNER_IMAGE != '' && vars.LUFFY_RUNNER_IMAGE || null }}",
+        "Leave `LUFFY_RUNNER_IMAGE` **unset** for the default path: `ubuntu-latest` + pin-keyed Hermes install cache (F2/F7/F14)."
       ],
-      "confidence": "medium"
+      "confidence": "high"
     },
     {
       "kind": "usage",
-      "path": "docker",
+      "path": "docker/luffy-runner",
       "action": "merge",
-      "section": "Common commands",
-      "content": "- Build the prebaked Hermes runner image locally: `bash scripts/build-luffy-runner-image.sh` (source `docker/luffy-runner/Dockerfile`); CI equivalent is the **Build Luffy Runner** workflow (`.github/workflows/build-luffy-runner.yml`).\n- Measure the startup win the image is supposed to deliver: `bash scripts/benchmark-hermes-startup.sh` — compare against a cold-install job before switching `runs-on`.\n- To make a custom/self-hosted runner skip Hermes installation entirely, export `LUFFY_HERMES_PREBAKED=1` or drop a `.hermes-pin` marker at `/root/.hermes-pin` or `$HOME/.hermes-pin` with `hermes` already on PATH.",
+      "section": "Troubleshooting",
+      "content": "- If a review job still spends 1–2 min installing Hermes while `LUFFY_RUNNER_IMAGE` is set, check the job log for the `F8 prebaked Hermes detected …; skipping install cache` notice: the workflow's *Detect prebaked Hermes* step is what disables the cache save/restore steps, and it only fires when `hermes` is on PATH inside the container.\n- A stale `LUFFY_RUNNER_IMAGE` pin is invisible: the prebaked short-circuit returns before any pin comparison, so a container built from an older `HERMES_COMMIT` will run happily against a newer `scripts/hermes-pin.sh` default. Compare the image tag's 12-char pin against `scripts/hermes-pin.sh default` when Hermes behaviour differs between the container path and the host path.\n- Self-hosted runners can opt into the same fast path without the image by placing `hermes` on PATH plus a `/root/.hermes-pin` (or `$HOME/.hermes-pin`) marker file.",
       "evidence": [
-        "docker/luffy-runner/Dockerfile",
-        "?? scripts/build-luffy-runner-image.sh\n?? scripts/benchmark-hermes-startup.sh",
-        "?? .github/workflows/build-luffy-runner.yml"
+        "echo \"::notice::F8 prebaked Hermes detected ($(command -v hermes)); skipping install cache\"",
+        "if [[ \"${LUFFY_HERMES_PREBAKED:-}\" == \"1\" || -f /root/.hermes-pin || -f \"${HOME}/.hermes-pin\" ]] && command -v hermes >/dev/null 2>&1; then ... return",
+        "# F8: prebaked image (LUFFY_RUNNER_IMAGE) or self-hosted with /root/.hermes-pin + hermes on PATH."
       ],
       "confidence": "medium"
     }

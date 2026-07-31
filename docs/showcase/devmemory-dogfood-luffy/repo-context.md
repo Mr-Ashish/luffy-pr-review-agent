@@ -1,26 +1,22 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T12:21:44Z
+- **assembled_at:** 2026-07-31T12:25:36Z
 
 ## git status
 
 ```
-M scripts/run-hermes-review.sh
-?? .github/workflows/build-luffy-runner.yml
-?? docker/
-?? scripts/benchmark-hermes-startup.sh
-?? scripts/build-luffy-runner-image.sh
+(clean)
 ```
 
 ## recent log
 
 ```
+ff1096a feat(ops): prebaked Hermes runner image + optional container (F8)
+3c7d39b docs(knowledge): dogfood F19 cooldown patterns into DEV/USAGE + showcase
 e015fd2 feat(cost): per-PR re-trigger cooldown after successful review (F19)
 5b836d5 docs(knowledge): dogfood F7 Hermes pin into DEV/USAGE + showcase
 34841d9 feat(ops): pin Hermes install for reproducible CI (F7)
-fc672e8 feat(security): redact secrets in posted PR reviews (F18)
-0cfa72c Add colocated DEV/USAGE from devmemory dogfood on Luffy
 ```
 
 ## tree (sample)
@@ -51,6 +47,7 @@ readme-kit/src/render/document.mjs
 readme-kit/src/assets/hero-options.mjs
 readme-kit/src/assets/hero-svg.mjs
 docker/luffy-runner/Dockerfile
+docker/luffy-runner/README.md
 memory/DEV.md
 memory/README.md
 memory/index.json
@@ -75,6 +72,8 @@ docs/README-KIT-MVP.md
 docs/ROI-FIXES.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/blog/building-luffy-agentic-pr-review.md
+docs/benchmarks/hermes-startup-latest.json
+docs/benchmarks/hermes-startup-latest.md
 docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/README.md
 docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/context.md
 docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/e2e-agentic-trace.mmd
@@ -156,25 +155,7 @@ assets/brand-options/three-artifacts.html
 ## git diff
 
 ```
-diff --git a/scripts/run-hermes-review.sh b/scripts/run-hermes-review.sh
-index c8f1d54..6a2e075 100755
---- a/scripts/run-hermes-review.sh
-+++ b/scripts/run-hermes-review.sh
-@@ -66,6 +66,14 @@ ensure_hermes() {
-   pin="$("$PIN_HELPER" resolve 2>/dev/null | tr -d '\n' || true)"
-   printf '%s\n' "${pin:-floating}" >"$OUT_DIR/hermes-pin.txt" || true
- 
-+  # F8: prebaked Docker/custom runner (image sets LUFFY_HERMES_PREBAKED=1 or /.hermes-pin)
-+  if [[ "${LUFFY_HERMES_PREBAKED:-}" == "1" || -f /root/.hermes-pin || -f "${HOME}/.hermes-pin" ]] \
-+    && command -v hermes >/dev/null 2>&1; then
-+    notice "hermes prebaked runner: $(command -v hermes)"
-+    hermes --version 2>/dev/null || true
-+    return
-+  fi
-+
-   if command -v hermes >/dev/null 2>&1; then
-     head="$(_hermes_install_head || true)"
-     if [[ -z "$pin" ]]; then
+(no unstaged/uncommitted diff)
 ```
 
 ## existing knowledge files
@@ -184,7 +165,8 @@ index c8f1d54..6a2e075 100755
 - [DEV.md#Architecture] artifact compos deterministic every inner llm-driven orchestr record
 - [DEV.md#Architecture] assemble-contextsh contractfencessizehtml distill-memorysh hermes-pinsh hub-ingest-runpy marker normalize-reviewpy one-shot
 - [DEV.md#Architecture] branch config default domain luffy luffy-hermes-home memory prompt
-- [DEV.md#Design decisions] 400000 45-minute 900s @luffy allowlist author-associ bypass cancel-in-progres
+- [DEV.md#Design decisions] 400000 45-minute 900s @luffy allowlist author-associ bypas cancel-in-progres
+- [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
 - [DEV.md#Design decisions] --commit --force-commit --skip-setup action cache default float install
 - [DEV.md#Design decisions] comment delet luffy luffy-review luffyreplaceprevious=0 marker match prior
 - [DEV.md#Design decisions] always-publish comment crash failure hermesmodel low-confidence openrouter produce
@@ -199,11 +181,11 @@ index c8f1d54..6a2e075 100755
 - [DEV.md#Pitfalls] advertise alone anthropicclaude-opus-5 anyone default diverg either explicitly
 - [DEV.md#Pitfalls] --version accept behaviour binary check contain degrad ensureherm
 - [DEV.md#Pitfalls] <sha> default defaulthermescommit duplicat fallback hardcod overrid script
+- [DEV.md#Pitfalls] --paginate array assum buffer concatenat consumer cooldown-checksh extend
+- [DEV.md#Pitfalls] disabl error guard luffycooldownsecond non-integer reason=disabledinvalid remov silently
+- [DEV.md#Pitfalls] age=0 bypass clamp clock comment cooldown maximis newer
 - [DEV.md#Patterns] apikey-style assignment choke-point driven generic ghpousr… githubpat… helper
-- [DEV.md#Patterns] adding again agent cannot contract-failure ensurecontract fallback normalize-reviewpy
-- [DEV.md#Patterns] acros added apart comment drift duplicated-but-align intentionally normalize-reviewpy
-- [DEV.md#Patterns] agentsoulmd delegat enforc guarantee intent mechanically model never
-- [DEV.md#Patterns] absent assert assertion both-sid broken-output fallback githubtokenredact inc
+- [DEV.md#Patterns] 
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -216,8 +198,8 @@ index c8f1d54..6a2e075 100755
 - Dual workspace separates trust domains: `luffy/` holds SOUL + prompts + scripts from the default branch, `workspace/` holds only the PR head, `.luffy-hermes-home/` holds Hermes config + growing memory.
 
 ## Design decisions
-- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after successful Luffy comment; failures do not start the window; `@luffy review force` bypasses), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout.
-- Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (defa
+- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout.
+- **F8 prebaked runner:** `ensure_hermes` sho
 … [truncated; do not restate] …
 
 ### memory/DEV.md
@@ -239,17 +221,15 @@ index c8f1d54..6a2e075 100755
 ### USAGE.md
 
 ## Common commands
+- Build prebaked Hermes runner image: `./scripts/build-luffy-runner-image.sh` (optional `PUSH=1`).
+- Benchmark Hermes startup paths: `SKIP_COLD=1 ./scripts/benchmark-hermes-startup.sh` → `docs/benchmarks/`.
 - Inspect the effective Hermes pin locally without network: `scripts/hermes-pin.sh resolve` (empty output = floating), `scripts/hermes-pin.sh default` (baked-in known-good SHA), `scripts/hermes-pin.sh install-args` (exact `install.sh` args), `scripts/hermes-pin.sh cache-suffix` (Actions cache key suffix).
 - Check whether an installed tree satisfies the pin: `scripts/hermes-pin.sh matches <git-head-sha>` — exit 0 means acceptable (short/full SHA prefixes both count).
-- Per-run pin actually used is recorded at `.luffy-out/hermes-pin.txt` and shipped in the trace artifact — read it before blaming the model for a behaviour change.
 
 ## Setup
 - Install on each target repo by copying `agent/`, `scripts/`, and `.github/workflows/luffy-pr-review.yml` onto that repo's **default branch** (workflow only runs from default branch).
 - Required secret: `OPENROUTER_API_KEY`. For cross-repo hub memory also add `LUFFY_HUB_TOKEN` (PAT with contents write on the hub).
-- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
-- Trigger a review by commenting `@luffy review this pr` (or `@luffy review`) on the PR.
-
-## Debugging
-- Local dry-run (needs authenticated `gh`, network, and `.env` with `OPEN
+- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_RUNNER_IMAGE` (optional prebaked Hermes container image, F8), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
+- Trigger a review by commenting `@luffy review this pr` (or `@l
 … [truncated; do not restate] …
 
