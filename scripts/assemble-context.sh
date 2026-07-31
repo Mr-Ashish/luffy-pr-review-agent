@@ -328,6 +328,49 @@ try:
 except Exception:
     pr_desc_action = "error"
 
+# F61: deterministic suggested test plan (soft; pure code)
+testplan_on = "0"
+testplan_cases = "0"
+try:
+    import sys as _sys4
+    _sys4.path.insert(0, str(luffy_root / "scripts"))
+    from testplan_generation import (  # type: ignore
+        enabled as testplan_enabled,
+        build_plan,
+        render_section as testplan_section,
+        render_markdown as testplan_markdown,
+        apply_to_prompt as testplan_apply_prompt,
+    )
+
+    if testplan_enabled():
+        diff_text = None
+        try:
+            dp = Path(diff_path)
+            if dp.is_file():
+                # cap read for huge diffs
+                diff_text = dp.read_text(encoding="utf-8", errors="replace")[:400_000]
+        except Exception:
+            diff_text = None
+        tp = build_plan(
+            pr_json=pr,
+            diff=diff_text,
+            title=title,
+            body=str(pr.get("body") or ""),
+        )
+        sec = testplan_section(tp)
+        (out_dir / "testplan.md").write_text(
+            testplan_markdown(tp), encoding="utf-8"
+        )
+        (out_dir / "testplan-section.md").write_text(sec, encoding="utf-8")
+        prompt = testplan_apply_prompt(prompt, sec)
+        Path(os.environ["PROMPT_PATH"]).write_text(prompt, encoding="utf-8")
+        testplan_on = "1"
+        testplan_cases = str(len(tp.cases))
+    else:
+        testplan_on = "0"
+except Exception:
+    testplan_on = "0"
+
 # Shell-safe meta for later steps
 meta = {
     "REPO": repo,
@@ -352,6 +395,8 @@ meta = {
     "MERMAID": mermaid_on,
     "MERMAID_FILES": mermaid_nodes,
     "PR_DESCRIPTION_ACTION": pr_desc_action,
+    "TESTPLAN": testplan_on,
+    "TESTPLAN_CASES": testplan_cases,
 }
 with open(os.environ["META_PATH"], "w") as fh:
     for k, v in meta.items():

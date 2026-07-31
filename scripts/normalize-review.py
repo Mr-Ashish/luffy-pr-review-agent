@@ -29,6 +29,7 @@ SOFT_SECTIONS = (
     "### Suggestions",
     "### Code suggestions",
     "### Nits",
+    "### Suggested test plan",
     "### What I checked",
 )
 

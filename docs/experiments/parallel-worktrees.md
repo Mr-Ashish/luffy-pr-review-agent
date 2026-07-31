@@ -1,9 +1,7 @@
-# Parallel worktrees tracker
+# Parallel worktrees
 
-| Worktree | Status |
-|----------|--------|
-| (none) | F60 merged PR #10 |
+| Worktree | Feature |
+|----------|---------|
+| `pr-review-agent-wt/f61-testplan` | F61 testplan generation |
 
-## Eval corpus milvus: 3 PRs (#1–#3)
-
-Updated: 2026-07-31 F60 merged.
+Updated: 2026-08-01 F61 in flight.
