@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T12:25:36Z
+- **assembled_at:** 2026-07-31T12:30:11Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+bd8e3f6 feat(install): one-command Luffy pack install into target repos (F20)
+28e7d6e docs(knowledge): dogfood F8 prebaked runner into docker/ + showcase
 ff1096a feat(ops): prebaked Hermes runner image + optional container (F8)
 3c7d39b docs(knowledge): dogfood F19 cooldown patterns into DEV/USAGE + showcase
 e015fd2 feat(cost): per-PR re-trigger cooldown after successful review (F19)
-5b836d5 docs(knowledge): dogfood F7 Hermes pin into DEV/USAGE + showcase
-34841d9 feat(ops): pin Hermes install for reproducible CI (F7)
 ```
 
 ## tree (sample)
@@ -46,8 +46,10 @@ readme-kit/src/render/badges.mjs
 readme-kit/src/render/document.mjs
 readme-kit/src/assets/hero-options.mjs
 readme-kit/src/assets/hero-svg.mjs
+docker/luffy-runner/DEV.md
 docker/luffy-runner/Dockerfile
 docker/luffy-runner/README.md
+docker/luffy-runner/USAGE.md
 memory/DEV.md
 memory/README.md
 memory/index.json
@@ -59,6 +61,7 @@ tests/test_cooldown_check.py
 tests/test_gate_helpers.py
 tests/test_hermes_pin.py
 tests/test_hub_ingest.py
+tests/test_install_luffy.py
 tests/test_normalize_review.py
 agent/DEV.md
 agent/MEMORY.seed.md
@@ -114,6 +117,7 @@ scripts/cooldown-check.sh
 scripts/distill-memory.sh
 scripts/hermes-pin.sh
 scripts/hub-ingest-run.py
+scripts/install-luffy.sh
 scripts/normalize-review.py
 scripts/post-review-comment.sh
 scripts/preload-hub-memory.sh
@@ -164,6 +168,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] @luffy action assemble cacheartifact checkout comment concurrency context
 - [DEV.md#Architecture] artifact compos deterministic every inner llm-driven orchestr record
 - [DEV.md#Architecture] assemble-contextsh contractfencessizehtml distill-memorysh hermes-pinsh hub-ingest-runpy marker normalize-reviewpy one-shot
+- [DEV.md#Architecture] --with-hub-ingest --with-runner-build adoption agent allowlist entrypoint f20 image-buildbench
 - [DEV.md#Architecture] branch config default domain luffy luffy-hermes-home memory prompt
 - [DEV.md#Design decisions] 400000 45-minute 900s @luffy allowlist author-associ bypas cancel-in-progres
 - [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
@@ -184,8 +189,6 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Pitfalls] --paginate array assum buffer concatenat consumer cooldown-checksh extend
 - [DEV.md#Pitfalls] disabl error guard luffycooldownsecond non-integer reason=disabledinvalid remov silently
 - [DEV.md#Pitfalls] age=0 bypass clamp clock comment cooldown maximis newer
-- [DEV.md#Patterns] apikey-style assignment choke-point driven generic ghpousr… githubpat… helper
-- [DEV.md#Patterns] 
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -195,12 +198,19 @@ assets/brand-options/three-artifacts.html
 - Luffy is a gated GitHub Actions control plane, not a chat bot: `@luffy review this pr` → gate + per-PR concurrency → dual checkout → restore Hermes memory → assemble context → `hermes -z` → normalize → PR comment → distill memory → cache/artifacts.
 - Orchestration is deterministic shell (`scripts/run-luffy-review.sh` composes stages and records timings); only the inner review step is LLM-driven, so every run leaves reproducible artifacts.
 - Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
-- Dual workspace separates trust domains: `luffy/` holds SOUL + prompts + scripts from the default branch, `workspace/` holds only the PR head, `.luffy-hermes-home/` holds Hermes config + growing memory.
+- **F20 install pack:** `scripts/install-luffy.sh` is the adoption entrypoint — copies `agent/`, a runtime-script allowlist (not image-build/bench tools), and `luffy-pr-review.yml` into a target repo; optional `--with-hub-ingest` / `--with-runner-build`; writes `.luffy-install-stamp` with source SHA.
 
 ## Design decisions
-- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout.
-- **F8 prebaked runner:** `ensure_hermes` sho
+- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (de
 … [truncated; do not restate] …
+
+### docker/luffy-runner/DEV.md
+
+## Design decisions
+- The image's job is to satisfy a two-signal contract that CI probes, not to run Luffy itself: it sets `LUFFY_HERMES_PREBAKED=1` and writes the resolved SHA to `/root/.hermes-pin`, and bakes `PATH=/root/.local/bin:/root/.hermes/bin`. `ensure_hermes` short-circuits when either signal is present *and* `hermes` is on PATH, so a broken/renamed marker silently falls back to a cold install instead of failing loudly.
+- Base is plain `ubuntu:24.04` plus the minimum Hermes needs (`ca-certificates curl git python3 python3-venv bash build-essential`); Hermes is installed at build time with `install.sh --skip-setup --commit "${HERMES_COMMIT}" --force-commit`, i.e. the same pinned, non-interactive install path CI uses (F7).
+- The pin is an `ARG HERMES_COMMIT` with a hardcoded default that must track `scripts/hermes-pin.sh` DEFAULT — `scripts/build-luffy-runner-image.sh` resolves the pin via `scripts/hermes-pin.sh default` (overridable with `HERMES_COMMIT=…`) and passes it as `--build-arg`, so the Dockerfile default only matters for raw `docker build` invocations.
+- Tagging is pin-derived, not semver: `ghcr.io/<owner>/luffy-hermes-runner:<first-12-chars-of-pin>` plus `:latest`, which makes the image ref self-documenting about which Hermes commit is inside.
 
 ### memory/DEV.md
 
@@ -221,15 +231,25 @@ assets/brand-options/three-artifacts.html
 ### USAGE.md
 
 ## Common commands
+- Install Luffy pack into another repo: `./scripts/install-luffy.sh /path/to/target-repo` (add `--force` to overwrite; `--dry-run` to preview).
 - Build prebaked Hermes runner image: `./scripts/build-luffy-runner-image.sh` (optional `PUSH=1`).
 - Benchmark Hermes startup paths: `SKIP_COLD=1 ./scripts/benchmark-hermes-startup.sh` → `docs/benchmarks/`.
 - Inspect the effective Hermes pin locally without network: `scripts/hermes-pin.sh resolve` (empty output = floating), `scripts/hermes-pin.sh default` (baked-in known-good SHA), `scripts/hermes-pin.sh install-args` (exact `install.sh` args), `scripts/hermes-pin.sh cache-suffix` (Actions cache key suffix).
-- Check whether an installed tree satisfies the pin: `scripts/hermes-pin.sh matches <git-head-sha>` — exit 0 means acceptable (short/full SHA prefixes both count).
 
 ## Setup
-- Install on each target repo by copying `agent/`, `scripts/`, and `.github/workflows/luffy-pr-review.yml` onto that repo's **default branch** (workflow only runs from default branch).
+- Install on each target repo: from this repo run `./scripts/install-luffy.sh /path/to/target-repo` (or manually copy `agent/`, runtime `scripts/`, and `.github/workflows/luffy-pr-review.yml`) onto that repo's **default branch** (workflow only runs from default branch).
 - Required secret: `OPENROUTER_API_KEY`. For cross-repo hub memory also add `LUFFY_HUB_TOKEN` (PAT with contents write on the hub).
-- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_RUNNER_IMAGE` (optional prebaked Hermes container image, F8), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
-- Trigger a review by commenting `@luffy review this pr` (or `@l
+- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_RUNNER_IMAGE` (optional prebaked Hermes container image, F8), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`
 … [truncated; do not restate] …
+
+### docker/luffy-runner/USAGE.md
+
+## Setup
+- Order of operations to adopt the prebaked runner: (1) publish the image (`PUSH=1 ./scripts/build-luffy-runner-image.sh` or the **Build Luffy Hermes runner** workflow), (2) make the GHCR package readable by Actions — public package, or explicitly grant the consuming repo access, (3) set repo variable `LUFFY_RUNNER_IMAGE` to the pin-tagged ref (e.g. `ghcr.io/mr-ashish/luffy-hermes-runner:53559aaf86b8`), (4) re-trigger `@luffy review`.
+- The workflow resolves the container as `${{ vars.LUFFY_RUNNER_IMAGE != '' && vars.LUFFY_RUNNER_IMAGE || null }}`, so leaving the variable unset (or empty) is the supported default path: host `ubuntu-latest` + pin-keyed Hermes install cache. There is no separate on/off flag.
+- Verify an image locally before wiring it into CI: `docker run --rm ghcr.io/mr-ashish/luffy-hermes-runner:latest hermes --version`.
+
+## Troubleshooting
+- A stale `LUFFY_RUNNER_IMAGE` pin is invisible: the prebaked short-circuit returns before any pin comparison, so a container built from an older `HERMES_COMMIT` will run happily against a newer `scripts/hermes-pin.sh` default. Compare the image tag's 12-char pin against `scripts/hermes-pin.sh default` when Hermes behaviour differs between the container path and the host path.
+- Self-hosted runners can opt into the same fast path without the image by placing `hermes` on PATH plus a `/root/.hermes-pin` (or `$HOME/.hermes-pin`) marker file.
 

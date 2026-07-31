@@ -22,6 +22,13 @@
 - Observability is forced on at the env level (`HERMES_TUI_TOOL_PROGRESS=verbose`, `PYTHONUNBUFFERED=1`) so agent/tool activity is recoverable from logs even for a run that later fails.
 - `HERMES_HOME` is seeded per run but `MEMORY.md` is explicitly preserved through seeding — the home directory is disposable, the memory file is not.
 
+- `install-luffy.sh` picks the pack in two different ways on purpose: runtime scripts come from a hardcoded `RUNTIME_SCRIPTS` array (image-build/bench tooling excluded unless `--with-runner-build`), while `agent/` is enumerated dynamically (`find "$SRC/agent" -maxdepth 1 -type f`), so adding an agent file propagates automatically but adding a script does not.
+- The installer copies **itself** into the target pack (`install-luffy.sh` is in `RUNTIME_SCRIPTS`), so an installed repo can re-run the install/update from its own tree; executable bits are preserved per-file (`[[ -x "$from" ]] && chmod +x`).
+- Source root defaults to the parent of `scripts/` (`--source` overrides) and is validated by three presence checks — `agent/`, `scripts/`, `.github/workflows/luffy-pr-review.yml` — before any copy, so a wrong `--source` fails fast instead of half-installing.
+- Installing the pack into the Luffy source tree itself (`SRC == DEST`) is refused unless `--force`, explicitly to avoid half-copies over the canonical tree.
+- Exit contract: `0` ok, `1` usage/error (including refuse install into source tree without `--force`); existing target files are **skipped** (not exit 2) unless `--force`. All human output goes to **stderr** via `log()`.
+- Provenance is a plain-text stamp, not a version string: `.luffy-install-stamp` records `installed_at`, `source_sha` (`git rev-parse --short HEAD` of the source, `unknown` outside git), `source_path`, and the pack contents.
+
 ## Pitfalls
 
 - `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403), so the hub publish default is `mode=direct` (clone hub → ingest → push `main`); the dispatch path needs a classic PAT on the target repo.
@@ -37,6 +44,12 @@
 - `gh api --paginate` can emit **several concatenated JSON arrays** (one per page), so a plain `json.loads` on its output fails; `cooldown-check.sh` walks the buffer with `json.JSONDecoder().raw_decode` and extends a single list. Reuse that loop for any new paginated `gh api --jq` consumer instead of assuming one array.
 - A non-integer `LUFFY_COOLDOWN_SECONDS` is treated as **disabled** (`reason=disabled_invalid`, warning only) rather than an error — a typo in the repo variable silently removes the spend guard.
 - Clock skew is clamped, not trusted: a comment timestamp newer than `now` yields `age=0`, which means a bad clock maximises the cooldown rather than bypassing it.
+
+- Re-running `install-luffy.sh` without `--force` is a silent no-op per file: `copy_file` logs `exists (skip, use --force)` and returns 0, so an *upgrade* over an already-installed repo leaves the old pack in place while the command still exits successfully. Upgrades require `--force`.
+- A missing source file only warns (`WARN missing in source: $rel/$f`) and continues, so a drifted/incomplete source tree can produce a partially installed pack with exit code 0 — read the stderr log, don't trust the exit status alone.
+- `RUNTIME_SCRIPTS` is a hand-maintained allowlist: any new runtime script added to `scripts/` must be appended there or target repos silently never receive it (the workflow then fails at run time, not install time).
+- `agent/` is copied with `-maxdepth 1 -type f`, so nested files under `agent/` are never installed — keep agent assets flat.
+- `usage()` renders help by slicing the file header (`sed -n '2,25p' "$0"`); editing or growing the top comment block silently truncates or corrupts `--help` output.
 
 ## Patterns
 

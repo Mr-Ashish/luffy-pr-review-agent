@@ -2,50 +2,61 @@
   "units": [
     {
       "kind": "dev",
-      "path": "docker/luffy-runner",
+      "path": ".",
       "action": "merge",
       "section": "Design decisions",
-      "content": "- The image's job is to satisfy a two-signal contract that CI probes, not to run Luffy itself: it sets `LUFFY_HERMES_PREBAKED=1` and writes the resolved SHA to `/root/.hermes-pin`, and bakes `PATH=/root/.local/bin:/root/.hermes/bin`. `ensure_hermes` short-circuits when either signal is present *and* `hermes` is on PATH, so a broken/renamed marker silently falls back to a cold install instead of failing loudly.\n- Base is plain `ubuntu:24.04` plus the minimum Hermes needs (`ca-certificates curl git python3 python3-venv bash build-essential`); Hermes is installed at build time with `install.sh --skip-setup --commit \"${HERMES_COMMIT}\" --force-commit`, i.e. the same pinned, non-interactive install path CI uses (F7).\n- The pin is an `ARG HERMES_COMMIT` with a hardcoded default that must track `scripts/hermes-pin.sh` DEFAULT — `scripts/build-luffy-runner-image.sh` resolves the pin via `scripts/hermes-pin.sh default` (overridable with `HERMES_COMMIT=…`) and passes it as `--build-arg`, so the Dockerfile default only matters for raw `docker build` invocations.\n- Tagging is pin-derived, not semver: `ghcr.io/<owner>/luffy-hermes-runner:<first-12-chars-of-pin>` plus `:latest`, which makes the image ref self-documenting about which Hermes commit is inside.\n- The build script gates publication on a smoke run (`docker run --rm <tag> hermes --version`) before any push, and only pushes when `PUSH=1`; the GHCR workflow (`.github/workflows/build-luffy-runner.yml`) rebuilds on pin/Dockerfile changes.",
+      "content": "- `install-luffy.sh` picks the pack in two different ways on purpose: runtime scripts come from a hardcoded `RUNTIME_SCRIPTS` array (image-build/bench tooling excluded unless `--with-runner-build`), while `agent/` is enumerated dynamically (`find \"$SRC/agent\" -maxdepth 1 -type f`), so adding an agent file propagates automatically but adding a script does not.\n- The installer copies **itself** into the target pack (`install-luffy.sh` is in `RUNTIME_SCRIPTS`), so an installed repo can re-run the install/update from its own tree; executable bits are preserved per-file (`[[ -x \"$from\" ]] && chmod +x`).\n- Source root defaults to the parent of `scripts/` (`--source` overrides) and is validated by three presence checks — `agent/`, `scripts/`, `.github/workflows/luffy-pr-review.yml` — before any copy, so a wrong `--source` fails fast instead of half-installing.\n- Installing the pack into the Luffy source tree itself (`SRC == DEST`) is refused unless `--force`, explicitly to avoid half-copies over the canonical tree.\n- Documented exit contract: `0` ok, `1` usage/error, `2` refused (target exists without `--force`); all human output goes to **stderr** via `log()`, keeping stdout clean.\n- Provenance is a plain-text stamp, not a version string: `.luffy-install-stamp` records `installed_at`, `source_sha` (`git rev-parse --short HEAD` of the source, `unknown` outside git), `source_path`, and the pack contents.",
       "evidence": [
-        "ENV DEBIAN_FRONTEND=noninteractive LUFFY_HERMES_PREBAKED=1 PATH=\"/root/.local/bin:/root/.hermes/bin:${PATH}\"",
-        "printf '%s\\n' \"${HERMES_COMMIT}\" >/root/.hermes-pin",
-        "PIN=\"$(\"$ROOT/scripts/hermes-pin.sh\" default | tr -d '\\n')\"; SHORT=\"${PIN:0:12}\"",
-        "log \"Smoke: hermes --version in image\"; docker run --rm \"$TAG_PIN\" hermes --version",
-        "# Pin must match scripts/hermes-pin.sh DEFAULT (or pass HERMES_COMMIT=...)."
+        "# Runtime script allowlist — exclude image build / bench from target packs by default",
+        "die \"refusing to install into the Luffy source tree itself (use --force if intentional)\"",
+        "# Exit: 0 ok, 1 usage/error, 2 refused (exists without --force)"
       ],
       "confidence": "high"
     },
     {
-      "kind": "usage",
-      "path": "docker/luffy-runner",
+      "kind": "dev",
+      "path": ".",
       "action": "merge",
-      "section": "Setup",
-      "content": "- Order of operations to adopt the prebaked runner: (1) publish the image (`PUSH=1 ./scripts/build-luffy-runner-image.sh` or the **Build Luffy Hermes runner** workflow), (2) make the GHCR package readable by Actions — public package, or explicitly grant the consuming repo access, (3) set repo variable `LUFFY_RUNNER_IMAGE` to the pin-tagged ref (e.g. `ghcr.io/mr-ashish/luffy-hermes-runner:53559aaf86b8`), (4) re-trigger `@luffy review`.\n- The workflow resolves the container as `${{ vars.LUFFY_RUNNER_IMAGE != '' && vars.LUFFY_RUNNER_IMAGE || null }}`, so leaving the variable unset (or empty) is the supported default path: host `ubuntu-latest` + pin-keyed Hermes install cache. There is no separate on/off flag.\n- Verify an image locally before wiring it into CI: `docker run --rm ghcr.io/mr-ashish/luffy-hermes-runner:latest hermes --version`.",
+      "section": "Pitfalls",
+      "content": "- Re-running `install-luffy.sh` without `--force` is a silent no-op per file: `copy_file` logs `exists (skip, use --force)` and returns 0, so an *upgrade* over an already-installed repo leaves the old pack in place while the command still exits successfully. Upgrades require `--force`.\n- A missing source file only warns (`WARN missing in source: $rel/$f`) and continues, so a drifted/incomplete source tree can produce a partially installed pack with exit code 0 — read the stderr log, don't trust the exit status alone.\n- `RUNTIME_SCRIPTS` is a hand-maintained allowlist: any new runtime script added to `scripts/` must be appended there or target repos silently never receive it (the workflow then fails at run time, not install time).\n- `agent/` is copied with `-maxdepth 1 -type f`, so nested files under `agent/` are never installed — keep agent assets flat.\n- `usage()` renders help by slicing the file header (`sed -n '2,25p' \"$0\"`); editing or growing the top comment block silently truncates or corrupts `--help` output.",
       "evidence": [
-        "Ensure the package is readable by Actions (public package, or grant the repo access).",
-        "container: ${{ vars.LUFFY_RUNNER_IMAGE != '' && vars.LUFFY_RUNNER_IMAGE || null }}",
-        "Leave `LUFFY_RUNNER_IMAGE` **unset** for the default path: `ubuntu-latest` + pin-keyed Hermes install cache (F2/F7/F14)."
+        "log \"exists (skip, use --force): $to\"",
+        "log \"WARN missing in source: $rel/$f\"",
+        "sed -n '2,25p' \"$0\" | sed 's/^# \\{0,1\\}//'"
       ],
       "confidence": "high"
     },
     {
       "kind": "usage",
-      "path": "docker/luffy-runner",
+      "path": ".",
       "action": "merge",
       "section": "Troubleshooting",
-      "content": "- If a review job still spends 1–2 min installing Hermes while `LUFFY_RUNNER_IMAGE` is set, check the job log for the `F8 prebaked Hermes detected …; skipping install cache` notice: the workflow's *Detect prebaked Hermes* step is what disables the cache save/restore steps, and it only fires when `hermes` is on PATH inside the container.\n- A stale `LUFFY_RUNNER_IMAGE` pin is invisible: the prebaked short-circuit returns before any pin comparison, so a container built from an older `HERMES_COMMIT` will run happily against a newer `scripts/hermes-pin.sh` default. Compare the image tag's 12-char pin against `scripts/hermes-pin.sh default` when Hermes behaviour differs between the container path and the host path.\n- Self-hosted runners can opt into the same fast path without the image by placing `hermes` on PATH plus a `/root/.hermes-pin` (or `$HOME/.hermes-pin`) marker file.",
+      "content": "- Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` in the target and compare `source_sha` with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`.\n- Installer output is entirely on stderr; capture it with `./scripts/install-luffy.sh /path/to/repo 2>&1 | tee install.log` and grep for `exists (skip` / `WARN missing` before committing the pack.\n- Preview exactly what would be written (including the stamp) with `--dry-run`; lines are prefixed `DRY  <from> → <to>`.\n- Interpret exit codes: `2` means the target already has the pack (or you aimed at the Luffy source tree) and the run was refused — re-invoke with `--force`; `1` is a usage/validation error such as a bad `--source` missing `agent/`, `scripts/`, or `luffy-pr-review.yml`.",
       "evidence": [
-        "echo \"::notice::F8 prebaked Hermes detected ($(command -v hermes)); skipping install cache\"",
-        "if [[ \"${LUFFY_HERMES_PREBAKED:-}\" == \"1\" || -f /root/.hermes-pin || -f \"${HOME}/.hermes-pin\" ]] && command -v hermes >/dev/null 2>&1; then ... return",
-        "# F8: prebaked image (LUFFY_RUNNER_IMAGE) or self-hosted with /root/.hermes-pin + hermes on PATH."
+        "log \"DRY  would write $STAMP (source_sha=$VERSION)\"",
+        "echo \"source_sha=$VERSION\"",
+        "log() { printf '%s\\n' \"$*\" >&2; }"
       ],
-      "confidence": "medium"
+      "confidence": "high"
+    },
+    {
+      "kind": "usage",
+      "path": ".",
+      "action": "merge",
+      "section": "Common commands",
+      "content": "- Explicit-flag form of the installer (equivalent to the positional target): `./scripts/install-luffy.sh --dest /path/to/target-repo [--source /path/to/luffy] [--dry-run|--force]`.\n- Hub-only extra: `--with-hub-ingest` additionally copies `.github/workflows/ingest-luffy-run.yml` (install this on the hub repo, not on app repos).\n- Image-building extra: `--with-runner-build` copies `build-luffy-runner.yml`, `docker/luffy-runner/{Dockerfile,README.md}`, plus `scripts/build-luffy-runner-image.sh` and `scripts/benchmark-hermes-startup.sh`, which are otherwise excluded from target packs.\n- Post-install checklist printed by the script: commit the pack to the **default branch**, add secret `OPENROUTER_API_KEY`, optionally set `LUFFY_HUB_TOKEN` / `LUFFY_MODEL` / `LUFFY_HERMES_COMMIT` / `LUFFY_COOLDOWN_SECONDS` / `LUFFY_RUNNER_IMAGE`, then comment `@luffy review this pr` on a PR.",
+      "evidence": [
+        "--with-hub-ingest   Also copy ingest-luffy-run.yml (hub repo only)",
+        "for extra in build-luffy-runner-image.sh benchmark-hermes-startup.sh; do",
+        "log \"  1. Commit the installed pack and push to the default branch.\""
+      ],
+      "confidence": "high"
     }
   ],
-  "summary": "The session's F8 prebaked-runner work is largely already captured in root DEV.md/USAGE.md, but the image-side contract and GHCR wiring for docker/luffy-runner is not yet documented at that path: the Dockerfile's prebaked markers, pin-derived tagging, build-script smoke gate, and the package-visibility prerequisite for using the image as an Actions container.",
+  "summary": "Session covers the F20 install-luffy.sh implementation in detail. New durable knowledge beyond the existing F20 one-liner: the pack-selection strategy (hardcoded runtime allowlist + dynamic single-level agent/ enumeration + self-inclusion), the self-install guard and exit-code contract, and the silent-skip/WARN failure modes that make re-installs and partial packs look successful.",
   "session_ids": [
     "dogfood-luffy-session"
   ],
   "model": "anthropic/claude-opus-5",
-  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T175536-cd3a82/extract.raw.md"
+  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T180011-05e5d0/extract.raw.md"
 }

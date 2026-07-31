@@ -20,7 +20,7 @@
 #   --source DIR        Luffy source root (default: parent of scripts/)
 #   -h | --help
 #
-# Exit: 0 ok, 1 usage/error, 2 refused (exists without --force)
+# Exit: 0 ok (skips existing files unless --force), 1 usage/error
 set -euo pipefail
 
 SRC=""

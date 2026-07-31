@@ -16,6 +16,10 @@ devmemory extract --fixture sample-auth-module --apply
 - Check whether an installed tree satisfies the pin: `scripts/hermes-pin.sh matches <git-head-sha>` — exit 0 means acceptable (short/full SHA prefixes both count).
 - Per-run pin actually used is recorded at `.luffy-out/hermes-pin.txt` and shipped in the trace artifact — read it before blaming the model for a behaviour change.
 
+- Explicit-flag form of the installer (equivalent to the positional target): `./scripts/install-luffy.sh --dest /path/to/target-repo [--source /path/to/luffy] [--dry-run|--force]`.
+- Hub-only extra: `--with-hub-ingest` additionally copies `.github/workflows/ingest-luffy-run.yml` (install this on the hub repo, not on app repos).
+- Image-building extra: `--with-runner-build` copies `build-luffy-runner.yml`, `docker/luffy-runner/{Dockerfile,README.md}`, plus `scripts/build-luffy-runner-image.sh` and `scripts/benchmark-hermes-startup.sh`, which are otherwise excluded from target packs.
+
 ## Setup
 
 - Install on each target repo: from this repo run `./scripts/install-luffy.sh /path/to/target-repo` (or manually copy `agent/`, runtime `scripts/`, and `.github/workflows/luffy-pr-review.yml`) onto that repo's **default branch** (workflow only runs from default branch).
@@ -33,3 +37,10 @@ devmemory extract --fixture sample-auth-module --apply
 - `scripts/capture-hermes-loop.py` turns a run into a step-by-step agent-loop dump (API calls, tool turns, messages, token/cost estimates) as in `docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/`.
 
 - Reproduce a cooldown decision offline (no `gh`, no network): `LUFFY_COOLDOWN_FIXTURE=/tmp/comments.json NOW_EPOCH=1753963200 bash scripts/cooldown-check.sh 1` — fixture is a JSON array of `{created_at, body}` objects; read the `allowed=`/`reason=`/`remaining_s=` lines and the exit code (0 allow, 2 skip, 1 error).
+
+## Troubleshooting
+
+- Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` in the target and compare `source_sha` with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`.
+- Installer output is entirely on stderr; capture it with `./scripts/install-luffy.sh /path/to/repo 2>&1 | tee install.log` and grep for `exists (skip` / `WARN missing` before committing the pack.
+- Preview exactly what would be written (including the stamp) with `--dry-run`; lines are prefixed `DRY  <from> → <to>`.
+- Interpret exit codes: `1` is a usage/validation error (missing dest, bad `--source`, or install into the Luffy source tree without `--force`). Existing target files are skipped with a stderr notice unless you pass `--force` (exit still `0`).

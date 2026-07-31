@@ -7,7 +7,7 @@
 
 ## Transcript / notes
 
-# Luffy dogfood session — F8 prebaked runner
+# Luffy dogfood — F20 install-luffy.sh
 
 # Luffy architecture
 
@@ -70,7 +70,12 @@ Reusable `workflow_call` so app repos only need a thin caller.
 
 ## Required setup
 
-1. Put this project (or at least `agent/`, `scripts/`, `.github/workflows/luffy-pr-review.yml`) on the **default branch** of a GitHub repo.
+1. Install the pack onto the **default branch** of a GitHub repo:
+   ```bash
+   ./scripts/install-luffy.sh /path/to/target-repo
+   # or: --force to overwrite, --with-hub-ingest for hub dispatch workflow
+   ```
+   (Equivalent manual copy: `agent/`, runtime `scripts/`, `.github/workflows/luffy-pr-review.yml`.)
 2. Repository secret: `OPENROUTER_API_KEY`
 3. Optional variable: `LUFFY_MODEL` (default in scripts: `openai/gpt-5-mini`)
 4. Optional variable: `LUFFY_HERMES_COMMIT` — pin Hermes to a git SHA (default baked into workflow + `scripts/hermes-pin.sh`); set `latest` or `main` to float on install.sh tip
@@ -87,6 +92,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 5 (F7):** pin Hermes install via `LUFFY_HERMES_COMMIT` + `scripts/hermes-pin.sh` (cache key v4)
 - **Sprint 6 (F19):** per-PR re-trigger cooldown after successful review
 - **Sprint 7 (F8):** prebaked Hermes runner image (`docker/luffy-runner/`, `vars.LUFFY_RUNNER_IMAGE`)
+- **Sprint 8 (F20):** `scripts/install-luffy.sh` one-command pack install into target repos
 
 ## Central hub memory (cross-repo)
 
@@ -228,7 +234,7 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 14 | **F18** | Redact secrets in **posted** review (`normalize-review.py` choke-point) | XS | 🔥 Trust — no keys on PR comments | **Shipped** |
 | 15 | **F7** | Pin Hermes install (`scripts/hermes-pin.sh` + `LUFFY_HERMES_COMMIT` + cache key `v4-<pin>`) | S | 🔥 Repro CI | **Shipped** |
 | 16 | **F19** | Per-PR re-trigger cooldown (`scripts/cooldown-check.sh`, default 900s) | S | 🔥 Cost/abuse | **Shipped** |
-| 17 | F20 | `scripts/install-luffy.sh` copy pack to target repo | S | Adoption | Next |
+| 17 | **F20** | `scripts/install-luffy.sh` copy pack to target repo | S | 🔥 Adoption | **Shipped** |
 | 18 | **F8** | Prebaked Hermes runner image + startup benchmark | M | 🔥 Fast CI startup | **Shipped** (docker/ + build workflow + benchmark script) |
 | 19 | F9 | Inline GitHub review comments | L | Product | Later |
 | 20 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
@@ -260,6 +266,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 7 (shipped)
 
 **F8** prebaked Hermes runner: `docker/luffy-runner/Dockerfile` + `scripts/build-luffy-runner-image.sh` + GHCR publish workflow; optional `vars.LUFFY_RUNNER_IMAGE` as job `container`; `ensure_hermes` short-circuits on `LUFFY_HERMES_PREBAKED=1` or `~/.hermes-pin`; startup benchmark under `docs/benchmarks/`.
+
+### Sprint 8 (shipped)
+
+**F20** one-command install: `scripts/install-luffy.sh /path/to/target-repo` copies `agent/`, runtime `scripts/`, and `luffy-pr-review.yml`; optional `--with-hub-ingest` / `--with-runner-build`; stamp `.luffy-install-stamp`.
 
 ### readme-kit (shipped)
 
@@ -332,6 +342,7 @@ cooldown-check.sh
 distill-memory.sh
 hermes-pin.sh
 hub-ingest-run.py
+install-luffy.sh
 normalize-review.py
 post-review-comment.sh
 preload-hub-memory.sh
@@ -343,216 +354,235 @@ save-trace.sh
 sparse-pr-paths.sh
 write-failure-review.sh
 
-## F8 Dockerfile
-# F8: Prebaked GitHub Actions / local runner image with Hermes Agent installed.
-# Speeds Luffy CI by skipping cold Hermes install on every job.
-#
-# Build (from repo root):
-#   ./scripts/build-luffy-runner-image.sh
-#
-# Run:
-#   docker run --rm ghcr.io/mr-ashish/luffy-hermes-runner:latest hermes --version
-#
-# Pin must match scripts/hermes-pin.sh DEFAULT (or pass HERMES_COMMIT=...).
-ARG HERMES_COMMIT=53559aaf86b84dadae83cd9bb605ca476f9a0606
-FROM ubuntu:24.04
-
-ENV DEBIAN_FRONTEND=noninteractive \
-    LUFFY_HERMES_PREBAKED=1 \
-    PATH="/root/.local/bin:/root/.hermes/bin:${PATH}"
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl git python3 python3-venv bash \
-      build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Hermes at pinned commit (non-interactive)
-ARG HERMES_COMMIT
-RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh \
-      | bash -s -- --skip-setup --commit "${HERMES_COMMIT}" --force-commit \
-    && command -v hermes \
-    && hermes --version \
-    && printf '%s\n' "${HERMES_COMMIT}" >/root/.hermes-pin
-
-LABEL org.opencontainers.image.title="luffy-hermes-runner" \
-      org.opencontainers.image.description="Luffy CI runner with Hermes Agent preinstalled" \
-      org.opencontainers.image.source="https://github.com/Mr-Ashish/luffy-pr-review-agent"
-
-WORKDIR /workspace
-CMD ["hermes", "--version"]
-
-## F8 README
-# Luffy Hermes runner image (F8)
-
-Prebaked Ubuntu image with **Hermes Agent** installed at the Luffy pin so CI jobs skip cold `install.sh` (~1–2 min).
-
-## Build
-
-From repo root:
-
-```bash
-./scripts/build-luffy-runner-image.sh
-# PUSH=1 ./scripts/build-luffy-runner-image.sh   # also push to GHCR
-```
-
-CI: workflow **Build Luffy Hermes runner** (`.github/workflows/build-luffy-runner.yml`) builds on pin/Dockerfile changes and pushes:
-
-`ghcr.io/<owner>/luffy-hermes-runner:<12-char-pin>` and `:latest`.
-
-## Use with Luffy PR Review
-
-1. Ensure the package is readable by Actions (public package, or grant the repo access).
-2. Set repository variable **`LUFFY_RUNNER_IMAGE`** to the image ref, e.g.  
-   `ghcr.io/mr-ashish/luffy-hermes-runner:53559aaf86b8`
-3. Re-trigger `@luffy review` — the job runs in that container; `ensure_hermes` sees `LUFFY_HERMES_PREBAKED=1` / `/root/.hermes-pin` and skips install; Hermes Actions cache steps are skipped.
-
-Leave `LUFFY_RUNNER_IMAGE` **unset** for the default path: `ubuntu-latest` + pin-keyed Hermes install cache (F2/F7/F14).
-
-## Benchmark
-
-```bash
-SKIP_COLD=1 ./scripts/benchmark-hermes-startup.sh
-# full (slow cold path):
-./scripts/benchmark-hermes-startup.sh
-```
-
-Results land in `docs/benchmarks/hermes-startup-latest.{json,md}`.
-
-## build script
+## install-luffy.sh
 #!/usr/bin/env bash
-# F8: Build (and optionally push) the prebaked Luffy+Hermes runner image.
+# F20: copy the Luffy runtime pack into a target repository.
+#
+# Pack (what target repos need on their *default* branch):
+#   agent/                              SOUL, prompts, config, memory seed
+#   scripts/                            orchestration (runtime helpers)
+#   .github/workflows/luffy-pr-review.yml
+#
+# Usage:
+#   ./scripts/install-luffy.sh /path/to/target-repo
+#   ./scripts/install-luffy.sh --dest /path/to/target-repo --dry-run
+#   ./scripts/install-luffy.sh --dest . --force   # re-install over existing
+#
+# Options:
+#   --dest DIR          Target repo root (required unless positional DIR)
+#   --dry-run           Print actions; do not write
+#   --force             Overwrite existing files without prompting
+#   --with-hub-ingest   Also copy ingest-luffy-run.yml (hub repo only)
+#   --with-runner-build Also copy build-luffy-runner.yml + docker/luffy-runner/
+#   --source DIR        Luffy source root (default: parent of scripts/)
+#   -h | --help
+#
+# Exit: 0 ok, 1 usage/error, 2 refused (exists without --force)
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck source=hermes-pin.sh
-PIN="$("$ROOT/scripts/hermes-pin.sh" default | tr -d '\n')"
-PIN="${HERMES_COMMIT:-$PIN}"
-SHORT="${PIN:0:12}"
+SRC=""
+DEST=""
+DRY_RUN=0
+FORCE=0
+WITH_INGEST=0
+WITH_RUNNER=0
 
-IMAGE_BASE="${LUFFY_RUNNER_IMAGE_BASE:-ghcr.io/mr-ashish/luffy-hermes-runner}"
-TAG_PIN="${IMAGE_BASE}:${SHORT}"
-TAG_LATEST="${IMAGE_BASE}:latest"
+log() { printf '%s\n' "$*" >&2; }
+die() { log "ERROR: $*"; exit 1; }
 
-log() { echo "$*" >&2; }
-
-command -v docker >/dev/null 2>&1 || {
-  log "ERROR: docker not found"
-  exit 1
+usage() {
+  sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
+  exit "${1:-0}"
 }
 
-log "Building $TAG_PIN (HERMES_COMMIT=$PIN)"
-docker build \
-  --build-arg "HERMES_COMMIT=$PIN" \
-  -t "$TAG_PIN" \
-  -t "$TAG_LATEST" \
-  -f "$ROOT/docker/luffy-runner/Dockerfile" \
-  "$ROOT"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dest)
+      DEST="${2:-}"
+      shift 2
+      ;;
+    --source)
+      SRC="${2:-}"
+      shift 2
+      ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    --force) FORCE=1; shift ;;
+    --with-hub-ingest) WITH_INGEST=1; shift ;;
+    --with-runner-build) WITH_RUNNER=1; shift ;;
+    -h | --help) usage 0 ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      die "unknown option: $1 (try --help)"
+      ;;
+    *)
+      if [[ -z "$DEST" ]]; then
+        DEST="$1"
+        shift
+      else
+        die "unexpected argument: $1"
+      fi
+      ;;
+  esac
+done
 
-log "Smoke: hermes --version in image"
-docker run --rm "$TAG_PIN" hermes --version
+SRC="${SRC:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+[[ -n "$DEST" ]] || die "target directory required (positional or --dest)"
+DEST="$(cd "$DEST" 2>/dev/null && pwd)" || die "target not found: $DEST"
+SRC="$(cd "$SRC" && pwd)"
 
-if [[ "${PUSH:-0}" == "1" ]]; then
-  log "Pushing $TAG_PIN and $TAG_LATEST"
-  docker push "$TAG_PIN"
-  docker push "$TAG_LATEST"
+[[ -d "$SRC/agent" ]] || die "source missing agent/: $SRC"
+[[ -d "$SRC/scripts" ]] || die "source missing scripts/: $SRC"
+[[ -f "$SRC/.github/workflows/luffy-pr-review.yml" ]] || die "source missing luffy-pr-review.yml"
+
+# Refuse installing pack into itself unless forced (avoids half-copies)
+if [[ "$SRC" == "$DEST" && "$FORCE" != "1" ]]; then
+  die "refusing to install into the Luffy source tree itself (use --force if intentional)"
 fi
 
-log "OK image=$TAG_PIN"
-printf '%s\n' "$TAG_PIN"
+# Runtime script allowlist — exclude image build / bench from target packs by default
+# (still available when --with-runner-build copies docker tooling separately).
+RUNTIME_SCRIPTS=(
+  assemble-context.sh
+  association-allowed.sh
+  build-hub-payload.py
+  capture-hermes-loop.py
+  cooldown-check.sh
+  distill-memory.sh
+  hermes-pin.sh
+  hub-ingest-run.py
+  install-luffy.sh
+  normalize-review.py
+  post-review-comment.sh
+  preload-hub-memory.sh
+  publish-run-to-hub.sh
+  review-local.sh
+  run-hermes-review.sh
+  run-luffy-review.sh
+  save-trace.sh
+  sparse-pr-paths.sh
+  write-failure-review.sh
+)
 
-## ensure_hermes prebaked
-
-# ---------------------------------------------------------------------------
-# F7: Ensure Hermes (pinned install; path cached by workflow when possible)
-# ---------------------------------------------------------------------------
-_hermes_install_head() {
-  local d
-  for d in \
-    "${HOME}/.hermes/hermes-agent" \
-    "${HERMES_INSTALL_DIR:-}" \
-    "${HOME}/.local/share/hermes-agent"; do
-    [[ -n "$d" && -d "$d/.git" ]] || continue
-    git -C "$d" rev-parse HEAD 2>/dev/null && return 0
-  done
-  return 1
+copy_file() {
+  local from="$1" to="$2"
+  if [[ -e "$to" && "$FORCE" != "1" ]]; then
+    log "exists (skip, use --force): $to"
+    return 0
+  fi
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "DRY  $from → $to"
+    return 0
+  fi
+  mkdir -p "$(dirname "$to")"
+  cp -f "$from" "$to"
+  # Preserve executable bit for scripts
+  if [[ -x "$from" ]]; then
+    chmod +x "$to"
+  fi
+  log "OK   $to"
 }
 
-ensure_hermes() {
-  export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
-  chmod +x "$PIN_HELPER" 2>/dev/null || true
-
-  local pin head
-  pin="$("$PIN_HELPER" resolve 2>/dev/null | tr -d '\n' || true)"
-  printf '%s\n' "${pin:-floating}" >"$OUT_DIR/hermes-pin.txt" || true
-
-  # F8: prebaked Docker/custom runner (image sets LUFFY_HERMES_PREBAKED=1 or /.hermes-pin)
-  if [[ "${LUFFY_HERMES_PREBAKED:-}" == "1" || -f /root/.hermes-pin || -f "${HOME}/.hermes-pin" ]] \
-    && command -v hermes >/dev/null 2>&1; then
-    notice "hermes prebaked runner: $(command -v hermes)"
-    hermes --version 2>/dev/null || true
-    return
-  fi
-
-  if command -v hermes >/dev/null 2>&1; then
-    head="$(_hermes_install_head || true)"
-    if [[ -z "$pin" ]]; then
-      notice "hermes (cached/present, floating): $(command -v hermes)"
-      hermes --version 2>/dev/null || true
-      return
-    fi
-    if "$PIN_HELPER" matches "$head"; then
-      notice "hermes (cached/present, pin=$pin head=${head:-unknown}): $(command -v hermes)"
-      hermes --version 2>/dev/null || true
-      return
-    fi
-    # Version string may still mention short pin when git dir missing
-    local ver
-    ver="$(hermes --version 2>/dev/null || true)"
-    if [[ -n "$ver" && "$ver" == *"${pin:0:8}"* ]]; then
-      notice "hermes version matches pin ${pin:0:8}: $(command -v hermes)"
-      return
-    fi
-    notice "hermes present but pin mismatch (want $pin head=${head:-n/a}); reinstalling..."
-  else
-    notice "Installing Hermes Agent (cold, pin=${pin:-floating})..."
-  fi
-
-  local args
-  # shellcheck disable=SC2207
-  args=( $("$PIN_HELPER" install-args) )
-  notice "hermes install.sh args: ${args[*]}"
-  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- "${args[@]}"
-  export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
-  # shellcheck disable=SC1091
-  [[ -f "${HOME}/.bashrc" ]] && source "${HOME}/.bashrc" || true
-  hash -r 2>/dev/null || true
-  for candidate in \
-    "${HOME}/.local/bin/hermes" \
-    "${HOME}/.hermes/bin/hermes" \
-    "${HOME}/.hermes/hermes"; do
-    if [[ -x "$candidate" ]]; then
-      export PATH="$(dirname "$candidate"):${PATH}"
-      break
-    fi
+copy_tree_files() {
+  # copy selected files under a subdir (not full recursive junk)
+  local rel="$1"
+  shift
+  local f
+  for f in "$@"; do
+    local from="$SRC/$rel/$f"
+    local to="$DEST/$rel/$f"
+    [[ -f "$from" ]] || {
+      log "WARN missing in source: $rel/$f"
+      continue
+    }
+    copy_file "$from" "$to"
   done
-  command -v hermes >/dev/null 2>&1 || die "hermes not found after install"
-  head="$(_hermes_install_head || true)"
+}
 
-## workflow container + prebaked
-.github/workflows/luffy-pr-review.yml:8:# Optional: LUFFY_RUNNER_IMAGE — non-empty image ref runs the job in that container (F8 prebaked
-.github/workflows/luffy-pr-review.yml:47:    # F8: optional prebaked container (null when var unset/empty → host runner + Hermes cache)
-.github/workflows/luffy-pr-review.yml:48:    container: ${{ vars.LUFFY_RUNNER_IMAGE != '' && vars.LUFFY_RUNNER_IMAGE || null }}
-.github/workflows/luffy-pr-review.yml:51:    # F8: prebaked image (LUFFY_RUNNER_IMAGE) or self-hosted with /root/.hermes-pin + hermes on PATH.
-.github/workflows/luffy-pr-review.yml:276:      # F8: skip Hermes install cache when runner image already has hermes
-.github/workflows/luffy-pr-review.yml:277:      - name: Detect prebaked Hermes
-.github/workflows/luffy-pr-review.yml:279:        id: prebaked
-.github/workflows/luffy-pr-review.yml:286:            echo "::notice::F8 prebaked Hermes detected ($(command -v hermes)); skipping install cache"
-.github/workflows/luffy-pr-review.yml:294:        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.prebaked.outputs.yes != 'true'
-.github/workflows/luffy-pr-review.yml:313:        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.prebaked.outputs.yes != 'true'
-.github/workflows/luffy-pr-review.yml:483:          steps.prebaked.outputs.yes != 'true' &&
-.github/workflows/build-luffy-runner.yml:1:# F8: Build & publish prebaked Hermes runner image to GHCR.
-.github/workflows/build-luffy-runner.yml:2:# Speeds Luffy PR review jobs when vars.LUFFY_RUNNER_IMAGE points at this image.
-.github/workflows/build-luffy-runner.y
+log "Luffy install · source=$SRC"
+log "               dest=$DEST dry_run=$DRY_RUN force=$FORCE"
+
+# agent/*
+AGENT_FILES=()
+while IFS= read -r -d '' f; do
+  AGENT_FILES+=("$(basename "$f")")
+done < <(find "$SRC/agent" -maxdepth 1 -type f -print0 | sort -z)
+
+copy_tree_files "agent" "${AGENT_FILES[@]}"
+
+# runtime scripts
+copy_tree_files "scripts" "${RUNTIME_SCRIPTS[@]}"
+
+# main workflow
+copy_file \
+  "$SRC/.github/workflows/luffy-pr-review.yml" \
+  "$DEST/.github/workflows/luffy-pr-review.yml"
+
+if [[ "$WITH_INGEST" == "1" ]]; then
+  copy_file \
+    "$SRC/.github/workflows/ingest-luffy-run.yml" \
+    "$DEST/.github/workflows/ingest-luffy-run.yml"
+fi
+
+if [[ "$WITH_RUNNER" == "1" ]]; then
+  copy_file \
+    "$SRC/.github/workflows/build-luffy-runner.yml" \
+    "$DEST/.github/workflows/build-luffy-runner.yml"
+  if [[ -f "$SRC/docker/luffy-runner/Dockerfile" ]]; then
+    copy_file \
+      "$SRC/docker/luffy-runner/Dockerfile" \
+      "$DEST/docker/luffy-runner/Dockerfile"
+  fi
+  if [[ -f "$SRC/docker/luffy-runner/README.md" ]]; then
+    copy_file \
+      "$SRC/docker/luffy-runner/README.md" \
+      "$DEST/docker/luffy-runner/README.md"
+  fi
+  for extra in build-luffy-runner-image.sh benchmark-hermes-startup.sh; do
+    [[ -f "$SRC/scripts/$extra" ]] && copy_file "$SRC/scripts/$extra" "$DEST/scripts/$extra"
+  done
+fi
+
+# Stamp for operators (not secret)
+STAMP="$DEST/.luffy-install-stamp"
+VERSION="$(git -C "$SRC" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+if [[ "$DRY_RUN" == "1" ]]; then
+  log "DRY  would write $STAMP (source_sha=$VERSION)"
+else
+  {
+    echo "installed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "source_sha=$VERSION"
+    echo "source_path=$SRC"
+    echo "pack=agent,scripts(runtime),luffy-pr-review.yml"
+  } >"$STAMP"
+  log "OK   $STAMP"
+fi
+
+log ""
+log "Next steps on the target repo (default branch):"
+log "  1. Commit the installed pack and push to the default branch."
+log "  2. Add secret OPENROUTER_API_KEY."
+log "  3. Optional: LUFFY_HUB_TOKEN, vars LUFFY_MODEL / LUFFY_HERMES_COMMIT / LUFFY_COOLDOWN_SECONDS / LUFFY_RUNNER_IMAGE."
+log "  4. On a PR, comment: @luffy review this pr"
+log "Done."
+
+# DEV — engineering knowledge
+
+> How this repository is built.
+
+## Architecture
+
+- Luffy is a gated GitHub Actions control plane, not a chat bot: `@luffy review this pr` → gate + per-PR concurrency → dual checkout → restore Hermes memory → assemble context → `hermes -z` → normalize → PR comment → distill memory → cache/artifacts.
+- Orchestration is deterministic shell (`scripts/run-luffy-review.sh` composes stages and records timings); only the inner review step is LLM-driven, so every run leaves reproducible artifacts.
+- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
+- **F20 install pack:** `scripts/install-luffy.sh` is the adoption entrypoint — copies `agent/`, a runtime-script allowlist (not image-build/bench tools), and `luffy-pr-review.yml` into a target repo; optional `--with-hub-ingest` / `--with-runner-build`; writes `.luffy-install-stamp` with source SHA.
+- Dual workspace separates trust domains: `luffy/` holds SOUL + prompts + scripts from the default branch, `workspace/` holds only the PR head, `.luffy-hermes-home/` holds Hermes config + growing memory.
+
+## Design decisions
+
+- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORAT
 
 … [session truncated] …
 
