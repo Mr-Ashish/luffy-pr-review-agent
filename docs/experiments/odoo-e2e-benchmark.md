@@ -31,6 +31,7 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 | #4 stock/mrp PERF (F49 mini re-prompt) | 3 | 4 | 4 | 4 | 3 | 4 | 5 | 3 | 4 | 4 | **38** | tools 0→9; soft comment nits only; no deep PERF hazards |
 | #5 POS ticket (F49 mini re-prompt) | 3 | 4 | 3 | 4 | 3 | 4 | 5 | 3 | 4 | 4 | **37** | tools 0→8; soft i18n/import nits; no deep layout/responsive hazards |
 | #5 POS ticket (F50 offline on F49) | 3 | 4 | 4 | 5 | 3 | 4 | 5 | 3 | 5 | 4 | **40** | F50 tests:no under APPROVE → REQUEST CHANGES; score 92→69 |
+| #6 street_split (pending e2e) | — | — | — | — | — | — | — | — | — | — | **—** | H23 ported; needs H24 F49 mini + score |
 
 ### Evidence (one line)
 
@@ -46,6 +47,7 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 - **#4 F49 mini:** Soft re-prompt recovered `tool_turns` **0→9** (sessions `20260731_222340_fb13a3` → `20260731_222355_b47e5a`); F45 skipped; APPROVE 95 · attempt-2 ~$0.014 · 10 API · total ~58s (attempt-1 ~$0.003); read mrp orderpoint/rule + tests; cache-comment suggestion only; chip `tool-reprompt-ok`; soul_blocked=0; score **38/50** (was 31).
 - **#5 F49 mini:** Soft re-prompt recovered `tool_turns` **0→8** (sessions `20260731_223146_62f430` → `20260731_223158_96a569`); F45 skipped (`tools_used`); APPROVE 92 · attempt-2 ~$0.026 · 9 API · total ~56s (attempt-1 ~$0.002); read ticket_screen js/xml/scss + pos_restaurant; noted no UI tests; soft i18n/`_t` + unused-import nits (partial-read risk); chip `tool-reprompt-ok`; soul_blocked=0; score **37/50**.
 - **#5 F50 offline:** match=`tests_no_line` (Relevant tests: no) under APPROVE 92 → **REQUEST CHANGES** + score 69; #4 F49 clean (no gap signal, stays APPROVE).
+- **#6 port (H23):** odoo#279777 → Mr-Ashish/odoo#6; 14 files tools/misc street_split + base_address_extended tests + l10n_dk_nemhandel/oioubl fixtures; apply clean 3way onto 19.0; e2e not run this fire.
 
 ### #2 F44 sub-dims (D1=2, D3=2, D8=1)
 

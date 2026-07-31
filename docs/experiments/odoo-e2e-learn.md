@@ -13,8 +13,9 @@ Luffy SoT: this repo only.
 | [#3](https://github.com/Mr-Ashish/odoo/pull/3) | luffy-eval: #271153 tools Unicode XML control-char strip | odoo#271153 | 3 (py+test) | +88/−18 | OPEN |
 | [#4](https://github.com/Mr-Ashish/odoo/pull/4) | luffy-eval: #279776 stock, mrp replenishment horizon PERF | odoo#279776 | 7 (py+test) | +234/−22 | OPEN |
 | [#5](https://github.com/Mr-Ashish/odoo/pull/5) | luffy-eval: #279360 point_of_sale ticket screen responsiveness | odoo#279360 | 6 (JS/XML/SCSS) | +109/−122 | OPEN |
+| [#6](https://github.com/Mr-Ashish/odoo/pull/6) | luffy-eval: #279777 tools street_split regex + address fixtures | odoo#279777 | 14 (py+test+l10n fixtures) | +138/−100 | OPEN — needs F49 e2e score |
 
-Corpus size: **5** open eval PRs (grew fire: ported odoo#279360).
+Corpus size: **6** open eval PRs (grew fire: ported odoo#279777).
 
 ## Runs
 
