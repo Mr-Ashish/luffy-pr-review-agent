@@ -505,6 +505,76 @@ table.grid td.mono {
   max-width: 40rem;
 }
 
+/* F32 trigger panel */
+.trigger-panel {
+  max-width: 48rem;
+}
+.trigger-grid {
+  display: grid;
+  grid-template-columns: 1fr 6rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.trigger-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.trigger-grid label.wide {
+  grid-column: 1 / -1;
+}
+.trigger-grid label.check {
+  flex-direction: row;
+  align-items: center;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  grid-column: 1 / -1;
+}
+.trigger-grid input[type="text"],
+.trigger-grid input:not([type]),
+.trigger-grid input[inputmode] {
+  appearance: none;
+  border: 1px solid var(--gold-hairline);
+  background: var(--raised);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.65rem;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.trigger-grid input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+.trigger-cmd {
+  margin-bottom: var(--space-3);
+}
+.trigger-cmd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: 0.35rem;
+}
+.scroll-code.compact {
+  max-height: 6rem;
+  font-size: 0.75rem;
+  padding: var(--space-3);
+}
+.inline-code {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--gold-rich);
+}
+
 @media (max-width: 840px) {
   .workspace {
     grid-template-columns: 1fr;

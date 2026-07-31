@@ -121,6 +121,7 @@ RUNTIME_SCRIPTS=(
   save-trace.sh
   review-to-openui.py
   sparse-pr-paths.sh
+  trigger-review.sh
   usage-summary.py
   write-failure-review.sh
 )

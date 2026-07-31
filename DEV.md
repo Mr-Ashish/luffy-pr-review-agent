@@ -13,6 +13,7 @@
 
 ## Design decisions
 
+- **F32 trigger:** `scripts/trigger-review.sh` is the operator entry (`print|local|modal`). Modal bit 4 is spawn-only: `parse_enqueue_payload` + `enqueue_review` / `review_webhook` never run Hermes in the HTTP path; `modal run --bit 4` dry-plans by default (`--spawn` to enqueue). Run Console **Run** tab copies commands — browser is not a kitchen.
 - **F31 run-bundle:** after memory-health the orchestrator soft-packs TRACE_DIR (or OUT_DIR) via `pack-run-for-ui.py --soft` into `.luffy-out/run-bundle.json` and optionally `TRACE_DIR/run-bundle.json`. Host auto-detect (`LUFFY_HOST` / `GITHUB_ACTIONS` / Modal). Failures never flip `LUFFY_STATUS`. Operators download the Actions artifact and **Load bundle** in `ui/review-console` — no manual pack for live runs.
 - **F8 prebaked runner:** `ensure_hermes` short-circuits when `LUFFY_HERMES_PREBAKED=1` or `/root/.hermes-pin`/`$HOME/.hermes-pin` exists and `hermes` is on PATH (image from `docker/luffy-runner/`). Workflow optional `container: vars.LUFFY_RUNNER_IMAGE`; Hermes Actions cache is skipped when prebaked is detected.
 - Re-runs replace prior Luffy comments by deleting bodies matching the `<!-- luffy-review pr=N` marker before posting; set `LUFFY_REPLACE_PREVIOUS=0` to stack instead.

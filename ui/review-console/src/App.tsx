@@ -31,11 +31,165 @@ function shortSha(s?: string): string {
   return s.length > 12 ? s.slice(0, 12) : s;
 }
 
+/** F32: build local/modal trigger commands (mirror scripts/trigger-review.sh print). */
+function buildTriggerCommands(
+  repo: string,
+  pr: string,
+  model: string,
+  post: boolean,
+): { local: string; modal: string; bit4: string; print: string } {
+  const r = repo.trim() || "owner/repo";
+  const n = pr.trim() || "1";
+  const m = model.trim();
+  const envLocal: string[] = [];
+  if (m) envLocal.push(`LUFFY_MODEL=${m}`);
+  if (post) envLocal.push("POST_COMMENT=1");
+  const local =
+    (envLocal.length ? envLocal.join(" ") + " " : "") +
+    `./scripts/review-local.sh ${r} ${n}`;
+  const modalParts = [
+    "modal run modal_app/app.py --bit 3",
+    `--repo ${r}`,
+    `--pr ${n}`,
+  ];
+  if (m) modalParts.push(`--model ${m}`);
+  if (!post) modalParts.push("--no-post-comment");
+  const modal = modalParts.join(" ");
+  const bit4 = [
+    "modal run modal_app/app.py --bit 4",
+    `--repo ${r}`,
+    `--pr ${n}`,
+    m ? `--model ${m}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const print = `./scripts/trigger-review.sh print ${r} ${n}`;
+  return { local, modal, bit4, print };
+}
+
+function TriggerPanel({
+  initialRepo = "",
+  initialPr = "",
+  initialModel = "openai/gpt-4.1-mini",
+}: {
+  initialRepo?: string;
+  initialPr?: string;
+  initialModel?: string;
+}) {
+  const [repo, setRepo] = useState(initialRepo);
+  const [pr, setPr] = useState(initialPr);
+  const [model, setModel] = useState(initialModel);
+  const [post, setPost] = useState(true);
+  const [copied, setCopied] = useState("");
+  const cmds = useMemo(
+    () => buildTriggerCommands(repo, pr, model, post),
+    [repo, pr, model, post],
+  );
+
+  const copy = async (label: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      setTimeout(() => setCopied(""), 1500);
+    } catch {
+      setCopied("failed");
+    }
+  };
+
+  return (
+    <div className="trigger-panel">
+      <p className="section-title">Trigger a review (F32)</p>
+      <p className="hint" style={{ marginTop: 0 }}>
+        Console stays static — copy a command or POST the Modal webhook after{" "}
+        <code className="inline-code">modal deploy modal_app/app.py</code>. Hermes
+        never runs in the browser.
+      </p>
+      <div className="trigger-grid">
+        <label>
+          Repo
+          <input
+            value={repo}
+            onChange={(e) => setRepo(e.target.value)}
+            placeholder="owner/name"
+            spellCheck={false}
+          />
+        </label>
+        <label>
+          PR
+          <input
+            value={pr}
+            onChange={(e) => setPr(e.target.value)}
+            placeholder="123"
+            inputMode="numeric"
+            spellCheck={false}
+          />
+        </label>
+        <label className="wide">
+          Model
+          <input
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder="openai/gpt-4.1-mini"
+            spellCheck={false}
+          />
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={post}
+            onChange={(e) => setPost(e.target.checked)}
+          />
+          Post PR comment
+        </label>
+      </div>
+      {(
+        [
+          ["print", cmds.print],
+          ["local", cmds.local],
+          ["modal bit3", cmds.modal],
+          ["modal bit4 dry", cmds.bit4],
+        ] as const
+      ).map(([label, cmd]) => (
+        <div className="trigger-cmd" key={label}>
+          <div className="trigger-cmd-head">
+            <span className="tag mono">{label}</span>
+            <button type="button" className="btn" onClick={() => copy(label, cmd)}>
+              {copied === label ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <pre className="scroll-code compact">{cmd}</pre>
+        </div>
+      ))}
+      <div className="block" style={{ marginTop: "1rem" }}>
+        <h3>Webhook body (bit 4)</h3>
+        <pre className="scroll-code compact">
+          {JSON.stringify(
+            {
+              repo: repo.trim() || "owner/repo",
+              pr: Number(pr) || 0,
+              model: model.trim() || "openai/gpt-4.1-mini",
+              post_comment: post,
+            },
+            null,
+            2,
+          )}
+        </pre>
+        <p className="hint">
+          GitHub <code className="inline-code">issue_comment</code> payloads with{" "}
+          <code className="inline-code">@luffy review</code> on a PR are also
+          accepted. Handler only <strong>spawns</strong> the worker.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [bundle, setBundle] = useState<RunBundle | null>(null);
   const [tab, setTab] = useState<TabId>("overview");
   const [error, setError] = useState("");
   const [sourceLabel, setSourceLabel] = useState("Loading…");
+  const [booting, setBooting] = useState(true);
 
   const loadBundle = useCallback((data: RunBundle, label: string) => {
     setBundle(data);
@@ -53,7 +207,12 @@ export default function App() {
         const data = (await res.json()) as RunBundle;
         if (!cancel) loadBundle(data, "Fixture · e2e odoo PR #3 showcase");
       } catch (e) {
-        if (!cancel) setError(String(e));
+        if (!cancel) {
+          setError(String(e));
+          setSourceLabel("No fixture — use Load bundle or Run tab");
+        }
+      } finally {
+        if (!cancel) setBooting(false);
       }
     })();
     return () => {
@@ -81,7 +240,7 @@ export default function App() {
     [stages],
   );
 
-  if (!bundle && !error) {
+  if (booting && !bundle) {
     return (
       <div className="shell">
         <div className="strip">
@@ -92,20 +251,35 @@ export default function App() {
     );
   }
 
-  if (error && !bundle) {
+  // No bundle yet — still allow F32 trigger + load
+  if (!bundle) {
     return (
       <div className="shell">
-        <div className="strip">
+        <header className="strip">
           <p className="wordmark">Luffy</p>
-        </div>
-        <div className="main">
-          <div className="banner-error">{error}</div>
+          <div className="strip-meta">
+            <span className="tag">Run console</span>
+            <span className="tag mono">{sourceLabel}</span>
+          </div>
+          <div className="strip-actions">
+            <label className="btn">
+              Load bundle
+              <input
+                className="file-input"
+                type="file"
+                accept="application/json,.json"
+                onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+          </div>
+        </header>
+        <div className="main" style={{ padding: "1.25rem" }}>
+          {error && <div className="banner-error">{error}</div>}
+          <TriggerPanel />
         </div>
       </div>
     );
   }
-
-  if (!bundle) return null;
 
   const { run, pr, result, cost, timings, memory, trace, diff } = bundle;
   const vClass = verdictClass(result.verdict);
@@ -184,6 +358,15 @@ export default function App() {
 
         <main className="main">
           {error && <div className="banner-error">{error}</div>}
+
+          {tab === "run" && (
+            <TriggerPanel
+              key={`${pr.repo}-${pr.number}-${run.model}`}
+              initialRepo={pr.repo || ""}
+              initialPr={pr.number || ""}
+              initialModel={run.model || "openai/gpt-4.1-mini"}
+            />
+          )}
 
           {tab === "overview" && (
             <>

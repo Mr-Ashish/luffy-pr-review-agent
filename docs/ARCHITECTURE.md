@@ -95,3 +95,5 @@ review pipeline (GHA / Modal / local)
 ```
 
 Host label: auto (`GITHUB_ACTIONS` → `gha`, Modal env → `modal`, else `local`) or `LUFFY_HOST`. Manual: `scripts/pack-run-for-ui.py`. Optional OpenUI Lang export: `scripts/review-to-openui.py`. See [OPENUI-INTEGRATION.md](OPENUI-INTEGRATION.md).
+
+**F32 trigger:** `scripts/trigger-review.sh` (`print|local|modal`) + console **Run** tab. Modal bit 4 webhook/`enqueue_review` only **spawns** `review_pr` (never Hermes in the doorbell).

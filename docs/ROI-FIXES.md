@@ -44,7 +44,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 28 | **F29** | Soft max cost budget (`LUFFY_MAX_COST_USD`) after F21 usage | XS | 🔥 Cost ops — overage alert on comment + job summary | **Shipped** (`usage-summary.py budget`) |
 | 29 | **F30** | Memory health visibility + README F28 truth (no silent local publish fail) | XS | 🔥 Ops — learning loss no longer invisible | **Shipped** (`memory-health.sh`, job summary) |
 | 30 | **F31** | Auto-emit `run-bundle.json` every review for Run Console | XS | 🔥 UI ops — real GHA/Modal runs openable without manual pack | **Shipped** (`pack-run-for-ui.py` in orchestrator) |
-| 31 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 31 | **F32** | Unified trigger (CLI + Modal bit4 webhook + Run Console Run tab) | S | 🔥 Ops — start reviews without hunting docs; webhook spawns only | **Shipped** (`trigger-review.sh`, `enqueue_review`) |
+| 32 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -125,6 +126,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 20 (shipped)
 
 **F31** auto Run Console bundle: after each review the orchestrator soft-runs `scripts/pack-run-for-ui.py` → `.luffy-out/run-bundle.json` (+ copy under the trace dir). Host label auto-detects `gha` / `modal` / `local` (`LUFFY_HOST` override). Included in existing `luffy-out` + trace artifacts; job summary **Luffy Run Console bundle (F31)**. Modal `review_pr` sets `LUFFY_HOST=modal` and returns `run_bundle`. Soft-fail only — never fails the review. Load via `ui/review-console` **Load bundle**.
+
+### Sprint 21 (shipped)
+
+**F32** unified trigger + Modal bit 4 enqueue: `scripts/trigger-review.sh` (`print|local|modal`) is the single entry for starting a review; Modal adds pure `parse_enqueue_payload` / `plan_enqueue` / `enqueue_review` (spawn-only, Hermes never in HTTP path) + `review_webhook` POST endpoint; CLI `modal run … --bit 4` dry-plans (parser self-check) or `--spawn` to enqueue. Run Console **Run** tab + empty-state trigger panel copy local/modal/bit4 commands + sample webhook JSON. Install pack includes `trigger-review.sh`.
 
 ### readme-kit (shipped)
 

@@ -1,5 +1,6 @@
 export type TabId =
   | "overview"
+  | "run"
   | "pr"
   | "result"
   | "findings"
@@ -90,6 +91,7 @@ export interface RunBundle {
 
 export const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "run", label: "Run" },
   { id: "pr", label: "Pull request" },
   { id: "result", label: "Result" },
   { id: "findings", label: "Findings" },

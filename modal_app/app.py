@@ -11,21 +11,24 @@ Run:
   modal run modal_app/app.py --bit 1
   modal run modal_app/app.py --bit 2
   modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3
+  modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3   # dry enqueue plan
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
 from pathlib import Path
+from typing import Any
 
 import modal
 
 APP_NAME = "luffy-pr-review"
-LUFFY_MODAL_VERSION = "0.3.2-cheap"
+LUFFY_MODAL_VERSION = "0.4.0-cheap"
 HERMES_PIN = "53559aaf86b84dadae83cd9bb605ca476f9a0606"
 # OpenRouter — keep Modal compute cheap AND LLM spend low
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
@@ -394,6 +397,171 @@ def review_pr(
     }
 
 
+_LUFFY_TRIGGER_RE = re.compile(
+    r"@luffy\b.*\breview\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def parse_enqueue_payload(item: dict[str, Any]) -> dict[str, Any]:
+    """Parse simple API or GitHub issue_comment webhook → enqueue plan.
+
+    Simple API:
+      {"repo": "owner/name", "pr": 3, "model": "...", "post_comment": true}
+
+    GitHub issue_comment (PR thread):
+      action=created, issue.pull_request set, comment.body matches @luffy … review
+    """
+    if not isinstance(item, dict):
+        return {"ok": False, "error": "body must be a JSON object"}
+
+    # --- simple API ---
+    if item.get("repo") and item.get("pr") is not None:
+        try:
+            pr_n = int(item["pr"])
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "pr must be an int"}
+        repo = str(item["repo"]).strip()
+        if "/" not in repo:
+            return {"ok": False, "error": "repo must be owner/name"}
+        model = str(item.get("model") or DEFAULT_MODEL)
+        post = item.get("post_comment", True)
+        if isinstance(post, str):
+            post = post.strip().lower() not in ("0", "false", "no", "off")
+        return {
+            "ok": True,
+            "source": "api",
+            "repo": repo,
+            "pr_number": pr_n,
+            "model": model,
+            "post_comment": bool(post),
+            "trigger": "api",
+        }
+
+    # --- GitHub webhook (issue_comment on a PR) ---
+    action = item.get("action")
+    issue = item.get("issue") or {}
+    comment = item.get("comment") or {}
+    repository = item.get("repository") or {}
+    if issue.get("pull_request") and repository.get("full_name"):
+        body = (comment.get("body") or "") if isinstance(comment, dict) else ""
+        if action and action not in ("created", "edited"):
+            return {
+                "ok": False,
+                "skipped": True,
+                "error": f"ignore action={action}",
+                "source": "github",
+            }
+        if not _LUFFY_TRIGGER_RE.search(body):
+            return {
+                "ok": False,
+                "skipped": True,
+                "error": "comment does not match @luffy review",
+                "source": "github",
+            }
+        try:
+            pr_n = int(issue.get("number"))
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "issue.number missing", "source": "github"}
+        return {
+            "ok": True,
+            "source": "github",
+            "repo": str(repository["full_name"]),
+            "pr_number": pr_n,
+            "model": str(item.get("model") or DEFAULT_MODEL),
+            "post_comment": True,
+            "trigger": (body or "")[:200],
+            "comment_id": comment.get("id") if isinstance(comment, dict) else None,
+        }
+
+    return {
+        "ok": False,
+        "error": "unrecognized payload (need repo+pr or GitHub issue_comment on a PR)",
+    }
+
+
+def plan_enqueue(
+    repo: str,
+    pr_number: int,
+    *,
+    model: str = DEFAULT_MODEL,
+    post_comment: bool = True,
+) -> dict[str, Any]:
+    """Bit 4 dry plan — no Modal spawn, no Hermes (free)."""
+    return {
+        "ok": True,
+        "bit": 4,
+        "dry_run": True,
+        "spawned": False,
+        "version": LUFFY_MODAL_VERSION,
+        "repo": repo,
+        "pr_number": pr_number,
+        "model": model or DEFAULT_MODEL,
+        "post_comment": post_comment,
+        "note": "Pass spawn=True / webhook without dry_run to review_pr.spawn",
+    }
+
+
+@app.function(secrets=[github_secret, openrouter_secret], timeout=120)
+def enqueue_review(
+    repo: str,
+    pr_number: int,
+    *,
+    model: str = DEFAULT_MODEL,
+    post_comment: bool = True,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Bit 4: spawn review_pr (or return plan when dry_run). Never runs Hermes here."""
+    if dry_run:
+        return plan_enqueue(repo, pr_number, model=model, post_comment=post_comment)
+    # Spawn — returns immediately; worker runs separately
+    call = review_pr.spawn(
+        repo, pr_number, model=model or DEFAULT_MODEL, post_comment=post_comment
+    )
+    call_id = getattr(call, "object_id", None) or getattr(call, "objectId", None) or str(call)
+    return {
+        "ok": True,
+        "bit": 4,
+        "dry_run": False,
+        "spawned": True,
+        "version": LUFFY_MODAL_VERSION,
+        "repo": repo,
+        "pr_number": pr_number,
+        "model": model or DEFAULT_MODEL,
+        "post_comment": post_comment,
+        "call_id": call_id,
+        "profile": "cheap",
+    }
+
+
+@app.function(secrets=[github_secret, openrouter_secret], timeout=60)
+@modal.fastapi_endpoint(method="POST")
+def review_webhook(item: dict) -> dict:
+    """HTTP doorbell: parse body → spawn review_pr (Hermes never runs in this handler).
+
+    Deploy: `modal deploy modal_app/app.py` then POST the endpoint URL.
+    Optional query-less body — see parse_enqueue_payload.
+    Set env LUFFY_WEBHOOK_DRY_RUN=1 on the app to plan-only (ops testing).
+    """
+    plan = parse_enqueue_payload(item if isinstance(item, dict) else {})
+    if not plan.get("ok"):
+        # skipped is still HTTP 200-ish for GitHub (avoid retries); surface ok=false
+        return {**plan, "bit": 4, "version": LUFFY_MODAL_VERSION}
+    dry = os.environ.get("LUFFY_WEBHOOK_DRY_RUN", "").strip() in ("1", "true", "yes")
+    result = enqueue_review.local(
+        plan["repo"],
+        int(plan["pr_number"]),
+        model=str(plan.get("model") or DEFAULT_MODEL),
+        post_comment=bool(plan.get("post_comment", True)),
+        dry_run=dry,
+    )
+    result["source"] = plan.get("source")
+    result["trigger"] = plan.get("trigger")
+    if plan.get("comment_id") is not None:
+        result["comment_id"] = plan["comment_id"]
+    return result
+
+
 @app.local_entrypoint()
 def main(
     bit: int = 1,
@@ -401,6 +569,7 @@ def main(
     pr: int = 3,
     model: str = DEFAULT_MODEL,
     post_comment: bool = True,
+    spawn: bool = False,
 ) -> None:
     if bit == 2:
         result = probe_clone.remote(repo=repo)
@@ -418,6 +587,44 @@ def main(
             print(result["review_preview"][:800])
         assert result.get("ok"), result
         print("BIT3_OK")
+        return
+    if bit == 4:
+        # Default dry plan (no OpenRouter spend). --spawn to actually enqueue.
+        print(f"BIT4 enqueue plan {repo}#{pr} model={model} spawn={spawn}")
+        if spawn:
+            result = enqueue_review.remote(
+                repo, pr, model=model, post_comment=post_comment, dry_run=False
+            )
+        else:
+            result = plan_enqueue(repo, pr, model=model, post_comment=post_comment)
+            # Also exercise payload parser with simple API shape
+            parsed = parse_enqueue_payload(
+                {"repo": repo, "pr": pr, "model": model, "post_comment": post_comment}
+            )
+            result["parsed_ok"] = parsed.get("ok")
+            gh = parse_enqueue_payload(
+                {
+                    "action": "created",
+                    "issue": {"number": pr, "pull_request": {"url": "x"}},
+                    "comment": {"id": 1, "body": "@luffy review this pr"},
+                    "repository": {"full_name": repo},
+                }
+            )
+            result["github_parse_ok"] = gh.get("ok")
+            result["github_skip"] = parse_enqueue_payload(
+                {
+                    "action": "created",
+                    "issue": {"number": pr, "pull_request": {"url": "x"}},
+                    "comment": {"body": "lgtm"},
+                    "repository": {"full_name": repo},
+                }
+            ).get("skipped")
+        print(json.dumps(result, indent=2)[:2000])
+        assert result.get("ok"), result
+        if not spawn:
+            assert result.get("parsed_ok") and result.get("github_parse_ok")
+            assert result.get("github_skip") is True
+        print("BIT4_OK")
         return
     result = health.remote()
     print(result)

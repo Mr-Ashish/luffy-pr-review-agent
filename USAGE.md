@@ -7,9 +7,20 @@
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
-- Tabs: Overview, PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
+- Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
 - Optional OpenUI Lang: `python3 scripts/review-to-openui.py --review review.md -o out.openui`
 - Design: Impeccable (`/tmp/impeccable`) · `ui/review-console/PRODUCT.md` + `DESIGN.md`
+
+## Trigger a review (F32)
+
+```bash
+./scripts/trigger-review.sh print  owner/repo 123          # commands only
+./scripts/trigger-review.sh local  owner/repo 123 --model openai/gpt-4.1-mini
+./scripts/trigger-review.sh modal  owner/repo 123 --cheap --no-post
+modal run modal_app/app.py --bit 4 --repo owner/repo --pr 123   # dry enqueue plan
+```
+
+Run Console **Run** tab copies the same commands + sample webhook JSON. Modal webhook (after `modal deploy`) accepts `{repo,pr,model,post_comment}` or GitHub `@luffy review` issue_comment on a PR — spawns only.
 
 ## Common commands
 
