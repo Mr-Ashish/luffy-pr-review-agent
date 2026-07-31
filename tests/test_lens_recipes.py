@@ -33,6 +33,9 @@ class PackLoad(unittest.TestCase):
         self.assertIn("odoo", ids)
         self.assertIn("docs", ids)
         self.assertIn("performance", ids)
+        self.assertIn("milvus", ids)
+        self.assertIn("go", ids)
+        self.assertIn("cpp", ids)
 
     def test_get_odoo(self):
         pack = _mod.get_pack("odoo", PACKS)
@@ -104,6 +107,58 @@ class ActivePack(unittest.TestCase):
             os.environ.pop("LUFFY_LENS_PACK", None)
 
 
+class AutoSelect(unittest.TestCase):
+    def test_milvus_paths(self):
+        pack = _mod.select_pack_for_paths(
+            [
+                "internal/flushcommon/writebuffer/write_buffer.go",
+                "internal/util/function/manager.go",
+            ],
+            PACKS,
+        )
+        self.assertEqual(pack["id"], "milvus")
+
+    def test_go_generic(self):
+        pack = _mod.select_pack_for_paths(
+            ["pkg/server/handler.go", "cmd/api/main.go"],
+            PACKS,
+        )
+        self.assertEqual(pack["id"], "go")
+
+    def test_cpp_paths(self):
+        pack = _mod.select_pack_for_paths(
+            ["src/engine/query.cpp", "include/engine/query.h"],
+            PACKS,
+        )
+        self.assertEqual(pack["id"], "cpp")
+
+    def test_docs_paths(self):
+        pack = _mod.select_pack_for_paths(
+            ["docs/guide.md", "README.md"],
+            PACKS,
+        )
+        self.assertEqual(pack["id"], "docs")
+
+    def test_unknown_falls_default(self):
+        pack = _mod.select_pack_for_paths(
+            ["random/file.xyz"],
+            PACKS,
+        )
+        self.assertEqual(pack["id"], "default")
+
+    def test_resolve_auto(self):
+        os.environ["LUFFY_LENS_PACK"] = "auto"
+        os.environ.pop("LUFFY_TOGGLES_FILE", None)
+        try:
+            pack = _mod.resolve_active(
+                PACKS,
+                paths=["internal/streamingnode/server/wal/interceptor.go"],
+            )
+            self.assertEqual(pack["id"], "milvus")
+        finally:
+            os.environ.pop("LUFFY_LENS_PACK", None)
+
+
 class CLI(unittest.TestCase):
     def _run(self, *args, env=None):
         e = os.environ.copy()
@@ -129,6 +184,16 @@ class CLI(unittest.TestCase):
         cp = self._run("resolve", env={"LUFFY_LENS_PACK": "docs"})
         self.assertEqual(cp.returncode, 0, cp.stderr)
         self.assertEqual(cp.stdout.strip(), "docs")
+
+    def test_select_milvus(self):
+        cp = self._run(
+            "select",
+            "--paths",
+            "internal/flushcommon/writebuffer/x.go",
+            env={"LUFFY_LENS_PACK": "auto"},
+        )
+        self.assertEqual(cp.returncode, 0, cp.stderr)
+        self.assertEqual(cp.stdout.strip(), "milvus")
 
 
 if __name__ == "__main__":

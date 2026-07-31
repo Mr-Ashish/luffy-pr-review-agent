@@ -185,10 +185,10 @@ REGISTRY: list[ToggleSpec] = [
         "lens_pack",
         "LUFFY_LENS_PACK",
         "str",
-        "default",
+        "auto",
         "product",
-        "Active lens recipe pack id (default|security|docs|odoo|performance)",
-        "F56",
+        "Lens pack id or auto (default|security|docs|odoo|performance|milvus|go|cpp|auto)",
+        "F63",
     ),
     ToggleSpec(
         "mermaid",

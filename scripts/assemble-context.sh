@@ -243,7 +243,8 @@ for k, v in replacements.items():
     prompt = prompt.replace(k, v)
 Path(os.environ["PROMPT_PATH"]).write_text(prompt)
 
-# F56: apply named lens recipe pack to multi-lens sections (soft)
+# F56/F63: apply named lens recipe pack to multi-lens sections (soft)
+# F63: when LUFFY_LENS_PACK=auto, select milvus/go/cpp/odoo/… from changed paths
 lens_pack_id = "default"
 lens_packs_on = "1"
 try:
@@ -251,8 +252,10 @@ try:
     _sys.path.insert(0, str(luffy_root / "scripts"))
     from lens_recipes import apply_file, active_pack_id, packs_enabled  # type: ignore
 
+    file_paths = [f.get("path") or f.get("filename") or "" for f in files]
+    file_paths = [p for p in file_paths if p]
     if packs_enabled():
-        info = apply_file(Path(os.environ["PROMPT_PATH"]))
+        info = apply_file(Path(os.environ["PROMPT_PATH"]), paths=file_paths)
         lens_pack_id = str(info.get("pack") or active_pack_id())
         lens_packs_on = "1"
         # rewrite prompt var if needed (file already updated)
