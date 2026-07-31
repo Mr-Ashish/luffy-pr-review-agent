@@ -28,3 +28,5 @@
 - F23 dual-channel: the full Markdown is still the issue comment (F12 replace via `<!-- luffy-review pr=N`); the formal PR Review body is intentionally short so the Reviews panel is not a second full dump. Marker `<!-- luffy-pr-review pr=N` tags Luffy-owned PR reviews.
 
 - **F41 max_turns:** `agent/config.yaml` sets `agent.max_turns: 40` (Hermes default 500 is unsafe for CI). Override with `LUFFY_MAX_TURNS`; `scripts/max_turns.py` resolves/detects budget hits.
+
+- **F42:** `run-hermes-review.sh` may select cheap vs full model via `scripts/model_tier.py` when `LUFFY_MODEL_TIER=auto` (docs/tiny → cheap). Does not change SOUL/prompt content.

@@ -344,6 +344,10 @@ def review_pr(
         ),
         # F41: Hermes max_turns (script default 40 if unset; 0/off disables)
         "LUFFY_MAX_TURNS": os.environ.get("LUFFY_MAX_TURNS", "40"),
+        # F42: auto model tier (off by default; auto|cheap|full)
+        "LUFFY_MODEL_TIER": os.environ.get("LUFFY_MODEL_TIER", "off"),
+        "LUFFY_MODEL_CHEAP": os.environ.get("LUFFY_MODEL_CHEAP", ""),
+        "LUFFY_MODEL_FULL": os.environ.get("LUFFY_MODEL_FULL", ""),
         "PATH": os.environ.get(
             "PATH",
             "/root/.local/bin:/root/.hermes/bin:/usr/local/bin:/usr/bin:/bin",

@@ -224,5 +224,33 @@ class PackRunForUiTests(unittest.TestCase):
             self.assertEqual(b["result"]["verdict"], "APPROVE")
 
 
+
+    def test_f42_model_tier_signal(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "run"
+            src.mkdir()
+            (src / "review-1.md").write_text(
+                "## Review\nLooks fine.\n", encoding="utf-8"
+            )
+            (src / "model-tier.env").write_text(
+                "mode=auto\ntier=cheap\nreason=tiny\nmodel=openai/gpt-4.1-mini\n",
+                encoding="utf-8",
+            )
+            (src / "luffy-model.txt").write_text(
+                "openai/gpt-4.1-mini\n", encoding="utf-8"
+            )
+            out = Path(td) / "bundle.json"
+            r = _run(["--dir", str(src), "-o", str(out), "--host", "gha"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            bundle = json.loads(out.read_text())
+            sig = bundle["signals"]
+            self.assertEqual(sig.get("model_tier_mode"), "auto")
+            self.assertEqual(sig.get("model_tier"), "cheap")
+            self.assertEqual(sig.get("model_tier_reason"), "tiny")
+            self.assertEqual(sig.get("model"), "openai/gpt-4.1-mini")
+            self.assertIn("model-cheap", sig.get("flags") or [])
+            self.assertTrue(sig.get("any"))
+
+
 if __name__ == "__main__":
     unittest.main()

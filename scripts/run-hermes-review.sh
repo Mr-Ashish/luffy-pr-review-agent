@@ -10,6 +10,8 @@
 #   LUFFY_HERMES_COMMIT  pin SHA (default in hermes-pin.sh); empty/latest/main = floating
 #   LUFFY_REVIEW_TIMEOUT_SECONDS  F36 wall-clock for hermes (default 1500; 0/off disables)
 #   LUFFY_MAX_TURNS  F41 Hermes tool-iteration cap (default 40; 0/off = Hermes default ~500)
+#   LUFFY_MODEL_TIER  F42 off|auto|cheap|full (default off) — auto picks cheap model for tiny/docs PRs
+#   LUFFY_MODEL_CHEAP / LUFFY_MODEL_FULL  F42 tier models (defaults gpt-4.1-mini / opus-5)
 #   PR_NUMBER
 set -euo pipefail
 
@@ -31,10 +33,9 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$LUFFY_ROOT}"
 MODEL="${LUFFY_MODEL:-${OPENROUTER_MODEL:-$DEFAULT_LUFFY_MODEL}}"
 TOOLSETS="${LUFFY_TOOLSETS:-terminal}"
 PIN_HELPER="$LUFFY_ROOT/scripts/hermes-pin.sh"
+MODEL_TIER_HELPER="$LUFFY_ROOT/scripts/model_tier.py"
 
 mkdir -p "$OUT_DIR" "$HERMES_HOME/memories" "$HERMES_HOME/logs"
-# Trace/debug: record effective model (override or default)
-printf '%s\n' "$MODEL" >"$OUT_DIR/luffy-model.txt" || true
 
 if [[ -f "$OUT_DIR/meta.env" ]]; then
   # shellcheck disable=SC1091
@@ -44,6 +45,62 @@ fi
 PROMPT_PATH="${PROMPT_PATH:-$OUT_DIR/prompt.md}"
 PR_NUMBER="${PR_NUMBER:-unknown}"
 [[ -f "$PROMPT_PATH" ]] || die "Missing prompt: $PROMPT_PATH"
+
+# ---------------------------------------------------------------------------
+# F42: auto model tier by PR size (opt-in LUFFY_MODEL_TIER=auto)
+# ---------------------------------------------------------------------------
+MODEL_TIER_MODE="${LUFFY_MODEL_TIER:-off}"
+MODEL_TIER_SELECTED="default"
+MODEL_TIER_REASON="default_full"
+if [[ -f "$MODEL_TIER_HELPER" ]]; then
+  _tier_args=(select)
+  [[ -n "${DIFF_SIZE:-}" ]] && _tier_args+=(--diff-bytes "$DIFF_SIZE")
+  [[ -n "${FILE_COUNT:-}" ]] && _tier_args+=(--file-count "$FILE_COUNT")
+  [[ -n "${DIFF_TRUNCATED:-}" ]] && _tier_args+=(--diff-truncated "$DIFF_TRUNCATED")
+  [[ -f "${PR_JSON_PATH:-}" ]] && _tier_args+=(--pr-json "$PR_JSON_PATH")
+  [[ -f "$OUT_DIR/meta.env" ]] && _tier_args+=(--meta "$OUT_DIR/meta.env")
+  [[ -f "$OUT_DIR/files.txt" ]] && _tier_args+=(--paths-file "$OUT_DIR/files.txt")
+  _tier_out="$(
+    python3 "$MODEL_TIER_HELPER" "${_tier_args[@]}" 2>/dev/null || true
+  )"
+  if [[ -n "$_tier_out" ]]; then
+    _m="$(printf '%s\n' "$_tier_out" | awk -F= '/^model=/{print substr($0,7); exit}')"
+    _t="$(printf '%s\n' "$_tier_out" | awk -F= '/^tier=/{print $2; exit}')"
+    _r="$(printf '%s\n' "$_tier_out" | awk -F= '/^reason=/{print $2; exit}')"
+    _mode="$(printf '%s\n' "$_tier_out" | awk -F= '/^mode=/{print $2; exit}')"
+    if [[ -n "$_m" ]]; then
+      MODEL="$_m"
+    fi
+    MODEL_TIER_SELECTED="${_t:-$MODEL_TIER_SELECTED}"
+    MODEL_TIER_REASON="${_r:-$MODEL_TIER_REASON}"
+    MODEL_TIER_MODE="${_mode:-$MODEL_TIER_MODE}"
+  fi
+fi
+# Export so hermes + capture see the effective model
+export LUFFY_MODEL="$MODEL"
+export OPENROUTER_MODEL="$MODEL"
+# Trace/debug: record effective model (override, tier, or default)
+printf '%s\n' "$MODEL" >"$OUT_DIR/luffy-model.txt" || true
+{
+  echo "mode=$MODEL_TIER_MODE"
+  echo "tier=$MODEL_TIER_SELECTED"
+  echo "reason=$MODEL_TIER_REASON"
+  echo "model=$MODEL"
+  echo "diff_bytes=${DIFF_SIZE:-}"
+  echo "file_count=${FILE_COUNT:-}"
+} >"$OUT_DIR/model-tier.env" || true
+if [[ "$MODEL_TIER_MODE" == "auto" || "$MODEL_TIER_MODE" == "cheap" || "$MODEL_TIER_MODE" == "full" ]]; then
+  notice "F42 model tier · mode=$MODEL_TIER_MODE tier=$MODEL_TIER_SELECTED reason=$MODEL_TIER_REASON model=$MODEL"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    {
+      echo "### Luffy model tier (F42)"
+      echo "- **Mode:** \`$MODEL_TIER_MODE\` · **tier:** \`$MODEL_TIER_SELECTED\` · **reason:** \`$MODEL_TIER_REASON\`"
+      echo "- **Model:** \`$MODEL\`"
+      echo "- Opt-in: \`vars.LUFFY_MODEL_TIER=auto\` (cheap for tiny/docs; full otherwise)"
+      echo
+    } >>"$GITHUB_STEP_SUMMARY" || true
+  fi
+fi
 
 export HERMES_HOME
 export OPENROUTER_API_KEY
@@ -238,7 +295,7 @@ _hermes_wrap() {
   fi
 }
 
-notice "Hermes review · model=$MODEL toolsets=$TOOLSETS workspace=$WORKSPACE_ROOT hermes_home=$HERMES_HOME timeout=${TIMEOUT_SECS}s max_turns=${MAX_TURNS_VAL:-off}"
+notice "Hermes review · model=$MODEL tier=${MODEL_TIER_SELECTED:-?} toolsets=$TOOLSETS workspace=$WORKSPACE_ROOT hermes_home=$HERMES_HOME timeout=${TIMEOUT_SECS}s max_turns=${MAX_TURNS_VAL:-off}"
 
 TIMED_OUT=0
 set +e

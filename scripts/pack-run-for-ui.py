@@ -128,7 +128,7 @@ def collect_signals(
     meta_env: str | None = None,
     usage: dict | None = None,
 ) -> dict:
-    """F40/F41: ops signals for Run Console overview.
+    """F40/F41/F42: ops signals for Run Console overview.
 
     Sources (files preferred, review text as soft fallback):
       hermes-timeout.env / hermes-timeout-seconds.txt  → timeout (F36)
@@ -136,6 +136,7 @@ def collect_signals(
       meta.env DIFF_TRUNCATED / review banner (F27)    → diff_truncated
       review OVER BUDGET / usage + env max (F29)       → over_budget
       hermes-max-turns.env / iteration budget logs     → max_turns_hit (F41)
+      model-tier.env (F42)                              → model_tier / selected_tier
     """
     signals: dict = {
         "timeout": False,
@@ -145,6 +146,10 @@ def collect_signals(
         "over_budget": False,
         "max_turns_hit": False,
         "max_turns": None,
+        "model_tier_mode": None,
+        "model_tier": None,
+        "model_tier_reason": None,
+        "model": None,
         "flags": [],  # short chip labels for UI
     }
     te = _parse_env_file(dir_path / "hermes-timeout.env")
@@ -252,6 +257,25 @@ def collect_signals(
             ):
                 signals["max_turns_hit"] = True
 
+    # F42 model tier (cheap/full selection)
+    mte = _parse_env_file(dir_path / "model-tier.env")
+    if mte.get("mode"):
+        signals["model_tier_mode"] = mte["mode"]
+    if mte.get("tier"):
+        signals["model_tier"] = mte["tier"]
+    if mte.get("reason"):
+        signals["model_tier_reason"] = mte["reason"]
+    if mte.get("model"):
+        signals["model"] = mte["model"]
+    # Soft: luffy-model.txt when env missing
+    if not signals.get("model"):
+        lm = dir_path / "luffy-model.txt"
+        if lm.is_file():
+            try:
+                signals["model"] = lm.read_text(encoding="utf-8", errors="replace").strip() or None
+            except OSError:
+                pass
+
     flags: list[str] = []
     if signals["path_skip"]:
         flags.append("path-skip")
@@ -263,6 +287,16 @@ def collect_signals(
         flags.append("diff-truncated")
     if signals["max_turns_hit"]:
         flags.append("max-turns")
+    # Surface auto/cheap/full when tier mode is active (not plain off/default)
+    mode = (signals.get("model_tier_mode") or "").lower()
+    tier = (signals.get("model_tier") or "").lower()
+    if mode in ("auto", "cheap", "full") or tier in ("cheap", "full") and mode not in ("", "off"):
+        if tier == "cheap" or mode == "cheap":
+            flags.append("model-cheap")
+        elif tier == "full" and mode in ("auto", "full"):
+            flags.append("model-full")
+        elif mode == "auto":
+            flags.append("model-tier")
     signals["flags"] = flags
     signals["any"] = bool(flags)
     return signals

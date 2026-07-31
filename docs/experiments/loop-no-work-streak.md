@@ -6,5 +6,5 @@ Track consecutive scheduled fires that found **no P0/P1** Luffy product work
 | Field | Value |
 |-------|------:|
 | streak | **0** |
-| last_fire | 2026-07-31 (F41 Hermes max_turns + loop metrics shipped) |
-| note | P1 cost/ops work found and shipped → streak stays 0. |
+| last_fire | 2026-07-31 (F42 auto model tier by PR size shipped) |
+| note | P1 cost work found and shipped → streak stays 0. |

@@ -14,7 +14,7 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | H4 | Context compressor / history budget for huge monorepos | M | Cuts tokens after F27 truncation | backlog |
 | H5 | Session/search memory over past PR traces (FTS5 pattern) | M | Better repo memory than append-only distill | backlog |
 | H6 | Hard preflight spend estimate before Hermes | S | Refuse/force cheap model when diff huge + budget tight | backlog |
-| H7 | Auto model tier by PR size (cheap first) | S | Cost without quality loss on docs/tiny PRs | backlog |
+| H7 | Auto model tier by PR size (cheap first) | S | Cost without quality loss on docs/tiny PRs | **Shipped F42** |
 | H8 | Subagent fan-out for multi-file PRs | L | Parallel review streams; Modal cost + complexity | backlog |
 | H9 | Trajectory packaging for offline eval datasets | M | Quality regressions measurable | backlog (capture-hermes-loop partial) |
 | H10 | Soft skill nudge mid-loop (“prefer fewer tools”) | M | Hermes skill nudge pattern; needs hermes hooks | backlog |
@@ -26,3 +26,5 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 ## Last pick
 
 **H1+H2 → F41** (2026-07-31): wire Hermes iteration budget default 40 + loop metrics in pack/UI.
+
+**H7 → F42** (2026-07-31): auto model tier (`LUFFY_MODEL_TIER=auto`) — cheap for tiny/docs, full otherwise.

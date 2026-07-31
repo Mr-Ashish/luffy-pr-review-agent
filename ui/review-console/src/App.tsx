@@ -481,6 +481,32 @@ export default function App() {
                         </dd>
                       </>
                     )}
+                    {(signals.model_tier_mode === "auto" ||
+                      signals.model_tier_mode === "cheap" ||
+                      signals.model_tier_mode === "full" ||
+                      signals.model_tier === "cheap" ||
+                      signals.model_tier === "full") && (
+                      <>
+                        <dt>Model tier (F42)</dt>
+                        <dd>
+                          {signals.model_tier_mode
+                            ? `mode ${signals.model_tier_mode}`
+                            : "tier"}
+                          {signals.model_tier
+                            ? ` · ${signals.model_tier}`
+                            : ""}
+                          {signals.model_tier_reason
+                            ? ` · ${signals.model_tier_reason}`
+                            : ""}
+                          {signals.model ? (
+                            <>
+                              {" "}
+                              · <code>{signals.model}</code>
+                            </>
+                          ) : null}
+                        </dd>
+                      </>
+                    )}
                   </dl>
                 </div>
               )}

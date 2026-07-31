@@ -517,6 +517,10 @@ jobs:
           LUFFY_REVIEW_TIMEOUT_SECONDS: ${{ vars.LUFFY_REVIEW_TIMEOUT_SECONDS }}
           # F41: Hermes max_turns (default 40 in max_turns.py / agent/config.yaml)
           LUFFY_MAX_TURNS: ${{ vars.LUFFY_MAX_TURNS }}
+          # F42: auto model tier (off|auto|cheap|full; default off)
+          LUFFY_MODEL_TIER: ${{ vars.LUFFY_MODEL_TIER }}
+          LUFFY_MODEL_CHEAP: ${{ vars.LUFFY_MODEL_CHEAP }}
+          LUFFY_MODEL_FULL: ${{ vars.LUFFY_MODEL_FULL }}
           # F7: job-level env already sets default; re-export for pipeline scripts
           LUFFY_HERMES_COMMIT: ${{ env.LUFFY_HERMES_COMMIT }}
         run: |
@@ -548,6 +552,16 @@ jobs:
           # F41: empty max-turns var → script default (40); 0/off disables
           if [[ -z "${LUFFY_MAX_TURNS:-}" ]]; then
             unset LUFFY_MAX_TURNS || true
+          fi
+          # F42: empty tier vars → script defaults (tier off; cheap/full product defaults)
+          if [[ -z "${LUFFY_MODEL_TIER:-}" ]]; then
+            unset LUFFY_MODEL_TIER || true
+          fi
+          if [[ -z "${LUFFY_MODEL_CHEAP:-}" ]]; then
+            unset LUFFY_MODEL_CHEAP || true
+          fi
+          if [[ -z "${LUFFY_MODEL_FULL:-}" ]]; then
+            unset LUFFY_MODEL_FULL || true
           fi
           export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
           chmod +x "$LUFFY_ROOT/scripts/"*.sh "$LUFFY_ROOT/scripts/"*.py 2>/dev/null || true

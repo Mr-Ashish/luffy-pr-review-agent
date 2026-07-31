@@ -53,8 +53,9 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 31 (F39):** Modal host parity (path-skip + report-verdict on bit 3)
 - **Sprint 32 (F40):** Ops signals in run-bundle + Run Console overview
 - **Sprint 33 (F41):** Hermes max_turns iteration budget (default 40) + loop metrics in run-bundle
+- **Sprint 34 (F42):** Auto model tier by PR size (`LUFFY_MODEL_TIER=auto` → cheap for tiny/docs)
 
-## Ops signals in Run Console (F40/F41)
+## Ops signals in Run Console (F40/F41/F42)
 
 Every auto-pack (`run-bundle.json`) includes a `signals` object:
 
@@ -65,6 +66,7 @@ Every auto-pack (`run-bundle.json`) includes a `signals` object:
 | `over_budget` | review OVER BUDGET / F29 |
 | `diff_truncated` | `meta.env` DIFF_TRUNCATED / F27 |
 | `max_turns_hit` | `hermes-max-turns.env` / F41 iteration budget |
+| `model_tier` / `model-cheap` | `model-tier.env` / F42 auto tier |
 
 Also `loop` metrics: `tool_call_turns`, `message_count`, `step_count`, `max_turns`.
 
@@ -85,6 +87,26 @@ python3 scripts/max_turns.py detect .luffy-out/hermes-*.stderr
 
 Wired in `run-hermes-review.sh` (`--max-turns` + `agent.config` rewrite + detect).
 Evidence: `hermes-max-turns.env`, job-summary **Luffy max turns (F41)**.
+
+## Auto model tier (F42)
+
+Opt-in cheap model for tiny / docs-only PRs (keeps Opus for large code PRs).
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_MODEL_TIER` | `off` | `auto` / `cheap` / `full` / `off` |
+| `LUFFY_MODEL_CHEAP` | `openai/gpt-4.1-mini` | Cheap-tier OpenRouter id |
+| `LUFFY_MODEL_FULL` | `anthropic/claude-opus-5` (or `LUFFY_MODEL`) | Full-tier model |
+| `LUFFY_TIER_MAX_BYTES` | `12000` | Tiny-diff threshold |
+| `LUFFY_TIER_MAX_FILES` | `3` | Tiny file-count threshold |
+
+```bash
+LUFFY_MODEL_TIER=auto python3 scripts/model_tier.py select --path README.md --diff-bytes 500
+# → model=openai/gpt-4.1-mini tier=cheap reason=docs_only
+```
+
+Wired in `run-hermes-review.sh` after assemble meta. Evidence: `model-tier.env`,
+`luffy-model.txt`, job-summary **Luffy model tier (F42)**, run-bundle `signals.model_tier*`.
 
 ## Modal host parity (F39)
 

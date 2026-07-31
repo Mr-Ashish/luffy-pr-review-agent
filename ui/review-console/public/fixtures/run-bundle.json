@@ -139,6 +139,10 @@
     "over_budget": false,
     "max_turns_hit": false,
     "max_turns": null,
+    "model_tier_mode": null,
+    "model_tier": null,
+    "model_tier_reason": null,
+    "model": null,
     "flags": [],
     "any": false
   },

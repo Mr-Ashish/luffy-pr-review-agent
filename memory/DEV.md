@@ -31,3 +31,5 @@
 - Hub on/off precedence is deliberate and duplicated on both halves: an explicit `LUFFY_HUB_PUBLISH` (`1`/`0`) always wins; when unset, mode `hub|both` implies publish=1 and anything else implies publish=0. This flips the old `LUFFY_HUB_PUBLISH:-1` default to off without changing the var's meaning.
 - The reusable workflow `unset`s `LUFFY_HUB_PUBLISH` when the GitHub Actions variable is empty, because an empty-string var would otherwise defeat the scripts' `:-` mode-based defaulting — same pattern already used for empty `LUFFY_MODEL` (F26).
 - `publish-run-local.sh` is added to `RUNTIME_SCRIPTS` in `install-luffy.sh` and is invoked on the config-error path too (before `publish-run-to-hub.sh`), so failed runs still leave a local record.
+
+- **F42:** `run-hermes-review.sh` may select cheap vs full model via `scripts/model_tier.py` when `LUFFY_MODEL_TIER=auto` (docs/tiny → cheap). Does not change SOUL/prompt content.

@@ -84,6 +84,11 @@ export interface RunBundle {
     budget_max_usd?: number;
     max_turns_hit?: boolean;
     max_turns?: number | string | null;
+    /** F42 auto model tier */
+    model_tier_mode?: string | null;
+    model_tier?: string | null;
+    model_tier_reason?: string | null;
+    model?: string | null;
   };
   /** F41: Hermes agent-loop metrics */
   loop?: {

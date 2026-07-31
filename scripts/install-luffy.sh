@@ -124,6 +124,7 @@ RUNTIME_SCRIPTS=(
   run-luffy-review.sh
   run-with-timeout.py
   max_turns.py
+  model_tier.py
   save-trace.sh
   review-to-openui.py
   sparse-pr-paths.sh
