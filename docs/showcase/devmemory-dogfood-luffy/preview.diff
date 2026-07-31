@@ -1,40 +1,10 @@
-diff --git a/DEV.md b/DEV.md
---- a/DEV.md
-+++ b/DEV.md
-@@ -76,6 +76,8 @@
- - **F44 normalize (chat-chrome):** `scripts/normalize-review.py` no longer assumes the review step ran through `hermes -z`; it extracts the real review out of `hermes chat -q` TUI chrome, because the review path can degrade to the chat fallback and would otherwise publish raw wrapper output.
- - F44 **promotes unbolded `Verdict:` / `Summary` headings** to the bold contract form so downstream `parse-verdict.py` and the contract checks keep matching when the model drops the bold markers.
+diff --git a/agent/DEV.md b/agent/DEV.md
+--- a/agent/DEV.md
++++ b/agent/DEV.md
+@@ -40,3 +40,6 @@
  
-+- Attempt 1 is preserved rather than overwritten: `review-*.attempt1.raw.md`, `agent-loop-attempt1/`, and `tool-turns-reprompt.env` are emitted so a run bundle shows both passes and why the second happened.
+ - Consequence: the **F45 tool-turns gate stays required** on multi-file code PRs whenever `tool_turns=0` (gate → `COMMENT` / confidence 55). Live re-score on `Mr-Ashish/odoo#2` with `openai/gpt-4.1-mini` held at 30/50 — the residual gap is tool use, not the CLI invocation.
+ - Open follow-ups for the cheap multi-file path: a soft re-prompt (H15) or a hard tool nudge (H18); do not remove the F45 gate before one of those lands.
 +
- ## Pitfalls
- 
- - `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403), so the hub publish default is `mode=direct` (clone hub → ingest → push `main`); the dispatch path needs a classic PAT on the target repo.
-@@ -124,7 +126,6 @@
- - `tool_turns=0` on a multi-file PR is a quality smell for an *agentic* review product, not a cheap win: the no-tool mini run on PR #2 returned APPROVE while an earlier GHA tool-using review caught the real gap (missing `format:false` tests). **F45/H12** fail-closes: `scripts/tool_turns_gate.py` downgrades APPROVE→COMMENT, caps score at 55, injects an F45 banner, writes `tool-turns-gate.env` (chip `tool-turns-gate`). Docs-only / single-file exempt; `LUFFY_TOOL_TURNS_GATE=off` disables.
- - **F49/H15 soft re-prompt:** same eligibility as F45, **once** before fail-closed — re-run `hermes -z` with a tool-nudge suffix (`reprompt-write`). Default on (`LUFFY_TOOL_TURNS_REPROMPT=1`). Evidence: `tool-turns-reprompt.env` + chips `tool-reprompt` / `tool-reprompt-ok`. If tools still 0, F45 still annotates. Doubles cheap-path spend when it fires — intentional recovery cost.
- - **F46/H13 SOUL load:** Hermes blocks context files matching threat patterns. Never quote classic injection phrases in `agent/SOUL.md`. Preflight: `scripts/soul_context_scan.py check`; runtime: `soul-context.env` + chip `soul-blocked`.
--- **H16 lesson:** fixing `hermes -z` argv does **not** guarantee tool use — gpt-4.1-mini can still single-shot with `tool_turns=0`; F45 remains the honesty gate; **F49** is the recovery attempt; H18 (hard tool nudge) is backlog if soft re-prompt stays 0.
- 
- - The normalizer is a **trust boundary**, not a formatter: never accept a body as a valid review contract just because expected snippets/headings appear in it — prompt echo contains all of them. Contract checks must assert the placeholder-free form.
- - `hermes -z` can fail at runtime and fall back to `hermes chat -q` (observed on a cheap run over Mr-Ashish/odoo PR #2); pre-F44 that path would have posted the **entire prompt** as the PR review comment.
-@@ -133,6 +134,8 @@
- - F47 makes CLI argv rejection a distinct, non-fallback failure class: on `invalid choice` / `unrecognized arguments`, skip the chat fallback and write `hermes-cli-argv.env` instead of burning a zero-tool path.
- 
- - `HERMES_HOME` is shared across runs, so scanning the whole `agent.log` yields **false `soul_blocked=1`** from stale history — this was observed on a live H16 run whose SOUL preflight was actually clean, and is what F48 fixes. If `soul_blocked` fires, first confirm the evidence came from the current invocation's log slice before treating it as a real SOUL/threat-scanner block.
-+
-+- Zero-tool reviews were observed *after* F47/F48 landed (odoo e2e corpus #2 and #4 both had mini `tool_turns=0`), so prompt/scoping fixes upstream of the loop do not by themselves make the agent use tools — treat `tool_turns=0` as a recurring residual condition to gate on, not a solved one.
- 
- ## Patterns
- 
-
-diff --git a/ui/DEV.md b/ui/DEV.md
---- a/ui/DEV.md
-+++ b/ui/DEV.md
-@@ -11,6 +11,7 @@
- - Agent loop panel (F41) is separate from cost model tier: turns thrash vs which OpenRouter model was selected.
- - Browser is not a kitchen: **Run** tab copies `trigger-review.sh` / Modal commands; review work stays in GHA/Modal.
- 
-+- **F49 adds a chip pair** to the pack signals, not a single flag: `tool-reprompt` (a soft re-prompt was attempted) and `tool-reprompt-ok` (the second pass actually produced tool turns). Both are filled from `tool-turns-reprompt.env`, so the console can distinguish "we retried" from "the retry worked" without opening the raw logs — a run showing `tool-reprompt` without `tool-reprompt-ok` is the H18 escalation signal.
- 
- ## Pitfalls
++- Zero tool turns on attempt 1 is the norm, not an anomaly, on live upstream-port PRs: repeated e2e runs (odoo#2, #4, #5) all recorded `tool_turns=0` before the F49 soft reprompt, which then recovered a real agentic loop (0→23, 0→9, 0→8). Treat a `tool_turns=0` first attempt as expected and check whether `LUFFY_TOOL_TURNS_REPROMPT=1` was set before suspecting a prompt/toolset regression.
++- Because the reprompt succeeds, the F45 tool-turns gate reports *skipped* rather than pass/fail on these runs — a skipped F45 plus `soul_blocked=0` is the healthy signature, so do not read "gate skipped" as "gate not wired up".

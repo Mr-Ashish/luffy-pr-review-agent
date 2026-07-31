@@ -1,24 +1,27 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T16:45:50Z
+- **assembled_at:** 2026-07-31T17:04:54Z
 
 ## git status
 
 ```
 ?? .luffy-out-e2e-pr2-f44/
+?? .luffy-out-e2e-pr2-f49/
 ?? .luffy-out-e2e-pr2-h16/
+?? .luffy-out-e2e-pr4-f49/
 ?? .luffy-out-e2e-pr4-h16/
+?? .luffy-out-e2e-pr5-f49/
 ```
 
 ## recent log
 
 ```
-e153394 feat(F49): soft re-prompt once on zero-tool multi-file reviews (H15)
-3d1cc25 docs(e2e): corpus #4 odoo#279776 stock/mrp PERF + mini score 31/50
-87bce57 docs: dogfood F48/H16 knowledge (SOUL detect scope, tool_turns residual)
-cd03a57 F48: scope SOUL detect + agent.log capture to this invocation (H17)
-eaee0da knowledge: dogfood F47 hermes -z argv / max-turns contract
+85916aa docs(e2e): H22 score odoo#5 F49 mini — tools 0→8, 37/50
+db992e0 docs(e2e): H21 corpus #5 — port odoo#279360 POS ticket screen
+e666fe0 docs(e2e): H19 F49 re-score odoo#4 — tools 0→9, 31→38/50
+f433584 docs: F49 live #2 e2e — tool_turns 0→23, score 36/50
+bc45eac docs: apply F49 dogfood knowledge into DEV.md
 ```
 
 ## tree (sample)

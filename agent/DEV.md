@@ -40,3 +40,6 @@
 
 - Consequence: the **F45 tool-turns gate stays required** on multi-file code PRs whenever `tool_turns=0` (gate → `COMMENT` / confidence 55). Live re-score on `Mr-Ashish/odoo#2` with `openai/gpt-4.1-mini` held at 30/50 — the residual gap is tool use, not the CLI invocation.
 - Open follow-ups for the cheap multi-file path: a soft re-prompt (H15) or a hard tool nudge (H18); do not remove the F45 gate before one of those lands.
+
+- Zero tool turns on attempt 1 is the norm, not an anomaly, on live upstream-port PRs: repeated e2e runs (odoo#2, #4, #5) all recorded `tool_turns=0` before the F49 soft reprompt, which then recovered a real agentic loop (0→23, 0→9, 0→8). Treat a `tool_turns=0` first attempt as expected and check whether `LUFFY_TOOL_TURNS_REPROMPT=1` was set before suspecting a prompt/toolset regression.
+- Because the reprompt succeeds, the F45 tool-turns gate reports *skipped* rather than pass/fail on these runs — a skipped F45 plus `soul_blocked=0` is the healthy signature, so do not read "gate skipped" as "gate not wired up".

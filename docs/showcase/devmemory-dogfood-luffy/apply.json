@@ -1,29 +1,11 @@
 [
   {
-    "path": "DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Design decisions",
-    "bytes": 29453,
-    "applied": true,
-    "unit_path": "."
-  },
-  {
-    "path": "DEV.md",
+    "path": "agent/DEV.md",
     "kind": "dev",
     "action": "merge",
     "section": "Pitfalls",
-    "bytes": 29749,
+    "bytes": 6433,
     "applied": true,
-    "unit_path": "."
-  },
-  {
-    "path": "ui/DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Design decisions",
-    "bytes": 1683,
-    "applied": true,
-    "unit_path": "ui"
+    "unit_path": "agent"
   }
 ]

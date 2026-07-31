@@ -44,25 +44,14 @@ Respond with **only** the JSON object (fence optional).
 
 ### Transcript
 
-# Dogfood session — F49 soft re-prompt (H15)
+# dogfood-luffy-session
 
-## What shipped
-- F49/H15: when first hermes -z has tool_turns=0 on multi-file code PR, soft re-prompt once with tool-nudge suffix before F45 fail-closed.
-- CLI: tool_turns_gate.py reprompt-decide / reprompt-write
-- Env: LUFFY_TOOL_TURNS_REPROMPT (default on)
-- Artifacts: tool-turns-reprompt.env, review-*.attempt1.raw.md, agent-loop-attempt1/
-- Pack chips: tool-reprompt / tool-reprompt-ok
-- Evidence prior: odoo e2e #2 and #4 both mini tool_turns=0 after F47/F48
-
-## Lessons
-- F45 honesty gate alone does not recover D1; recovery needs a second agentic pass.
-- Soft re-prompt doubles cheap-path spend when it fires — intentional.
-- If F49 still yields tool_turns=0, next is H18 hard tool nudge.
-
-## Verify
-- pytest test_tool_turns_gate + test_pack_run_for_ui: 36 passed
-- bash -n run-hermes-review.sh ok
-- Pushed main e153394
+## Session notes (H22)
+- Ran F49 mini e2e on Mr-Ashish/odoo#5 (POS ticket screen, port of odoo#279360).
+- tool_turns recovered 0→8 via LUFFY_TOOL_TURNS_REPROMPT=1; F45 gate skipped; soul_blocked=0.
+- Score 37/50; APPROVE 92; ~$0.028 · 56s; sessions 20260731_223146_62f430 → 20260731_223158_96a569.
+- Corpus fully scored: #1 35, #2 GHA 40 / F49 36, #3 39, #4 F49 38, #5 F49 37.
+- Next highest ROI: H20 severity calibration (missing tests blocking) or H23 sixth upstream PR.
 
 
 ## Existing directories (allowed `path` values)
@@ -109,17 +98,20 @@ agent
 ### git status
 ```
 ?? .luffy-out-e2e-pr2-f44/
+?? .luffy-out-e2e-pr2-f49/
 ?? .luffy-out-e2e-pr2-h16/
+?? .luffy-out-e2e-pr4-f49/
 ?? .luffy-out-e2e-pr4-h16/
+?? .luffy-out-e2e-pr5-f49/
 ```
 
 ### recent log
 ```
-e153394 feat(F49): soft re-prompt once on zero-tool multi-file reviews (H15)
-3d1cc25 docs(e2e): corpus #4 odoo#279776 stock/mrp PERF + mini score 31/50
-87bce57 docs: dogfood F48/H16 knowledge (SOUL detect scope, tool_turns residual)
-cd03a57 F48: scope SOUL detect + agent.log capture to this invocation (H17)
-eaee0da knowledge: dogfood F47 hermes -z argv / max-turns contract
+85916aa docs(e2e): H22 score odoo#5 F49 mini — tools 0→8, 37/50
+db992e0 docs(e2e): H21 corpus #5 — port odoo#279360 POS ticket screen
+e666fe0 docs(e2e): H19 F49 re-score odoo#4 — tools 0→9, 31→38/50
+f433584 docs: F49 live #2 e2e — tool_turns 0→23, score 36/50
+bc45eac docs: apply F49 dogfood knowledge into DEV.md
 ```
 
 ### tree (sample)

@@ -7,23 +7,12 @@
 
 ## Transcript / notes
 
-# Dogfood session — F49 soft re-prompt (H15)
+# dogfood-luffy-session
 
-## What shipped
-- F49/H15: when first hermes -z has tool_turns=0 on multi-file code PR, soft re-prompt once with tool-nudge suffix before F45 fail-closed.
-- CLI: tool_turns_gate.py reprompt-decide / reprompt-write
-- Env: LUFFY_TOOL_TURNS_REPROMPT (default on)
-- Artifacts: tool-turns-reprompt.env, review-*.attempt1.raw.md, agent-loop-attempt1/
-- Pack chips: tool-reprompt / tool-reprompt-ok
-- Evidence prior: odoo e2e #2 and #4 both mini tool_turns=0 after F47/F48
-
-## Lessons
-- F45 honesty gate alone does not recover D1; recovery needs a second agentic pass.
-- Soft re-prompt doubles cheap-path spend when it fires — intentional.
-- If F49 still yields tool_turns=0, next is H18 hard tool nudge.
-
-## Verify
-- pytest test_tool_turns_gate + test_pack_run_for_ui: 36 passed
-- bash -n run-hermes-review.sh ok
-- Pushed main e153394
+## Session notes (H22)
+- Ran F49 mini e2e on Mr-Ashish/odoo#5 (POS ticket screen, port of odoo#279360).
+- tool_turns recovered 0→8 via LUFFY_TOOL_TURNS_REPROMPT=1; F45 gate skipped; soul_blocked=0.
+- Score 37/50; APPROVE 92; ~$0.028 · 56s; sessions 20260731_223146_62f430 → 20260731_223158_96a569.
+- Corpus fully scored: #1 35, #2 GHA 40 / F49 36, #3 39, #4 F49 38, #5 F49 37.
+- Next highest ROI: H20 severity calibration (missing tests blocking) or H23 sixth upstream PR.
 

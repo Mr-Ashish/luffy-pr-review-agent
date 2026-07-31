@@ -1,31 +1,31 @@
-# Agent loop · `run-20260731T221549-70be60`
+# Agent loop · `run-20260731T223452-f797d2`
 
 - **model:** `anthropic/claude-opus-5`
 - **hermes_rc:** 0
-- **units:** 4
-- **at:** 2026-07-31T16:46:31Z
+- **units:** 1
+- **at:** 2026-07-31T17:05:13Z
 
 ## Summary
 
-Session shipped F49/H15 soft re-prompt: when the first `hermes -z` pass ends with tool_turns=0 on a multi-file code PR, the orchestrator re-prompts once with a tool-nudge suffix before the F45 fail-closed gate. Durable new knowledge is the escalation rationale (F45 alone cannot recover a zero-tool review), the intentional cost trade-off, the env kill switch, and the new console chip pair.
+The session is mostly benchmark bookkeeping (per-PR scores, run ids, cost) which is ephemeral, but it does confirm one durable empirical pattern: on live odoo PR reviews the first Hermes attempt lands with zero tool turns, and the F49 soft reprompt reliably recovers a real agentic loop so the F45 fail-closed gate ends up skipped.
 
 ## Usage
 
 ```json
 {
-  "estimated_cost_usd": 0.27835375,
+  "estimated_cost_usd": 0.2462225,
   "cost_status": "estimated",
   "cost_source": "provider_models_api",
   "input_tokens": 2,
-  "output_tokens": 2535,
+  "output_tokens": 1273,
   "cache_read_tokens": 0,
-  "cache_write_tokens": 34395,
-  "reasoning_tokens": 264,
-  "total_tokens": 36932,
+  "cache_write_tokens": 34302,
+  "reasoning_tokens": 179,
+  "total_tokens": 35577,
   "api_calls": 1,
   "model": "anthropic/claude-opus-5",
   "provider": "openrouter",
-  "session_id": "20260731_221551_c7d494",
+  "session_id": "20260731_223455_643c55",
   "completed": true,
   "failed": false,
   "service_tier": null
@@ -36,11 +36,11 @@ Session shipped F49/H15 soft re-prompt: when the first `hermes -z` pass ends wit
 
 ```json
 {
-  "assemble_s": 0.671,
-  "extract_s": 34.704,
-  "normalize_s": 0.002,
-  "apply_s": 6.196,
-  "total_s": 41.579
+  "assemble_s": 1.256,
+  "extract_s": 19.538,
+  "normalize_s": 0.001,
+  "apply_s": 0.163,
+  "total_s": 20.965
 }
 ```
 
