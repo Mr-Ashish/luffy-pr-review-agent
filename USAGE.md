@@ -155,6 +155,32 @@ Evidence: `tool-turns-reprompt.env` (`attempted`, `tool_turns_before/after`, `re
 chips `tool-reprompt` / `tool-reprompt-ok`. F45 still fires if tools remain zero after
 the second pass.
 
+### Linked issue context (F53)
+
+During `assemble-context`, Luffy extracts issue refs from the PR title/body
+(`Fixes #N`, `Closes owner/repo#N`, full issue URLs, bare `#N`) and optionally
+from the head branch (`feature/123-foo`), then fetches title/body/comments via
+`gh issue view` and injects them into `context.md` + the review prompt as
+**claim-to-fix / acceptance criteria**.
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_ISSUE_CONTEXT` | `1` | `0`/`off` disables |
+| `LUFFY_ISSUE_CONTEXT_MAX` | `3` | max issues to fetch |
+| `LUFFY_ISSUE_CONTEXT_COMMENTS` | `8` | max comments per issue (last N) |
+| `LUFFY_ISSUE_FROM_BRANCH` | `1` | extract issue number from head branch |
+| `LUFFY_ISSUE_CONTEXT_FIXTURE` | unset | JSON array of issues (no network; tests) |
+
+```bash
+python3 scripts/linked_issue_context.py extract \
+  --repo owner/repo --title "fix crash" --body "Fixes #42"
+python3 scripts/linked_issue_context.py assemble \
+  --pr-json pr.json --repo owner/repo --out-dir .luffy-out
+```
+
+Evidence: `linked-issues.md`, `linked-issue-context.env`, run-bundle chip `issue-ctx`.
+Soft: fetch failures never block assemble.
+
 ### Auto model tier (F42)
 
 Cheap model first for tiny / docs-only PRs when opted in:
@@ -271,6 +297,7 @@ devmemory extract --fixture sample-auth-module --apply
 - Batch form for a real PR path list: `python3 scripts/path-skip-check.py --paths-file pr-paths.txt` (paths come from `scripts/sparse-pr-paths.sh`).
 
 - **F50 severity calibration:** enabled by default; disable per-run with `LUFFY_SEVERITY_CALIBRATION=0`. Regression coverage lives in `tests/test_severity_calibration.py`.
+- **F53 linked issue context:** enabled by default; disable with `LUFFY_ISSUE_CONTEXT=0`. Tests: `tests/test_linked_issue_context.py`.
 - The gate can be re-run **offline against an existing run directory** to re-score a past review without new OpenRouter spend — this is how the odoo e2e corpus was re-scored (#2 36→42/50, #5 37→40/50, #4 no-op) after the gate landed.
 - Console/bundle side: a `sev-cal` chip appears in the run bundle `signals` when the gate fired, so an upgraded verdict is visible in the Run Console without reading the review body.
 

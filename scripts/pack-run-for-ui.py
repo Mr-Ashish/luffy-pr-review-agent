@@ -143,6 +143,7 @@ def collect_signals(
       tool-turns-reprompt.env (F49)                     → tool_turns_reprompt (H15)
       soul-context.env (F46)                            → soul_blocked (H13)
       severity-calibration.env (F50)                    → severity_calibration (H20)
+      linked-issue-context.env (F53)                    → issue_context
     """
     signals: dict = {
         "timeout": False,
@@ -168,6 +169,9 @@ def collect_signals(
         "soul_blocked_reason": None,
         "severity_calibration": False,
         "severity_calibration_reason": None,
+        "issue_context": False,
+        "issue_context_count": None,
+        "issue_context_refs": None,
         "flags": [],  # short chip labels for UI
     }
     te = _parse_env_file(dir_path / "hermes-timeout.env")
@@ -438,6 +442,21 @@ def collect_signals(
         flags.append("soul-blocked")
     if signals.get("severity_calibration"):
         flags.append("sev-cal")
+
+    # F53 linked issue context (product: claim-to-fix from Fixes/#N)
+    lic = _parse_env_file(dir_path / "linked-issue-context.env")
+    try:
+        fetched_n = int(lic.get("fetched") or "0")
+    except ValueError:
+        fetched_n = 0
+    if lic.get("enabled") in ("1", "true", "yes") and fetched_n > 0:
+        signals["issue_context"] = True
+        signals["issue_context_count"] = fetched_n
+        if lic.get("refs"):
+            signals["issue_context_refs"] = lic["refs"]
+    if signals.get("issue_context"):
+        flags.append("issue-ctx")
+
     # Surface auto/cheap/full when tier mode is active (not plain off/default)
     mode = (signals.get("model_tier_mode") or "").lower()
     tier = (signals.get("model_tier") or "").lower()
