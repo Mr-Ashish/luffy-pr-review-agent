@@ -2,22 +2,56 @@
   "units": [
     {
       "kind": "dev",
+      "path": ".",
+      "action": "merge",
+      "section": "Design decisions",
+      "content": "- **F50/H20 severity calibration** (`scripts/severity_calibration.py`) is a post-review gate that corrects verdict/severity mismatch rather than editing the review prose: when the review self-reports test gaps (e.g. a `relevant-tests: false` / missing-test suggestion) it upgrades `APPROVE` → `REQUEST CHANGES` and caps the reported score at **69**, so a self-contradicting APPROVE cannot ship at a high score.\n- Motivating evidence is a real disagreement with human/GHA review on the odoo corpus: e2e PR #2 under F49 emitted `APPROVE 95` while carrying a missing-test suggestion, where the GHA-side review was `REQUEST CHANGES` — the gate exists to close that specific gap, not to lower scores generally.\n- The gate is **on by default** (`LUFFY_SEVERITY_CALIBRATION`) and is designed to be a no-op on clean reviews: re-scoring the corpus offline moved #2 36→42/50 and #5 37→40/50 while #4 (no self-reported gap) was unchanged.",
+      "evidence": [
+        "Gate: scripts/severity_calibration.py upgrades APPROVE→REQUEST CHANGES when review self-reports test gaps",
+        "Evidence: odoo e2e #2 F49 APPROVE 95 with format:false test suggestion vs GHA REQUEST CHANGES",
+        "Env LUFFY_SEVERITY_CALIBRATION default on; score cap 69; pack chip sev-cal"
+      ],
+      "confidence": "high"
+    },
+    {
+      "kind": "usage",
+      "path": ".",
+      "action": "merge",
+      "section": "Common commands",
+      "content": "- **F50 severity calibration:** enabled by default; disable per-run with `LUFFY_SEVERITY_CALIBRATION=0`. Regression coverage lives in `tests/test_severity_calibration.py`.\n- The gate can be re-run **offline against an existing run directory** to re-score a past review without new OpenRouter spend — this is how the odoo e2e corpus was re-scored (#2 36→42/50, #5 37→40/50, #4 no-op) after the gate landed.\n- Console/bundle side: a `sev-cal` chip appears in the run bundle `signals` when the gate fired, so an upgraded verdict is visible in the Run Console without reading the review body.",
+      "evidence": [
+        "Env LUFFY_SEVERITY_CALIBRATION default on; score cap 69; pack chip sev-cal",
+        "Offline re-score: #2 36→42/50, #5 37→40/50 (#4 clean no-op)"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "kind": "dev",
+      "path": "ui/review-console",
+      "action": "merge",
+      "section": "Design decisions",
+      "content": "- **F50 `sev-cal`** joins the pack-signal chip family (path-skip, timeout, over-budget, diff-truncated, max-turns, model-tier, preflight, tool-turns): it means the severity-calibration gate rewrote the verdict to `REQUEST CHANGES` and capped the score at 69, so the displayed verdict/score may differ from what the model emitted — read the chip before trusting the raw review score.",
+      "evidence": [
+        "Env LUFFY_SEVERITY_CALIBRATION default on; score cap 69; pack chip sev-cal"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "kind": "dev",
       "path": "agent",
       "action": "merge",
       "section": "Pitfalls",
-      "content": "- Zero tool turns on attempt 1 is the norm, not an anomaly, on live upstream-port PRs: repeated e2e runs (odoo#2, #4, #5) all recorded `tool_turns=0` before the F49 soft reprompt, which then recovered a real agentic loop (0→23, 0→9, 0→8). Treat a `tool_turns=0` first attempt as expected and check whether `LUFFY_TOOL_TURNS_REPROMPT=1` was set before suspecting a prompt/toolset regression.\n- Because the reprompt succeeds, the F45 tool-turns gate reports *skipped* rather than pass/fail on these runs — a skipped F45 plus `soul_blocked=0` is the healthy signature, so do not read \"gate skipped\" as \"gate not wired up\".",
+      "content": "- The reviewer contract's `relevant-tests` field is **load-bearing downstream**, not just reporting: F50 reads a self-reported test gap and overrides an `APPROVE` verdict. A prompt/SOUL edit that drops or renames that field silently disables the severity-calibration upgrade instead of failing loudly.",
       "evidence": [
-        "tool_turns recovered 0→8 via LUFFY_TOOL_TURNS_REPROMPT=1; F45 gate skipped; soul_blocked=0",
-        "docs(e2e): H19 F49 re-score odoo#4 — tools 0→9, 31→38/50",
-        "docs: F49 live #2 e2e — tool_turns 0→23, score 36/50"
+        "Gate: scripts/severity_calibration.py upgrades APPROVE→REQUEST CHANGES when review self-reports test gaps"
       ],
       "confidence": "medium"
     }
   ],
-  "summary": "The session is mostly benchmark bookkeeping (per-PR scores, run ids, cost) which is ephemeral, but it does confirm one durable empirical pattern: on live odoo PR reviews the first Hermes attempt lands with zero tool turns, and the F49 soft reprompt reliably recovers a real agentic loop so the F45 fail-closed gate ends up skipped.",
+  "summary": "The session shipped F50/H20 severity calibration: a post-review gate (scripts/severity_calibration.py) that upgrades APPROVE→REQUEST CHANGES when the review body self-reports missing/insufficient tests, gated by LUFFY_SEVERITY_CALIBRATION (default on) with a score cap of 69 and a sev-cal pack chip. Offline re-scores of the odoo e2e corpus quantify the effect (#2 36→42/50, #5 37→40/50, #4 clean no-op).",
   "session_ids": [
     "dogfood-luffy-session"
   ],
   "model": "anthropic/claude-opus-5",
-  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T223452-f797d2/extract.raw.md"
+  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T224118-f42fe6/extract.raw.md"
 }

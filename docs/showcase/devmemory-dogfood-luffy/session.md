@@ -16,3 +16,9 @@
 - Corpus fully scored: #1 35, #2 GHA 40 / F49 36, #3 39, #4 F49 38, #5 F49 37.
 - Next highest ROI: H20 severity calibration (missing tests blocking) or H23 sixth upstream PR.
 
+## Shipped F50 / H20 severity calibration
+- Gate: scripts/severity_calibration.py upgrades APPROVE→REQUEST CHANGES when review self-reports test gaps
+- Evidence: odoo e2e #2 F49 APPROVE 95 with format:false test suggestion vs GHA REQUEST CHANGES
+- Offline re-score: #2 36→42/50, #5 37→40/50 (#4 clean no-op)
+- Env LUFFY_SEVERITY_CALIBRATION default on; score cap 69; pack chip sev-cal
+

@@ -1,10 +1,38 @@
-diff --git a/agent/DEV.md b/agent/DEV.md
---- a/agent/DEV.md
-+++ b/agent/DEV.md
-@@ -40,3 +40,6 @@
+diff --git a/DEV.md b/DEV.md
+--- a/DEV.md
++++ b/DEV.md
+@@ -125,7 +125,6 @@
+ - `hermes -z` is not reliable: an observed `-z` rc=2 on odoo PR #2 forced the `hermes chat -q` path, which is exactly the polluted-output case F44 scrubs. Anything that assumes one-shot mode always wins will regress (tracked as H14).
+ - `tool_turns=0` on a multi-file PR is a quality smell for an *agentic* review product, not a cheap win: the no-tool mini run on PR #2 returned APPROVE while an earlier GHA tool-using review caught the real gap (missing `format:false` tests). **F45/H12** fail-closes: `scripts/tool_turns_gate.py` downgrades APPROVE→COMMENT, caps score at 55, injects an F45 banner, writes `tool-turns-gate.env` (chip `tool-turns-gate`). Docs-only / single-file exempt; `LUFFY_TOOL_TURNS_GATE=off` disables.
+ - **F49/H15 soft re-prompt:** same eligibility as F45, **once** before fail-closed — re-run `hermes -z` with a tool-nudge suffix (`reprompt-write`). Default on (`LUFFY_TOOL_TURNS_REPROMPT=1`). Evidence: `tool-turns-reprompt.env` + chips `tool-reprompt` / `tool-reprompt-ok`. If tools still 0, F45 still annotates. Doubles cheap-path spend when it fires — intentional recovery cost.
+-- **F50/H20 severity calibration:** when the review **self-reports** a test gap under **APPROVE**, `scripts/severity_calibration.py` upgrades to **REQUEST CHANGES**, caps score at 69 (override `LUFFY_SEVERITY_SCORE_CAP`), injects F50 banner, chip `sev-cal`. Default on (`LUFFY_SEVERITY_CALIBRATION=1`). Complements SOUL/prompt rules that missing tests for claimed production fixes are Blocking. Offline: odoo #2 F49 APPROVE 95→RC (GHA parity); #5 tests:no; #4 clean.
+ - **F46/H13 SOUL load:** Hermes blocks context files matching threat patterns. Never quote classic injection phrases in `agent/SOUL.md`. Preflight: `scripts/soul_context_scan.py check`; runtime: `soul-context.env` + chip `soul-blocked`.
  
- - Consequence: the **F45 tool-turns gate stays required** on multi-file code PRs whenever `tool_turns=0` (gate → `COMMENT` / confidence 55). Live re-score on `Mr-Ashish/odoo#2` with `openai/gpt-4.1-mini` held at 30/50 — the residual gap is tool use, not the CLI invocation.
- - Open follow-ups for the cheap multi-file path: a soft re-prompt (H15) or a hard tool nudge (H18); do not remove the F45 gate before one of those lands.
+ - The normalizer is a **trust boundary**, not a formatter: never accept a body as a valid review contract just because expected snippets/headings appear in it — prompt echo contains all of them. Contract checks must assert the placeholder-free form.
+
+diff --git a/USAGE.md b/USAGE.md
+--- a/USAGE.md
++++ b/USAGE.md
+@@ -270,6 +270,10 @@
+ - Self-check the gate before wiring it up (exit code is the answer): `python3 scripts/path-skip-check.py --path README.md --path docs/a.md --globs docs` → exit 2 (skip); `python3 scripts/path-skip-check.py --path src/x.py --path README.md --globs docs` → exit 0 (allow).
+ - Batch form for a real PR path list: `python3 scripts/path-skip-check.py --paths-file pr-paths.txt` (paths come from `scripts/sparse-pr-paths.sh`).
+ 
++- **F50 severity calibration:** enabled by default; disable per-run with `LUFFY_SEVERITY_CALIBRATION=0`. Regression coverage lives in `tests/test_severity_calibration.py`.
++- The gate can be re-run **offline against an existing run directory** to re-score a past review without new OpenRouter spend — this is how the odoo e2e corpus was re-scored (#2 36→42/50, #5 37→40/50, #4 no-op) after the gate landed.
++- Console/bundle side: a `sev-cal` chip appears in the run bundle `signals` when the gate fired, so an upgraded verdict is visible in the Run Console without reading the review body.
 +
-+- Zero tool turns on attempt 1 is the norm, not an anomaly, on live upstream-port PRs: repeated e2e runs (odoo#2, #4, #5) all recorded `tool_turns=0` before the F49 soft reprompt, which then recovered a real agentic loop (0→23, 0→9, 0→8). Treat a `tool_turns=0` first attempt as expected and check whether `LUFFY_TOOL_TURNS_REPROMPT=1` was set before suspecting a prompt/toolset regression.
-+- Because the reprompt succeeds, the F45 tool-turns gate reports *skipped* rather than pass/fail on these runs — a skipped F45 plus `soul_blocked=0` is the healthy signature, so do not read "gate skipped" as "gate not wired up".
+ ## Setup
+ 
+ - Install on each target repo's **default branch** (workflow only runs from default branch):
+
+diff --git a/ui/review-console/DEV.md b/ui/review-console/DEV.md
+--- a/ui/review-console/DEV.md
++++ b/ui/review-console/DEV.md
+@@ -8,3 +8,7 @@
+ - Phase tracker state: Phase 2 (standalone review console shell) is **superseded** by the full Run Console; F40 ("ops signals in console", phase 4d) is done, while **4c live progress streaming remains pending** — treat streaming as the next console workstream, not signals.
+ 
+ - Those metrics render in two places: an **Agent loop (F41)** panel in the Overview tab, and measures on the **Loop** tab — i.e. `loop` is a first-class bundle section alongside `signals`, not a sub-field of it.
++
++## Design decisions
++
++- **F50 `sev-cal`** joins the pack-signal chip family (path-skip, timeout, over-budget, diff-truncated, max-turns, model-tier, preflight, tool-turns): it means the severity-calibration gate rewrote the verdict to `REQUEST CHANGES` and capped the score at 69, so the displayed verdict/score may differ from what the model emitted — read the chip before trusting the raw review score.

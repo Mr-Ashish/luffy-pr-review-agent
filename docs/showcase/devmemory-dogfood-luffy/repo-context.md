@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T17:04:54Z
+- **assembled_at:** 2026-07-31T17:11:19Z
 
 ## git status
 
@@ -17,11 +17,11 @@
 ## recent log
 
 ```
+b075a74 F50/H20: severity calibration for missing-test self-reports
+7384ce5 docs(dogfood): H22 pitfalls — F49 0→N tools is healthy signature
 85916aa docs(e2e): H22 score odoo#5 F49 mini — tools 0→8, 37/50
 db992e0 docs(e2e): H21 corpus #5 — port odoo#279360 POS ticket screen
 e666fe0 docs(e2e): H19 F49 re-score odoo#4 — tools 0→9, 31→38/50
-f433584 docs: F49 live #2 e2e — tool_turns 0→23, score 36/50
-bc45eac docs: apply F49 dogfood knowledge into DEV.md
 ```
 
 ## tree (sample)
@@ -106,6 +106,7 @@ tests/test_post_inline_comments.py
 tests/test_preflight_cost.py
 tests/test_review_to_openui.py
 tests/test_run_with_timeout.py
+tests/test_severity_calibration.py
 tests/test_soul_context_scan.py
 tests/test_tool_turns_gate.py
 tests/test_trigger_review.py
@@ -144,6 +145,7 @@ docs/experiments/2026-07-31-f45-tool-turns-gate.md
 docs/experiments/2026-07-31-f46-soul-context-scan.md
 docs/experiments/2026-07-31-f48-soul-detect-scope.md
 docs/experiments/2026-07-31-f49-soft-reprompt.md
+docs/experiments/2026-07-31-f50-severity-calibration.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-f9c-suggestions.md
@@ -225,8 +227,6 @@ scripts/review-to-openui.py
 scripts/run-hermes-review.sh
 scripts/run-luffy-review.sh
 scripts/run-with-timeout.py
-scripts/save-trace.sh
-scripts/soul_context_scan.py
 ```
 
 ## git diff

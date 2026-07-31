@@ -1,9 +1,9 @@
-# Run run-20260731T223452-f797d2
+# Run run-20260731T224118-f42fe6
 
 - session: `dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
-- units: 1
-- summary: The session is mostly benchmark bookkeeping (per-PR scores, run ids, cost) which is ephemeral, but it does confirm one durable empirical pattern: on live odoo PR reviews the first Hermes attempt lands with zero tool turns, and the F49 soft reprompt reliably recovers a real agentic loop so the F45 fail-closed gate ends up skipped.
-- at: 2026-07-31T17:05:13Z
-- timings: {"assemble_s": 1.256, "extract_s": 19.538, "normalize_s": 0.001}
+- units: 4
+- summary: The session shipped F50/H20 severity calibration: a post-review gate (scripts/severity_calibration.py) that upgrades APPROVE→REQUEST CHANGES when the review body self-reports missing/insufficient tests, gated by LUFFY_SEVERITY_CALIBRATION (default on) with a score cap of 69 and a sev-cal pack chip. Offline re-scores of the odoo e2e corpus quantify the effect (#2 36→42/50, #5 37→40/50, #4 clean no-op).
+- at: 2026-07-31T17:11:50Z
+- timings: {"assemble_s": 0.666, "extract_s": 30.615, "normalize_s": 0.001}

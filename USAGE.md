@@ -270,6 +270,10 @@ devmemory extract --fixture sample-auth-module --apply
 - Self-check the gate before wiring it up (exit code is the answer): `python3 scripts/path-skip-check.py --path README.md --path docs/a.md --globs docs` → exit 2 (skip); `python3 scripts/path-skip-check.py --path src/x.py --path README.md --globs docs` → exit 0 (allow).
 - Batch form for a real PR path list: `python3 scripts/path-skip-check.py --paths-file pr-paths.txt` (paths come from `scripts/sparse-pr-paths.sh`).
 
+- **F50 severity calibration:** enabled by default; disable per-run with `LUFFY_SEVERITY_CALIBRATION=0`. Regression coverage lives in `tests/test_severity_calibration.py`.
+- The gate can be re-run **offline against an existing run directory** to re-score a past review without new OpenRouter spend — this is how the odoo e2e corpus was re-scored (#2 36→42/50, #5 37→40/50, #4 no-op) after the gate landed.
+- Console/bundle side: a `sev-cal` chip appears in the run bundle `signals` when the gate fired, so an upgraded verdict is visible in the Run Console without reading the review body.
+
 ## Setup
 
 - Install on each target repo's **default branch** (workflow only runs from default branch):
