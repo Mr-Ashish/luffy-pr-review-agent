@@ -1,7 +1,7 @@
 # F57 — Mermaid architecture diagram in PR review
 
 **Date:** 2026-07-31  
-**Status:** shipped (control-plane)  
+**Status:** shipped (MERGED PR #7)  
 **Tag:** PRODUCT_FEATURE | DETERMINISTIC
 
 ## Problem
