@@ -110,6 +110,7 @@ RUNTIME_SCRIPTS=(
   normalize-review.py
   pack-run-for-ui.py
   parse-verdict.py
+  post-inline-comments.py
   post-review-comment.sh
   preload-hub-memory.sh
   publish-run-local.sh

@@ -8,6 +8,7 @@
 # - Optionally posts a commit status on the PR head SHA (LUFFY_COMMIT_STATUS)
 # - F23: Optionally submits a formal PR Review event (LUFFY_PR_REVIEW)
 # - F24: Dismisses prior Luffy PR reviews (same marker) before posting a new one
+# - F9:  Path-anchored inline comments on first changed lines (LUFFY_INLINE_COMMENTS)
 #
 # Usage:
 #   ./scripts/report-verdict.sh [review.md] [pipeline_rc]
@@ -22,6 +23,7 @@
 #   LUFFY_STATUS_CONTEXT — default "luffy/review"
 #   LUFFY_PR_REVIEW — 1 (default) to submit formal PR review; 0/off to skip
 #   LUFFY_REPLACE_PREVIOUS — 1 (default) also dismisses prior F23 PR reviews
+#   LUFFY_INLINE_COMMENTS — 1 (default) post F9 inline notes; 0/off to skip
 #   HEAD_SHA — optional; resolved via gh pr view when empty
 #   OUT_DIR — fallback locate review-*.md
 set -euo pipefail
@@ -30,6 +32,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT/.luffy-out}"
 PARSE="$ROOT/scripts/parse-verdict.py"
 DISMISS="$ROOT/scripts/dismiss-prior-pr-reviews.sh"
+INLINE="$ROOT/scripts/post-inline-comments.py"
 
 log() { echo "$*" >&2; }
 notice() { echo "::notice::$*" >&2; log "$*"; }
@@ -242,6 +245,72 @@ else
   log "Skip F23 PR review (disabled or missing REPO/PR_NUMBER/gh)"
 fi
 
+# ---------------------------------------------------------------------------
+# F9: path-anchored inline comments (soft; default on for critical/high)
+# ---------------------------------------------------------------------------
+INLINE_POSTED=0
+INLINE_ON="${LUFFY_INLINE_COMMENTS:-1}"
+if [[ "$INLINE_ON" != "0" && "$INLINE_ON" != "off" && "$INLINE_ON" != "false" ]] \
+  && [[ -f "$INLINE" ]] \
+  && [[ -n "${REVIEW_FILE:-}" && -f "${REVIEW_FILE:-}" ]] \
+  && [[ -n "$REPO" && -n "${PR_NUMBER:-}" ]]; then
+  DIFF_FILE="${LUFFY_INLINE_DIFF:-}"
+  if [[ -z "$DIFF_FILE" || ! -f "$DIFF_FILE" ]]; then
+    for cand in \
+      "$OUT_DIR/pr.diff" \
+      "${TRACE_DIR:-}/pr.diff" \
+      "$OUT_DIR/../pr.diff"; do
+      if [[ -n "$cand" && -f "$cand" ]]; then
+        DIFF_FILE="$cand"
+        break
+      fi
+    done
+  fi
+  if [[ -n "${DIFF_FILE:-}" && -f "$DIFF_FILE" ]]; then
+    HEAD_SHA="${HEAD_SHA:-}"
+    if [[ -z "$HEAD_SHA" && -n "${TOKEN:-}" ]] && command -v gh >/dev/null 2>&1; then
+      export GH_TOKEN="$TOKEN"
+      HEAD_SHA="$(
+        gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid' 2>/dev/null || true
+      )"
+    fi
+    set +e
+    INLINE_JSON="$(
+      python3 "$INLINE" post \
+        --review "$REVIEW_FILE" \
+        --diff "$DIFF_FILE" \
+        --repo "$REPO" \
+        --pr "$PR_NUMBER" \
+        --commit "${HEAD_SHA:-}" \
+        2>/dev/null
+    )"
+    INLINE_RC=$?
+    set -e
+    if [[ $INLINE_RC -eq 0 && -n "$INLINE_JSON" ]]; then
+      INLINE_POSTED="$(
+        python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(int(d.get("posted") or 0))' \
+          "$INLINE_JSON" 2>/dev/null || echo 0
+      )"
+      log "F9 inline comments posted=$INLINE_POSTED"
+      if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        {
+          echo "### Luffy inline comments (F9)"
+          echo ""
+          echo "- **posted:** $INLINE_POSTED"
+          echo "- **diff:** \`$DIFF_FILE\`"
+          echo ""
+        } >>"$GITHUB_STEP_SUMMARY"
+      fi
+    else
+      log "warn: F9 inline comments soft-failed"
+    fi
+  else
+    log "Skip F9 inline (no pr.diff found under OUT_DIR)"
+  fi
+else
+  log "Skip F9 inline comments (disabled or missing inputs)"
+fi
+
 # Always print kv on stdout for local/debug consumers
 cat <<EOF
 verdict=$VERDICT
@@ -252,4 +321,5 @@ status_state=$STATUS_STATE
 status_desc=$STATUS_DESC
 review_event=$REVIEW_EVENT
 pipeline_ok=$PIPELINE_OK
+inline_posted=$INLINE_POSTED
 EOF

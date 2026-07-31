@@ -46,7 +46,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 30 | **F31** | Auto-emit `run-bundle.json` every review for Run Console | XS | 🔥 UI ops — real GHA/Modal runs openable without manual pack | **Shipped** (`pack-run-for-ui.py` in orchestrator) |
 | 31 | **F32** | Unified trigger (CLI + Modal bit4 webhook + Run Console Run tab) | S | 🔥 Ops — start reviews without hunting docs; webhook spawns only | **Shipped** (`trigger-review.sh`, `enqueue_review`) |
 | 32 | **F33** | Webhook auth (GitHub HMAC + bearer token) on Modal doorbell | XS | 🔥 Trust — stop open spend URL | **Shipped** (`webhook_auth.py`, `review_webhook`) |
-| 33 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 33 | **F9** | Inline GitHub review comments (path-anchored, first changed line) | S | 🔥 Product — findings in Files changed | **Shipped** (`post-inline-comments.py`, report-verdict) |
+| 34 | F9b | Precise line anchors from model / multi-line threads | M | Product polish | Later |
 
 ### Sprint 1 (shipped)
 
@@ -135,6 +136,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 22 (shipped)
 
 **F33** webhook auth: pure `scripts/webhook_auth.py` (GitHub `X-Hub-Signature-256` HMAC-SHA256 + `Authorization: Bearer` / `X-Luffy-Token`). `review_webhook` reads raw body + headers, authorizes before parse/spawn. Env: `LUFFY_WEBHOOK_SECRET`, `LUFFY_WEBHOOK_TOKEN` (fold into Modal `luffy-github` secret or app env). Neither set → `auth=open` + warning (dev only). CLI: `webhook_auth.py sign|authorize`. Bit 4 dry plan self-checks auth. Tests: `tests/test_webhook_auth.py`.
+
+### Sprint 23 (shipped)
+
+**F9** path-anchored inline comments: `scripts/post-inline-comments.py` maps Key findings + Blocking bullets onto the **first added line** per file in `pr.diff`, submits a COMMENT PR review with inline notes (`<!-- luffy-inline -->`). Default severities `critical,high,blocking`, max 6; opt-out `vars.LUFFY_INLINE_COMMENTS=0`. Soft-fail; `report-verdict.sh` runs after F23; job summary **Luffy inline comments (F9)**. Fixture tests via `LUFFY_INLINE_FIXTURE`. Precise line numbers / multi-line threads = F9b later.
 
 ### readme-kit (shipped)
 

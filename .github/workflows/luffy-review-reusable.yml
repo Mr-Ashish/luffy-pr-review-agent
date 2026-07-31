@@ -486,6 +486,11 @@ jobs:
           LUFFY_STATUS_CONTEXT: ${{ vars.LUFFY_STATUS_CONTEXT || 'luffy/review' }}
           # F23: formal PR Review event (APPROVE/REQUEST_CHANGES/COMMENT); 0 disables
           LUFFY_PR_REVIEW: ${{ vars.LUFFY_PR_REVIEW || '1' }}
+          # F9: path-anchored inline comments on first changed line (critical/high default)
+          LUFFY_INLINE_COMMENTS: ${{ vars.LUFFY_INLINE_COMMENTS || '1' }}
+          LUFFY_INLINE_SEVERITY: ${{ vars.LUFFY_INLINE_SEVERITY || 'critical,high,blocking' }}
+          LUFFY_INLINE_MAX: ${{ vars.LUFFY_INLINE_MAX || '6' }}
+          LUFFY_INLINE_DIFF: ${{ github.workspace }}/luffy/.luffy-out/pr.diff
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
         run: |

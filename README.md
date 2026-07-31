@@ -371,7 +371,7 @@ Optional OpenUI Lang export: `scripts/review-to-openui.py`. Plan: [docs/OPENUI-I
 
 ## Limits (v1)
 
-- PR comment reviews only (not inline threads yet)
+- Path-anchored inline notes on first changed lines (F9; opt-out `LUFFY_INLINE_COMMENTS=0`)
 - Diffs truncated at MAX_DIFF_BYTES
 - Default OpenRouter model is paid (anthropic/claude-opus-5; override with LUFFY_MODEL)
 - Install on each target repo — not a global bot for arbitrary public repos

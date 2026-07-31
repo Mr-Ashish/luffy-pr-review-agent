@@ -22,6 +22,21 @@ modal run modal_app/app.py --bit 4 --repo owner/repo --pr 123   # dry enqueue pl
 
 Run Console **Run** tab copies the same commands + sample webhook JSON. Modal webhook (after `modal deploy`) accepts `{repo,pr,model,post_comment}` or GitHub `@luffy review` issue_comment on a PR — spawns only.
 
+### Inline comments (F9)
+
+```bash
+# Plan only (no API)
+python3 scripts/post-inline-comments.py plan \
+  --review docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/review.md \
+  --diff docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/pr.diff
+
+# Post (needs gh auth + head SHA)
+python3 scripts/post-inline-comments.py post \
+  --review review.md --diff pr.diff --repo owner/name --pr 3 --commit "$HEAD_SHA"
+```
+
+Opt-out: `vars.LUFFY_INLINE_COMMENTS=0`. Severity/max: `LUFFY_INLINE_SEVERITY`, `LUFFY_INLINE_MAX`.
+
 ### Webhook auth (F33)
 
 ```bash

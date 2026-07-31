@@ -42,6 +42,19 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 20 (F31):** every run auto-writes `run-bundle.json` for the Run Console (artifact + job summary); soft-fail
 - **Sprint 21 (F32):** `trigger-review.sh` + Modal bit4 enqueue/webhook + Run Console Run tab (spawn-only doorbell)
 - **Sprint 22 (F33):** webhook HMAC + bearer auth on Modal doorbell (`webhook_auth.py`)
+- **Sprint 23 (F9):** path-anchored inline PR comments on first changed line (`post-inline-comments.py`)
+
+## Inline comments (F9)
+
+After the formal F23 review, Luffy may post a second COMMENT review with **inline** notes on the first *added* line of each finding’s file (from `pr.diff`).
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_INLINE_COMMENTS` | `1` | `0`/`off` disables |
+| `LUFFY_INLINE_SEVERITY` | `critical,high,blocking` | Comma list; `all` = no filter |
+| `LUFFY_INLINE_MAX` | `6` | Cap per run |
+
+Offline plan: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff`.
 
 ## Repo-local memory (F28 default)
 
