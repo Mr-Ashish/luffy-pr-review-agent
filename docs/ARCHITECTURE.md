@@ -64,6 +64,8 @@ Layout under the target repo:
 
 Vars: `LUFFY_MEMORY_MODE` (`local` default | `hub` | `both`), `LUFFY_MEMORY_PATH` (default `.luffy`), `LUFFY_HUB_PUBLISH` (force hub on/off).
 
+**F30 health:** each run writes `.luffy-out/memory-health.env` (`MEMORY_SOURCE`, `LOCAL_PUBLISH`, `HUB_PUBLISH`). Job summary **Memory health** + `::warning::` when local publish fails (branch protection / token). Review still succeeds — learning loss is no longer silent.
+
 ## Security
 
 - PR body/diff treated as untrusted data  

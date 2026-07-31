@@ -524,6 +524,13 @@ jobs:
               --usage "$OUT_DIR/hermes-usage.json" \
               --max-usd "${LUFFY_MAX_COST_USD:-}" || true
           fi
+          # F30: memory health (preload source + local/hub publish) — not silent on failure
+          if [[ -f "$OUT_DIR/memory-health.md" ]]; then
+            cat "$OUT_DIR/memory-health.md" >> "$GITHUB_STEP_SUMMARY" || true
+          elif [[ -f "$LUFFY_ROOT/scripts/memory-health.sh" ]]; then
+            OUT_DIR="$OUT_DIR" bash "$LUFFY_ROOT/scripts/memory-health.sh" summary >> "$GITHUB_STEP_SUMMARY" || true
+            OUT_DIR="$OUT_DIR" bash "$LUFFY_ROOT/scripts/memory-health.sh" warn-if-bad || true
+          fi
           echo "### Luffy trace" >> "$GITHUB_STEP_SUMMARY"
           if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
             TRACE_DIR="$(cat "$OUT_DIR/latest-trace-dir.txt")"

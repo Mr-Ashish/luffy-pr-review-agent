@@ -127,8 +127,15 @@ if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
 fi
 
 # F28: always (default) publish slim pack → target .luffy/; hub only when opted in
+# F30: soft-fail still records status + ::warning:: (does not flip LUFFY_STATUS)
 stage publish_local "$SCRIPTS/publish-run-local.sh" || true
 stage publish_hub "$SCRIPTS/publish-run-to-hub.sh" || true
+
+# F30: emit memory health into logs / Actions annotations
+if [[ -f "$SCRIPTS/memory-health.sh" ]]; then
+  bash "$SCRIPTS/memory-health.sh" warn-if-bad || true
+  bash "$SCRIPTS/memory-health.sh" summary >"$OUT_DIR/memory-health.md" 2>/dev/null || true
+fi
 
 if [[ "${POST_COMMENT:-0}" == "1" && -f "${REVIEW_FILE:-}" ]]; then
   stage post_comment "$SCRIPTS/post-review-comment.sh" "$REVIEW_FILE" "${PR_NUMBER:-}" || ORCH_RC=$?
@@ -142,6 +149,10 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
       echo "trace_dir=$(cat "$OUT_DIR/latest-trace-dir.txt")"
     fi
+    if [[ -f "$OUT_DIR/memory-health.env" ]]; then
+      # surface key lines for workflow consumers
+      grep -E '^(MEMORY_SOURCE|LOCAL_PUBLISH|HUB_PUBLISH)=' "$OUT_DIR/memory-health.env" || true
+    fi
   } >>"$GITHUB_OUTPUT"
 fi
 
@@ -149,6 +160,10 @@ echo "REVIEW_FILE=${REVIEW_FILE:-}"
 echo "LUFFY_STATUS=$LUFFY_STATUS"
 if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
   echo "TRACE_DIR=$(cat "$OUT_DIR/latest-trace-dir.txt")"
+fi
+if [[ -f "$OUT_DIR/memory-health.env" ]]; then
+  echo "--- memory-health ---"
+  cat "$OUT_DIR/memory-health.env"
 fi
 
 exit "$ORCH_RC"

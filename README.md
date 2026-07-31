@@ -6,10 +6,10 @@
 
 <p align="center"><strong>Comment-triggered PR review agent</strong></p>
 
-<p align="center">Hermes Agent + OpenRouter + growing hub memory + redacted run traces.</p>
+<p align="center">Hermes Agent + OpenRouter + repo-local <code>.luffy/</code> memory + redacted run traces.</p>
 
 [![PR Review](https://img.shields.io/static/v1?label=PR+Review&message=comment+%C2%B7+Actions&color=2ea44f&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/luffy-pr-review.yml)
-[![Hub memory](https://img.shields.io/static/v1?label=Hub+memory&message=central+ingest&color=C41E3A&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/Mr-Ashish/luffy-pr-review-agent/actions/workflows/ingest-luffy-run.yml)
+[![Memory](https://img.shields.io/static/v1?label=memory&message=.luffy+%28local+default%29&color=C41E3A&style=for-the-badge&logo=github&logoColor=white)](docs/ARCHITECTURE.md)
 ![trigger](https://img.shields.io/static/v1?label=trigger&message=%40luffy+review+this+pr&color=FF6B2C&style=for-the-badge&logo=github&logoColor=white)
 ![model](https://img.shields.io/static/v1?label=model&message=anthropic%2Fclaude-opus-5&color=0B0F19&style=for-the-badge)
 ![provider](https://img.shields.io/static/v1?label=provider&message=OpenRouter&color=C41E3A&style=for-the-badge)
@@ -18,7 +18,7 @@
 
 ## Why it exists
 
-Most AI PR bots are stateless chat on a diff. Luffy is a review control plane: explicit trigger, bounded context (sparse checkout + capped diff), Hermes via OpenRouter, durable hub memory so the next review on the same repo is smarter, and redacted traces as Actions artifacts for audit.
+Most AI PR bots are stateless chat on a diff. Luffy is a review control plane: explicit trigger, bounded context (sparse checkout + capped diff), Hermes via OpenRouter, **durable memory in the target repo under `.luffy/`** (hub is optional), and redacted fat traces as Actions artifacts for audit.
 
 ## Trigger
 
@@ -42,6 +42,7 @@ flowchart TB
     Comment["@luffy review this pr"]
     GHA["GitHub Actions"]
     Scripts["Luffy scripts"]
+    LocalMem[".luffy/ MEMORY + slim runs"]
   end
 
   subgraph LLM["Inference"]
@@ -49,18 +50,19 @@ flowchart TB
     OR["OpenRouter"]
   end
 
-  subgraph Hub["Hub repo"]
-    Memory["memory/repos/..."]
+  subgraph OptionalHub["Hub optional"]
+    HubMem["memory/repos/…"]
   end
 
   Dev --> Comment --> PR --> GHA
   GHA --> Scripts
   Scripts --> Hermes --> OR
-  Scripts --> Memory
+  Scripts --> LocalMem
+  Scripts -.->|opt-in| HubMem
   Scripts --> PR
 ```
 
-Install Luffy on each **target** repo; this hub stores memory under `memory/repos/`.
+Install Luffy on each **target** repo. **Default memory is repo-local** (`.luffy/` on the target default branch). Central hub ingest is **opt-in** (`LUFFY_MEMORY_MODE=hub|both` or `LUFFY_HUB_PUBLISH=1`).
 
 ## E2E flow
 
@@ -70,34 +72,36 @@ sequenceDiagram
   actor Dev as Developer
   participant PR as Target PR
   participant GHA as GitHub Actions
-  participant Hub as Luffy hub
+  participant Local as Target .luffy/
   participant Hermes as Hermes Agent
   participant OR as OpenRouter
 
   Dev->>PR: @luffy review this pr
   PR->>GHA: issue_comment
-  GHA->>Hub: preload MEMORY.md
-  Hub-->>GHA: prior notes
+  GHA->>Local: preload MEMORY.md default branch
+  Local-->>GHA: prior notes or seed
   GHA->>GHA: assemble prompt + diff
   GHA->>Hermes: hermes -z
   Hermes->>OR: completions
   OR-->>Hermes: review markdown
   Hermes-->>GHA: final text
-  GHA->>Hub: publish memory + run
-  GHA->>PR: review comment + artifacts
+  GHA->>PR: review comment + signals
+  GHA->>Local: publish slim memory pack
+  Note over GHA: fat traces → Actions artifacts only
 ```
 
 **Pipeline stages**
 
 ```mermaid
 flowchart LR
-  A[preload_hub_memory] --> B[assemble]
+  A[preload_memory] --> B[assemble]
   B --> C[hermes -z]
   C --> D[normalize]
   D --> E[distill]
   E --> F[save_trace]
-  F --> G[publish_hub]
-  G --> H[PR comment + artifacts]
+  F --> G[publish_local]
+  G --> H[publish_hub opt-in]
+  H --> I[PR comment + artifacts]
 ```
 
 ## Agentic loop (example)
@@ -119,7 +123,7 @@ End-to-end control plane for one review: comment trigger → Actions gate → or
 ┌───────────────────────────────────────────────────────────────┐
 │  Orchestrator · scripts/run-luffy-review.sh                   │
 │                                                               │
-│   1 preload_hub_memory ──► Hub MEMORY.md → HERMES_HOME        │
+│   1 preload_memory     ──► .luffy/MEMORY.md → HERMES_HOME     │
 │   2 assemble-context   ──► PR meta + diff + prompt + SOUL     │
 │   3 hermes -z  ───────────────────────────────────────────┐   │
 │        │                                                  │   │
@@ -134,9 +138,10 @@ End-to-end control plane for one review: comment trigger → Actions gate → or
 │        │    └───────────────────────────────────────────┘ │   │
 │        ▼                                                  │   │
 │   4 normalize-review   ──► contract · marker · cap        │   │
-│   5 distill-memory     ──► append notes to MEMORY.md      │   │
-│   6 save-trace         ──► redacted .luffy-out/traces/    │   │
-│   7 publish-run-to-hub ──► memory/repos/{owner}--{repo}/  │   │
+│   5 distill-memory     ──► append notes (job-local)       │   │
+│   6 save-trace         ──► fat artifact (not git)         │   │
+│   7 publish-run-local  ──► target .luffy/ slim pack       │   │
+│   8 publish-run-to-hub ──► opt-in hub memory/repos/…      │   │
 └────────────────────────────┬──────────────────────────────────┘
                              │
                              ▼
@@ -162,13 +167,14 @@ flowchart TB
   end
 
   subgraph Orchestrator["3 · Orchestrator · run-luffy-review.sh"]
-    Preload["preload_hub_memory\nHub MEMORY.md → HERMES_HOME"]
+    Preload["preload_memory\n.target .luffy/ first"]
     Assemble["assemble-context\nPR meta · diff · prompt · SOUL"]
     Hermes["Hermes Agent · hermes -z"]
     Normalize["normalize-review\ncontract · marker · size cap"]
     Distill["distill-memory\nappend structured notes"]
-    Trace["save-trace\nredacted package"]
-    HubPub["publish-run-to-hub\nmemory/repos/…"]
+    Trace["save-trace\nfat artifact"]
+    LocalPub["publish-run-local\n.luffy/ slim pack"]
+    HubPub["publish-run-to-hub\nopt-in only"]
   end
 
   subgraph InnerLoop["4 · Agentic loop · Hermes + OpenRouter"]
@@ -196,11 +202,11 @@ flowchart TB
   Hermes --> Prompt
   Think --> OR
   OR --> Think
-  Draft --> Normalize --> Distill --> Trace --> HubPub
+  Draft --> Normalize --> Distill --> Trace --> LocalPub --> HubPub
   HubPub --> Post --> React --> Arts --> CacheW
 ```
 
-Inner loop: Hermes may call tools (read workspace files) before emitting the final Markdown review. Outer loop is deterministic shell orchestration so every run leaves a redacted trace under `.luffy-out/traces/` and hub memory under `memory/repos/`.
+Inner loop: Hermes may call tools (read workspace files) before emitting the final Markdown review. Outer loop is deterministic shell orchestration so every run leaves a redacted fat trace under `.luffy-out/traces/` (artifact) and a **slim** durable pack under the target’s **`.luffy/`** (git). Hub `memory/repos/…` is opt-in.
 
 ## E2E showcase (live · Opus 5 agentic loop)
 
@@ -308,23 +314,28 @@ Each run packages a redacted trace and uploads Actions artifacts.
 gh run download <run-id> -R owner/repo -n luffy-trace-pr1-run<run-id>
 ```
 
-## Central hub memory
+## Memory (F28 default = repo-local)
 
-After each run, the target publishes into **this** hub repo so memory grows across reviews.
+Each target owns durable review memory under **`.luffy/`** on its default branch:
 
 ```text
-memory/repos/{owner}--{repo}/
+.luffy/
   MEMORY.md
-  latest.json
   runs/{trace_id}/meta.json|review.md|summary.md
 ```
+
+- Preload reads default-branch `.luffy/MEMORY.md` via API (not sparse PR workspace).
+- Fat debug packs stay **Actions artifacts** only.
+- **Hub** (`memory/repos/{owner}--{repo}/`) is optional: `LUFFY_MEMORY_MODE=hub|both` or `LUFFY_HUB_PUBLISH=1`.
+- Job summary **Memory health (F30)** shows preload source + local/hub publish status (warnings if local push fails, e.g. branch protection).
 
 ## Layout
 
 ```text
 agent/          SOUL, prompts, Hermes config
-scripts/        assemble → hermes → normalize → hub
-memory/         central per-repo MEMORY (hub)
+scripts/        assemble → hermes → normalize → local memory → hub opt-in
+.luffy/         repo-local MEMORY (target SoT)
+memory/         optional hub layout (this product repo)
 readme-kit/     compile README from theme + pack + config
 assets/         brand mark + favicon
 .github/workflows/

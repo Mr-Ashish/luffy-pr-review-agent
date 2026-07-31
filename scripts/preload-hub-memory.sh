@@ -28,11 +28,24 @@ MODE="$(printf '%s' "$MODE" | tr '[:upper:]' '[:lower:]')"
 
 if [[ -z "$REPO" || -z "$HERMES_HOME" ]]; then
   log "REPO/HERMES_HOME missing; skip memory preload"
+  if [[ -n "${OUT_DIR:-}" && -f "$(dirname "${BASH_SOURCE[0]}")/memory-health.sh" ]]; then
+    OUT_DIR="${OUT_DIR}" bash "$(dirname "${BASH_SOURCE[0]}")/memory-health.sh" record "MEMORY_SOURCE=skipped_no_repo" || true
+  fi
   exit 0
 fi
 
+_MH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/memory-health.sh"
+record_mh() {
+  if [[ -n "${OUT_DIR:-}" && -f "$_MH" ]]; then
+    OUT_DIR="$OUT_DIR" bash "$_MH" record "$1" >/dev/null || true
+  fi
+  echo "$1"
+}
+
 mkdir -p "$HERMES_HOME/memories"
 LOCAL_DEST="$HERMES_HOME/memories/MEMORY.md"
+record_mh "MEMORY_MODE=${MODE}"
+record_mh "MEMORY_PATH=${MEM_PATH}"
 
 # Hub fallback allowed?
 HUB_OK=0
@@ -87,7 +100,7 @@ fetch_raw "$REPO" "$LOCAL_MEM"
 if [[ "$HTTP" == "200" && -s "$TMP" ]]; then
   merge_into_hermes
   notice "Preloaded local memory: ${REPO}/${LOCAL_MEM} ($(wc -c <"$LOCAL_DEST" | tr -d ' ') bytes)"
-  echo "MEMORY_SOURCE=local"
+  record_mh "MEMORY_SOURCE=local"
   echo "HUB_MEMORY=local"
   rm -f "$TMP"
   exit 0
@@ -102,17 +115,17 @@ if [[ "$HUB_OK" == "1" ]]; then
   if [[ "$HTTP" == "200" && -s "$TMP" ]]; then
     merge_into_hermes
     notice "Preloaded hub memory: ${HUB_REPO}/${HUB_MEM} ($(wc -c <"$LOCAL_DEST" | tr -d ' ') bytes)"
-    echo "MEMORY_SOURCE=hub"
+    record_mh "MEMORY_SOURCE=hub"
     echo "HUB_MEMORY=preloaded"
     rm -f "$TMP"
     exit 0
   fi
   log "No hub memory for ${SLUG} (HTTP ${HTTP:-?}); using seed/local only"
-  echo "MEMORY_SOURCE=missing"
+  record_mh "MEMORY_SOURCE=missing"
   echo "HUB_MEMORY=missing"
 else
   log "Hub preload skipped (mode=${MODE}, LUFFY_HUB_PUBLISH=${LUFFY_HUB_PUBLISH:-unset})"
-  echo "MEMORY_SOURCE=seed"
+  record_mh "MEMORY_SOURCE=seed"
   echo "HUB_MEMORY=skipped"
 fi
 rm -f "$TMP"

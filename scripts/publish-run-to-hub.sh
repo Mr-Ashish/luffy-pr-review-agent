@@ -28,13 +28,22 @@ if [[ -z "${LUFFY_HUB_PUBLISH:-}" ]]; then
   esac
 fi
 
+LUFFY_ROOT="${LUFFY_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+OUT_DIR="${OUT_DIR:-$LUFFY_ROOT/.luffy-out}"
+_MH="$LUFFY_ROOT/scripts/memory-health.sh"
+record_mh() {
+  if [[ -f "$_MH" ]]; then
+    OUT_DIR="$OUT_DIR" bash "$_MH" record "$1" >/dev/null || true
+  fi
+  echo "$1"
+}
+
 if [[ "${LUFFY_HUB_PUBLISH}" == "0" ]]; then
   log "LUFFY_HUB_PUBLISH=0 (mode=${MODE_MEM}); skip hub publish"
+  record_mh "HUB_PUBLISH=skipped"
   exit 0
 fi
 
-LUFFY_ROOT="${LUFFY_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-OUT_DIR="${OUT_DIR:-$LUFFY_ROOT/.luffy-out}"
 HUB_REPO="${LUFFY_HUB_REPO:-Mr-Ashish/luffy-pr-review-agent}"
 TOKEN="${LUFFY_HUB_TOKEN:-${GH_TOKEN:-${GITHUB_TOKEN:-}}}"
 MODE="${LUFFY_HUB_MODE:-auto}"
@@ -42,6 +51,7 @@ SOURCE_REPO="${REPO:-${GITHUB_REPOSITORY:-}}"
 
 if [[ -z "$TOKEN" ]]; then
   log "No LUFFY_HUB_TOKEN/GITHUB_TOKEN; skip hub publish"
+  record_mh "HUB_PUBLISH=no_token"
   exit 0
 fi
 
@@ -106,12 +116,14 @@ publish_direct() {
       if git pull --rebase origin main && git push origin HEAD:main; then
         notice "Pushed hub memory update to $HUB_REPO"
         echo "HUB_PUBLISH=direct_ok"
+        echo "direct_ok" >"$OUT_DIR/.hub-publish-rc"
         return 0
       fi
       log "push retry $i"
       sleep $((i * 2))
     done
     log "direct push failed after retries"
+    echo "failed" >"$OUT_DIR/.hub-publish-rc"
     return 1
   )
 }
@@ -140,19 +152,36 @@ PY
   echo "HUB_PUBLISH=dispatch_ok"
 }
 
+rm -f "$OUT_DIR/.hub-publish-rc" 2>/dev/null || true
+set +e
 case "$MODE" in
   direct)
     publish_direct
+    HRC=$?
     ;;
   dispatch)
     publish_dispatch
+    HRC=$?
+    [[ $HRC -eq 0 ]] && echo "dispatch_ok" >"$OUT_DIR/.hub-publish-rc"
     ;;
   both)
     publish_direct || true
     publish_dispatch || true
+    HRC=0
     ;;
   *)
     log "Unknown LUFFY_HUB_MODE=$MODE"
+    set -e
     exit 1
     ;;
 esac
+set -e
+if [[ -f "$OUT_DIR/.hub-publish-rc" ]]; then
+  record_mh "HUB_PUBLISH=$(tr -d '[:space:]' <"$OUT_DIR/.hub-publish-rc")"
+  rm -f "$OUT_DIR/.hub-publish-rc"
+elif [[ "${HRC:-1}" -eq 0 ]]; then
+  record_mh "HUB_PUBLISH=ok"
+else
+  record_mh "HUB_PUBLISH=failed"
+  echo "::warning::F30 hub memory publish failed (mode=${MODE})"
+fi

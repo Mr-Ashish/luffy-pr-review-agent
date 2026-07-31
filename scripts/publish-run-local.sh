@@ -25,30 +25,55 @@ if [[ -z "${LUFFY_LOCAL_PUBLISH:-}" ]]; then
     *) LUFFY_LOCAL_PUBLISH=1 ;;
   esac
 fi
+LUFFY_ROOT="${LUFFY_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+OUT_DIR="${OUT_DIR:-$LUFFY_ROOT/.luffy-out}"
+_MH="$LUFFY_ROOT/scripts/memory-health.sh"
+record_mh() {
+  if [[ -f "$_MH" ]]; then
+    OUT_DIR="$OUT_DIR" bash "$_MH" record "$1" >/dev/null || true
+  fi
+  echo "$1"
+}
+
 if [[ "${LUFFY_LOCAL_PUBLISH}" == "0" ]]; then
   log "LUFFY_LOCAL_PUBLISH=0; skip local .luffy publish"
+  record_mh "LOCAL_PUBLISH=skipped"
   exit 0
 fi
 
-LUFFY_ROOT="${LUFFY_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-OUT_DIR="${OUT_DIR:-$LUFFY_ROOT/.luffy-out}"
 TOKEN="${LUFFY_LOCAL_TOKEN:-${GH_TOKEN:-${GITHUB_TOKEN:-}}}"
 SOURCE_REPO="${REPO:-${GITHUB_REPOSITORY:-}}"
 MEM_PATH="${LUFFY_MEMORY_PATH:-.luffy}"
 # Branch to commit memory onto (default branch of target)
 BRANCH="${LUFFY_MEMORY_BRANCH:-}"
+record_mh "MEMORY_MODE=${MODE}"
+record_mh "MEMORY_PATH=${MEM_PATH}"
 
 if [[ -z "$SOURCE_REPO" ]]; then
   log "REPO/GITHUB_REPOSITORY missing; skip local publish"
-  exit 0
+  echo "::warning::F30 local .luffy publish skipped — REPO missing"
+  record_mh "LOCAL_PUBLISH=missing_repo"
+  exit 1
 fi
 if [[ -z "$TOKEN" ]]; then
-  log "No GITHUB_TOKEN; skip local publish"
-  exit 0
+  log "No GITHUB_TOKEN; cannot publish local .luffy memory"
+  echo "::warning::F30 local .luffy publish failed — no GITHUB_TOKEN (need contents: write)"
+  record_mh "LOCAL_PUBLISH=no_token"
+  exit 1
 fi
 
-command -v python3 >/dev/null 2>&1 || { log "python3 not found; skip"; exit 0; }
-command -v git >/dev/null 2>&1 || { log "git not found; skip"; exit 0; }
+command -v python3 >/dev/null 2>&1 || {
+  log "python3 not found; skip"
+  record_mh "LOCAL_PUBLISH=error"
+  echo "::warning::F30 local .luffy publish failed — python3 missing"
+  exit 1
+}
+command -v git >/dev/null 2>&1 || {
+  log "git not found; skip"
+  record_mh "LOCAL_PUBLISH=error"
+  echo "::warning::F30 local .luffy publish failed — git missing"
+  exit 1
+}
 
 export OUT_DIR
 python3 "$LUFFY_ROOT/scripts/build-hub-payload.py"
@@ -76,15 +101,26 @@ notice "Local memory publish → ${SOURCE_REPO}@${BRANCH} path=${MEM_PATH}"
 WORK="$(mktemp -d)"
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
+mkdir -p "$OUT_DIR"
+rm -f "$OUT_DIR/.local-publish-rc"
 
+set +e
 git clone --depth 1 --branch "$BRANCH" \
   "https://x-access-token:${TOKEN}@github.com/${SOURCE_REPO}.git" \
   "$WORK/target" 2>/dev/null \
   || git clone --depth 1 \
     "https://x-access-token:${TOKEN}@github.com/${SOURCE_REPO}.git" \
     "$WORK/target"
+CLONE_RC=$?
+set -e
+if [[ $CLONE_RC -ne 0 || ! -d "$WORK/target/.git" ]]; then
+  record_mh "LOCAL_PUBLISH=error"
+  echo "::warning::F30 local .luffy publish failed — could not clone ${SOURCE_REPO}@${BRANCH}"
+  exit 1
+fi
 
 INGEST="$LUFFY_ROOT/scripts/hub-ingest-run.py"
+set +e
 (
   cd "$WORK/target"
   git config user.name "luffy-memory-bot"
@@ -93,11 +129,11 @@ INGEST="$LUFFY_ROOT/scripts/hub-ingest-run.py"
   export LUFFY_INGEST_LAYOUT=local
   export LUFFY_MEMORY_ROOT="$WORK/target"
   export LUFFY_MEMORY_PATH="$MEM_PATH"
-  python3 "$INGEST"
+  python3 "$INGEST" || exit 2
   git add -- "$MEM_PATH"
   if git diff --cached --quiet; then
     log "No local memory changes to commit"
-    echo "LOCAL_PUBLISH=noop"
+    echo "noop" >"$OUT_DIR/.local-publish-rc"
     exit 0
   fi
   MSG="chore(memory): luffy local ingest PR #${PR_NUMBER:-?} $(date -u +%Y-%m-%dT%H%MZ)"
@@ -109,13 +145,41 @@ INGEST="$LUFFY_ROOT/scripts/hub-ingest-run.py"
     fi
     if git push origin "HEAD:${BRANCH}"; then
       notice "Pushed local .luffy memory to ${SOURCE_REPO}@${BRANCH}"
-      echo "LOCAL_PUBLISH=ok"
+      echo "ok" >"$OUT_DIR/.local-publish-rc"
       exit 0
     fi
     log "local push retry $i"
     sleep $((i * 2))
   done
   log "local push failed after retries (branch protection may require a PAT)"
-  echo "LOCAL_PUBLISH=failed"
+  echo "failed" >"$OUT_DIR/.local-publish-rc"
   exit 1
 )
+SUB_RC=$?
+set -e
+
+_status="error"
+if [[ -f "$OUT_DIR/.local-publish-rc" ]]; then
+  _status="$(tr -d '[:space:]' <"$OUT_DIR/.local-publish-rc")"
+  rm -f "$OUT_DIR/.local-publish-rc"
+elif [[ $SUB_RC -ne 0 ]]; then
+  _status="error"
+fi
+case "$_status" in
+  ok)
+    record_mh "LOCAL_PUBLISH=ok"
+    ;;
+  noop)
+    record_mh "LOCAL_PUBLISH=noop"
+    ;;
+  failed)
+    record_mh "LOCAL_PUBLISH=failed"
+    echo "::warning::F30 local .luffy push failed after retries — branch protection may block GITHUB_TOKEN; use a PAT with contents:write or allow bot pushes to default branch"
+    exit 1
+    ;;
+  *)
+    record_mh "LOCAL_PUBLISH=error"
+    echo "::warning::F30 local .luffy publish error (clone/ingest/push rc=${SUB_RC})"
+    exit 1
+    ;;
+esac

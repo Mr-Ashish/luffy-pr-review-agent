@@ -67,6 +67,7 @@ class InstallLuffyTests(unittest.TestCase):
             self.assertTrue((dest / "scripts" / "report-verdict.sh").is_file())
             self.assertTrue((dest / "scripts" / "dismiss-prior-pr-reviews.sh").is_file())
             self.assertTrue((dest / "scripts" / "publish-run-local.sh").is_file())
+            self.assertTrue((dest / "scripts" / "memory-health.sh").is_file())
             # F28: seed repo-local memory
             self.assertTrue((dest / ".luffy" / "MEMORY.md").is_file())
             self.assertTrue(

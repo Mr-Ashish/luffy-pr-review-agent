@@ -42,7 +42,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 26 | **F27** | Auto banner when PR diff was size-truncated | XS | 🔥 Trust — incomplete context always visible on PR | **Shipped** (`normalize-review --diff-truncated`) |
 | 27 | **F28** | Repo-local `.luffy/` memory (primary); hub publish opt-in only | S | 🔥 Product memory lives on the target; no hub required | **Shipped** (`publish-run-local.sh`, ingest layout=local, preload local-first) |
 | 28 | **F29** | Soft max cost budget (`LUFFY_MAX_COST_USD`) after F21 usage | XS | 🔥 Cost ops — overage alert on comment + job summary | **Shipped** (`usage-summary.py budget`) |
-| 29 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 29 | **F30** | Memory health visibility + README F28 truth (no silent local publish fail) | XS | 🔥 Ops — learning loss no longer invisible | **Shipped** (`memory-health.sh`, job summary) |
+| 30 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -115,6 +116,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 18 (shipped)
 
 **F29** soft max cost budget: repo var `LUFFY_MAX_COST_USD` (e.g. `1.00`). When `hermes-usage.json` estimated cost exceeds the max, the PR cost footer notes ⚠️ OVER BUDGET, the job summary gains a **Luffy cost budget (F29)** section, and Actions emits `::warning::`. Soft only — never fails the review (spend already incurred). Disabled when unset/`0`/`off`. CLI: `usage-summary.py budget|footer|append|step-summary --max-usd …`.
+
+### Sprint 19 (shipped)
+
+**F30** memory health + architecture honesty: `scripts/memory-health.sh` records `MEMORY_SOURCE` / `LOCAL_PUBLISH` / `HUB_PUBLISH` into `.luffy-out/memory-health.env`; failed local push emits `::warning::` + job-summary **Memory health** table (does not fail the review). README/public diagrams aligned to F28 local-first (hub opt-in). Install `--caller` tip: pin `uses:` SHA.
 
 ### readme-kit (shipped)
 

@@ -106,6 +106,7 @@ RUNTIME_SCRIPTS=(
   hermes-pin.sh
   hub-ingest-run.py
   install-luffy.sh
+  memory-health.sh
   normalize-review.py
   parse-verdict.py
   post-review-comment.sh
@@ -202,6 +203,7 @@ if [[ "$CALLER_MODE" == "1" ]]; then
   log "  4. Optional vars: LUFFY_MODEL, LUFFY_HERMES_COMMIT, LUFFY_COOLDOWN_SECONDS, LUFFY_RUNNER_IMAGE, LUFFY_MEMORY_PATH."
   log "  5. On a PR, comment: @luffy review this pr"
   log "  Runtime agent/scripts are fetched from Mr-Ashish/luffy-pr-review-agent@main each run."
+  log "  Tip: pin the uses: ref to a commit SHA (not @main) to avoid blast radius from hub main."
   log "  Tip: seed .luffy/MEMORY.md on the target default branch (or re-install pack mode once)."
   log "Done."
   exit 0
