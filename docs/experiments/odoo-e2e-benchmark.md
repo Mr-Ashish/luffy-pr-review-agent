@@ -70,4 +70,10 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 - Hermes-style: agentic tool loop is the product differentiator — F44 run had **0 tool turns**, so we under-used the stack.
 - F45: control-plane fail-closed mirrors “don’t ship green without tools” — PR-Agent never claimed agentic; we must not green-light when we aren’t.
 
-_Last updated: 2026-07-31 F45_
+### F46 note (SOUL load)
+
+Product `agent/SOUL.md` no longer trips Hermes `prompt_injection` (verified with
+pin `scan_for_threats`). Future cheap runs should recover D8a vs F44’s SOUL-block;
+historical F44/F45 rows unchanged (evidence-preserving). Re-score after next live mini run on #2.
+
+_Last updated: 2026-07-31 F46_

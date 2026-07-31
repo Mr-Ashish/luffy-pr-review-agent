@@ -139,6 +139,7 @@ def collect_signals(
       model-tier.env (F42)                              → model_tier / selected_tier
       preflight-cost.env (F43)                          → preflight_refuse / forced_cheap
       tool-turns-gate.env (F45)                         → tool_turns_gate (H12)
+      soul-context.env (F46)                            → soul_blocked (H13)
     """
     signals: dict = {
         "timeout": False,
@@ -157,6 +158,8 @@ def collect_signals(
         "preflight_estimated_usd": None,
         "tool_turns_gate": False,
         "tool_turns_gate_reason": None,
+        "soul_blocked": False,
+        "soul_blocked_reason": None,
         "flags": [],  # short chip labels for UI
     }
     te = _parse_env_file(dir_path / "hermes-timeout.env")
@@ -327,6 +330,29 @@ def collect_signals(
         signals["tool_turns_gate"] = True
         signals["tool_turns_gate_reason"] = signals.get("tool_turns_gate_reason") or "review_banner"
 
+    # F46 SOUL.md blocked by Hermes context scanner
+    sce = _parse_env_file(dir_path / "soul-context.env")
+    scp = _parse_env_file(dir_path / "soul-context-preflight.env")
+    if sce.get("soul_blocked") in ("1", "true", "yes"):
+        signals["soul_blocked"] = True
+        if sce.get("reason"):
+            signals["soul_blocked_reason"] = sce["reason"]
+    if scp.get("soul_blocked_risk") in ("1", "true", "yes") or scp.get(
+        "preflight_failed"
+    ) in ("1", "true", "yes"):
+        # Preflight risk without runtime block still worth a softer flag
+        if not signals["soul_blocked"]:
+            signals["soul_blocked_reason"] = signals.get("soul_blocked_reason") or scp.get(
+                "findings"
+            ) or "preflight_risk"
+    if not signals["soul_blocked"] and (
+        "context file soul.md blocked" in low
+        or ("soul.md blocked" in low and "prompt_injection" in low)
+        or "soul blocked (f46)" in low
+    ):
+        signals["soul_blocked"] = True
+        signals["soul_blocked_reason"] = signals.get("soul_blocked_reason") or "prompt_injection"
+
     flags: list[str] = []
     if signals["path_skip"]:
         flags.append("path-skip")
@@ -344,6 +370,8 @@ def collect_signals(
         flags.append("preflight-cheap")
     if signals.get("tool_turns_gate"):
         flags.append("tool-turns-gate")
+    if signals.get("soul_blocked"):
+        flags.append("soul-blocked")
     # Surface auto/cheap/full when tier mode is active (not plain off/default)
     mode = (signals.get("model_tier_mode") or "").lower()
     tier = (signals.get("model_tier") or "").lower()

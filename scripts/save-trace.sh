@@ -74,6 +74,8 @@ copy_if "$OUT_DIR/tool-turns-gate.env" "$TRACE_DIR/tool-turns-gate.env"
 copy_if "$OUT_DIR/hermes-max-turns.env" "$TRACE_DIR/hermes-max-turns.env"
 copy_if "$OUT_DIR/model-tier.env" "$TRACE_DIR/model-tier.env"
 copy_if "$OUT_DIR/preflight-cost.env" "$TRACE_DIR/preflight-cost.env"
+copy_if "$OUT_DIR/soul-context.env" "$TRACE_DIR/soul-context.env"
+copy_if "$OUT_DIR/soul-context-preflight.env" "$TRACE_DIR/soul-context-preflight.env"
 
 # Full agentic loop package (prompts / steps / tool calls / usage)
 if [[ -d "$OUT_DIR/agent-loop" ]]; then

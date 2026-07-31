@@ -275,6 +275,23 @@ class PackRunForUiTests(unittest.TestCase):
             self.assertIn("tool-turns-gate", sig.get("flags") or [])
             self.assertTrue(sig.get("any"))
 
+    def test_f46_soul_blocked_signal(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "run"
+            src.mkdir()
+            (src / "review-1.md").write_text("**Verdict:** COMMENT\n", encoding="utf-8")
+            (src / "soul-context.env").write_text(
+                "soul_blocked=1\nreason=prompt_injection\n",
+                encoding="utf-8",
+            )
+            out = Path(td) / "bundle.json"
+            r = _run(["--dir", str(src), "-o", str(out), "--host", "local"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            sig = json.loads(out.read_text())["signals"]
+            self.assertTrue(sig.get("soul_blocked"))
+            self.assertEqual(sig.get("soul_blocked_reason"), "prompt_injection")
+            self.assertIn("soul-blocked", sig.get("flags") or [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -127,6 +127,7 @@ RUNTIME_SCRIPTS=(
   model_tier.py
   preflight_cost.py
   tool_turns_gate.py
+  soul_context_scan.py
   save-trace.sh
   review-to-openui.py
   sparse-pr-paths.sh

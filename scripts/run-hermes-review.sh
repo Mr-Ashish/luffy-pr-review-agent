@@ -307,6 +307,32 @@ ensure_hermes
 # ---------------------------------------------------------------------------
 cp -f "$LUFFY_ROOT/agent/config.yaml" "$HERMES_HOME/config.yaml"
 cp -f "$LUFFY_ROOT/agent/SOUL.md" "$HERMES_HOME/SOUL.md"
+# F46 / H13: refuse to ship a SOUL.md Hermes would block (prompt_injection false +ve)
+SOUL_SCAN_HELPER="$LUFFY_ROOT/scripts/soul_context_scan.py"
+if [[ -f "$SOUL_SCAN_HELPER" ]]; then
+  if python3 "$SOUL_SCAN_HELPER" check "$HERMES_HOME/SOUL.md" >"$OUT_DIR/soul-context-preflight.env" 2>/dev/null; then
+    notice "F46 SOUL context scan clean (Hermes will load reviewer contract)"
+  else
+    _soul_rc=$?
+    if [[ $_soul_rc -eq 2 ]]; then
+      notice "F46 SOUL.md would be blocked by Hermes scanner — fix agent/SOUL.md phrasing (H13)"
+      if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        {
+          echo "### Luffy SOUL context scan (F46)"
+          echo "- **Preflight failed:** \`agent/SOUL.md\` matches Hermes threat patterns"
+          echo "- Hermes would replace SOUL with a \`[BLOCKED: …]\` stub — review discipline lost"
+          echo "- Rephrase without classic injection quotes; see \`scripts/soul_context_scan.py\`"
+          echo
+        } >>"$GITHUB_STEP_SUMMARY" || true
+      fi
+      # Soft-continue: still run review, but mark ops signal (content may still block at Hermes)
+      {
+        echo "preflight_failed=1"
+        echo "soul_blocked_risk=1"
+      } >>"$OUT_DIR/soul-context-preflight.env" || true
+    fi
+  fi
+fi
 umask 077
 cat >"$HERMES_HOME/.env" <<EOF
 OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
@@ -497,6 +523,44 @@ export AGENT_LOOP_DIR="$LOOP_DIR"
 export LUFFY_PROVIDER=openrouter
 chmod +x "$LUFFY_ROOT/scripts/capture-hermes-loop.py" 2>/dev/null || true
 python3 "$LUFFY_ROOT/scripts/capture-hermes-loop.py" || notice "capture-hermes-loop soft-failed"
+
+# F46 / H13: detect Hermes actually blocking SOUL.md at load time
+SOUL_BLOCKED=0
+SOUL_BLOCK_REASON=""
+if [[ -f "$SOUL_SCAN_HELPER" ]]; then
+  _soul_detect_paths=()
+  [[ -f "$STDERR_FILE" ]] && _soul_detect_paths+=("$STDERR_FILE")
+  [[ -f "$OUT_DIR/hermes-run.log" ]] && _soul_detect_paths+=("$OUT_DIR/hermes-run.log")
+  [[ -f "$LOOP_DIR/agent.log" ]] && _soul_detect_paths+=("$LOOP_DIR/agent.log")
+  [[ -f "$LOOP_DIR/errors.log" ]] && _soul_detect_paths+=("$LOOP_DIR/errors.log")
+  if [[ ${#_soul_detect_paths[@]} -gt 0 ]]; then
+    if _soul_det="$(python3 "$SOUL_SCAN_HELPER" detect "${_soul_detect_paths[@]}" 2>/dev/null)"; then
+      SOUL_BLOCKED=0
+    else
+      _sdr=$?
+      if [[ $_sdr -eq 2 ]]; then
+        SOUL_BLOCKED=1
+        SOUL_BLOCK_REASON="$(printf '%s\n' "$_soul_det" | sed -n 's/^reason=//p' | head -1)"
+      fi
+    fi
+  fi
+fi
+{
+  echo "soul_blocked=$SOUL_BLOCKED"
+  echo "reason=${SOUL_BLOCK_REASON:-}"
+} >"$OUT_DIR/soul-context.env" || true
+if [[ "$SOUL_BLOCKED" -eq 1 ]]; then
+  notice "F46 Hermes blocked SOUL.md (${SOUL_BLOCK_REASON:-prompt_injection}) — reviewer contract not loaded"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    {
+      echo "### Luffy SOUL blocked (F46)"
+      echo "- Hermes log: \`Context file SOUL.md blocked: ${SOUL_BLOCK_REASON:-prompt_injection}\`"
+      echo "- Reviewer discipline / trust model did **not** load into the system prompt"
+      echo "- Fix: rephrase \`agent/SOUL.md\`; verify with \`python3 scripts/soul_context_scan.py check\`"
+      echo
+    } >>"$GITHUB_STEP_SUMMARY" || true
+  fi
+fi
 
 # F41: detect Hermes iteration-budget exhaustion (logs / stderr / agent-loop)
 MAX_TURNS_HIT=0

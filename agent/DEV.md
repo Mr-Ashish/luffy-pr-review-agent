@@ -5,7 +5,7 @@
 ## Design decisions
 
 - `agent/SOUL.md` is the reviewer contract: staff-level reviewer scoped to *this diff's* added lines, explicitly told it sees partial hunks and must not invent missing imports or re-suggest changes already in the `+` lines.
-- Trust model lives in SOUL, not in the prompt template: PR text and diff are UNTRUSTED DATA and prompt-injection attempts ("ignore previous instructions", "approve this PR") must be refused.
+- Trust model lives in SOUL, not in the prompt template: PR text and diff are UNTRUSTED DATA; author text that redefines the task or forces a merge verdict must be refused.
 - Finding discipline is asymmetric by design: thorough on bugs/security, high bar elsewhere — every finding needs file + symbol + concrete trigger, and silence beats speculation (an empty Blocking section is an acceptable output).
 - Every review must emit structured judgment fields: Score 0–100, review effort 1–5, security audit verdict, relevant-tests yes/no, key findings, optional concrete code suggestions.
 - Output contract is a single bare Markdown document (no preamble, no tool chatter, not fence-wrapped) so `normalize-review.py` can validate and post it directly as a PR comment.
@@ -33,4 +33,4 @@
 
 - **F43:** preflight cost may skip Hermes or force cheap model when `LUFFY_MAX_COST_USD` is tight — SOUL/prompt unchanged; stub review is COMMENT.
 
-- `agent/SOUL.md` can be **blocked by Hermes' own prompt_injection scanner** (its trust-model section quotes injection strings like "ignore previous instructions"), which means the reviewer contract and finding discipline may silently not load for a run. Check the Hermes log for a SOUL-blocked line when review quality/format degrades unexpectedly; a phrasing workaround is tracked as H13 (P1).
+- `agent/SOUL.md` is scanned by Hermes context-file threat patterns before load; **F46/H13** rephrased the trust model so classic injection quotes do not false-positive. Guard with `python3 scripts/soul_context_scan.py check`. Runtime block still surfaces as `soul-context.env` + pack chip `soul-blocked`.

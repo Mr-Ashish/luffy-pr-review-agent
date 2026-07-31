@@ -70,6 +70,7 @@ Every auto-pack (`run-bundle.json`) includes a `signals` object:
 | `model_tier` / `model-cheap` | `model-tier.env` / F42 auto tier |
 | `preflight_refuse` / `preflight-cheap` | `preflight-cost.env` / F43 |
 | `tool_turns_gate` / `tool-turns-gate` | `tool-turns-gate.env` / F45 zero-tool fail-closed |
+| `soul_blocked` / `soul-blocked` | `soul-context.env` / F46 Hermes SOUL scanner |
 
 Also `loop` metrics: `tool_call_turns`, `message_count`, `step_count`, `max_turns`.
 
@@ -128,6 +129,17 @@ python3 scripts/preflight_cost.py decide --model anthropic/claude-opus-5 --diff-
 ```
 
 Evidence: `preflight-cost.env`, job-summary, Run Console chips.
+
+## SOUL context scan (F46 / H13)
+
+Hermes replaces `SOUL.md` with a `[BLOCKED: …]` stub when threat patterns match.
+Do **not** quote classic injection phrases in the trust model.
+
+```bash
+python3 scripts/soul_context_scan.py check
+```
+
+Evidence: `soul-context.env`, chip `soul-blocked`, job-summary on runtime block.
 
 ## Tool-turns fail-closed (F45 / H12)
 

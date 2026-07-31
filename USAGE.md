@@ -99,6 +99,18 @@ LUFFY_MAX_COST_USD=0.05 python3 scripts/preflight_cost.py decide \
 Evidence: `preflight-cost.env`, job-summary **Luffy preflight cost (F43)**,
 run-bundle chips `preflight-cheap` / `preflight-refuse`.
 
+### SOUL context scan (F46)
+
+Hermes refuses to load `SOUL.md` when it matches prompt-injection patterns.
+Luffy’s reviewer contract must stay clean:
+
+```bash
+python3 scripts/soul_context_scan.py check          # exit 2 if would block
+python3 scripts/soul_context_scan.py detect hermes-run.log  # exit 2 if blocked at runtime
+```
+
+Evidence: `soul-context.env`, job-summary **Luffy SOUL blocked (F46)**, chip `soul-blocked`.
+
 ### Tool-turns fail-closed gate (F45)
 
 When Hermes records **0 tool turns** on a **multi-file non-docs** PR, Luffy refuses

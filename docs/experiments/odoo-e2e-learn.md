@@ -26,11 +26,17 @@ Corpus size: **3** open eval PRs (retitled F44 fire).
 
 Artifacts: `.luffy-out-e2e-pr2-f44/` (review, raw, run-bundle, traces/pr2-runlocal-a1); F45 offline: `/tmp/f45-pr2-review-gated.md`.
 
+## Introspect (F46)
+
+1. **Root cause of SOUL block:** Hermes `threat_patterns` `prompt_injection` matched the literal quote `ignore previous instructions` in the trust-model examples — not a malicious SOUL.
+2. **Fix is phrasing + regression scan:** product SOUL now clean under Hermes `scan_for_threats(scope=context)`; `soul_context_scan.py check` guards future regressions.
+3. **Next P0:** H14 hermes `-z` reliability (chat fallback still forces F44 scrub + F45 gate path).
+
 ## Introspect (F45)
 
 1. **Fail-closed without re-prompt is correct first step:** prevents false merge-green on zero-tool multi-file runs; does not invent the missing test finding (still needs tools / H14).
 2. **Trust/ops win over signal quality:** D4/D9 improve via honesty; D1 still limited until agent actually reads files.
-3. **Next P0:** H13 SOUL.md prompt_injection false positive (discipline file blocked on F44).
+3. **Was next P0:** H13 SOUL.md prompt_injection — **shipped F46**.
 
 ## Introspect (F44)
 
@@ -42,6 +48,6 @@ Artifacts: `.luffy-out-e2e-pr2-f44/` (review, raw, run-bundle, traces/pr2-runloc
 
 ## Next learn targets
 
-- H13: SOUL.md hermes prompt_injection false-positive workaround.
 - H14: Make hermes -z reliable; avoid chat -q fallback.
 - H15: optional one-shot re-prompt after F45 annotate (recover findings without always COMMENT-only).
+- Re-run cheap mini on #2 after F45+F46 to measure D8 lift when SOUL loads.
