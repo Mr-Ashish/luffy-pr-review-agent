@@ -2,6 +2,6 @@
 
 | Worktree | Feature |
 |----------|---------|
-| `pr-review-agent-wt/f61-testplan` | F61 testplan generation |
+| (none) | F61 merged PR #11 |
 
-Updated: 2026-08-01 F61 in flight.
+Updated: 2026-08-01 F61 merged.
