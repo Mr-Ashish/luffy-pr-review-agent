@@ -5,7 +5,7 @@
 ## Run console
 
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
-- **F40–F45 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns / model-tier / preflight / **tool-turns-gate** + `flags[]`) and `loop` metrics. Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip → `ops-signals.env`; F41 → `hermes-max-turns.env`; F42 → `model-tier.env`; F45 → `tool-turns-gate.env`.
+- **F40–F49 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns / model-tier / preflight / **tool-turns-gate** / **tool-turns-reprompt** + `flags[]`) and `loop` metrics. Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip → `ops-signals.env`; F41 → `hermes-max-turns.env`; F42 → `model-tier.env`; F45 → `tool-turns-gate.env`; F49 → `tool-turns-reprompt.env`.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
 - Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
@@ -131,6 +131,29 @@ python3 scripts/tool_turns_gate.py apply --review review.md --tool-turns 0 --fil
 Action: APPROVE→COMMENT, confidence low, score capped at 55, F45 banner.
 Evidence: `tool-turns-gate.env`, job-summary **Luffy tool-turns gate (F45)**,
 run-bundle chip `tool-turns-gate`.
+
+### Soft tool-turns re-prompt (F49 / H15)
+
+When the **first** Hermes pass records **0 tool turns** on a multi-file non-docs PR,
+Luffy runs **one** soft re-prompt (`hermes -z` again with a short tool-nudge suffix)
+**before** F45 fail-closed. Attempt-1 artifacts are kept under
+`review-*.attempt1.raw.md` / `agent-loop-attempt1/`.
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_TOOL_TURNS_REPROMPT` | `1` | `0`/`off` disables the second pass |
+| `LUFFY_TOOL_TURNS_MIN_FILES` | `2` | shared multi-file threshold with F45 |
+
+```bash
+python3 scripts/tool_turns_gate.py reprompt-decide --tool-turns 0 --file-count 4 --path a.js --path b.js
+python3 scripts/tool_turns_gate.py reprompt-write \
+  --prompt-in prompt.md --prompt-out prompt-reprompt.md \
+  --tool-turns 0 --file-count 4 --path a.js --path b.js
+```
+
+Evidence: `tool-turns-reprompt.env` (`attempted`, `tool_turns_before/after`, `recovered`),
+chips `tool-reprompt` / `tool-reprompt-ok`. F45 still fires if tools remain zero after
+the second pass.
 
 ### Auto model tier (F42)
 

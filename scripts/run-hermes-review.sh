@@ -15,6 +15,8 @@
 #   LUFFY_MAX_COST_USD  F29 soft + F43 hard preflight threshold when set
 #   LUFFY_PREFLIGHT_COST  F43 on|off|auto (default auto=hard when budget set)
 #   LUFFY_PREFLIGHT_ACTION  F43 force_cheap|refuse|warn (default force_cheap)
+#   LUFFY_TOOL_TURNS_GATE  F45 fail-closed on zero tools multi-file (default 1)
+#   LUFFY_TOOL_TURNS_REPROMPT  F49/H15 soft re-prompt once when zero tools (default 1)
 #   PR_NUMBER
 set -euo pipefail
 
@@ -540,6 +542,193 @@ export HERMES_LOG_OFFSET="$LOG_OFFSET"
 chmod +x "$LUFFY_ROOT/scripts/capture-hermes-loop.py" 2>/dev/null || true
 python3 "$LUFFY_ROOT/scripts/capture-hermes-loop.py" || notice "capture-hermes-loop soft-failed"
 
+# ---------------------------------------------------------------------------
+# F49 / H15: soft re-prompt once when tool_turns=0 on multi-file code PRs.
+# Runs *before* F45 fail-closed so a second agentic attempt can recover quality.
+# ---------------------------------------------------------------------------
+TOOL_TURNS_GATE_HELPER="$LUFFY_ROOT/scripts/tool_turns_gate.py"
+REPROMPT_ATTEMPTED=0
+REPROMPT_RECOVERED=0
+TT_BEFORE=""
+TT_AFTER=""
+REPROMPT_REASON="skipped"
+if [[ -f "$TOOL_TURNS_GATE_HELPER" && $TIMED_OUT -eq 0 && "${HERMES_CLI_ARGV_BROKEN:-0}" -eq 0 && -s "$RAW_OUT" ]]; then
+  _rp_args=(
+    reprompt-decide
+    --loop-json "$LOOP_DIR/agent-loop.json"
+  )
+  [[ -n "${FILE_COUNT:-}" ]] && _rp_args+=(--file-count "$FILE_COUNT")
+  [[ -f "$OUT_DIR/files.txt" ]] && _rp_args+=(--paths-file "$OUT_DIR/files.txt")
+  _rp_kv="$(python3 "$TOOL_TURNS_GATE_HELPER" "${_rp_args[@]}" 2>/dev/null || true)"
+  _rp_do="$(printf '%s\n' "$_rp_kv" | sed -n 's/^reprompt=//p' | head -1)"
+  TT_BEFORE="$(printf '%s\n' "$_rp_kv" | sed -n 's/^tool_turns=//p' | head -1)"
+  REPROMPT_REASON="$(printf '%s\n' "$_rp_kv" | sed -n 's/^reason=//p' | head -1)"
+  if [[ "$_rp_do" == "1" || "$_rp_do" == "true" ]]; then
+    REPROMPT_ATTEMPTED=1
+    notice "F49 soft re-prompt · tool_turns=${TT_BEFORE:-0} files=${FILE_COUNT:-?} (H15 zero-tool multi-file)"
+    # Archive attempt-1 artifacts for comparison
+    cp -f "$RAW_OUT" "$OUT_DIR/review-${PR_NUMBER}.attempt1.raw.md" 2>/dev/null || true
+    [[ -f "$STDERR_FILE" ]] && cp -f "$STDERR_FILE" "$OUT_DIR/hermes-${PR_NUMBER}.attempt1.stderr" 2>/dev/null || true
+    [[ -f "$USAGE_FILE" ]] && cp -f "$USAGE_FILE" "$OUT_DIR/hermes-usage.attempt1.json" 2>/dev/null || true
+    if [[ -d "$LOOP_DIR" ]]; then
+      rm -rf "$OUT_DIR/agent-loop-attempt1"
+      cp -a "$LOOP_DIR" "$OUT_DIR/agent-loop-attempt1" 2>/dev/null || true
+    fi
+    # Build nudged prompt
+    REPROMPT_PROMPT="$OUT_DIR/prompt-reprompt.md"
+    _rpw_args=(
+      reprompt-write
+      --prompt-in "$PROMPT_PATH"
+      --prompt-out "$REPROMPT_PROMPT"
+      --tool-turns "${TT_BEFORE:-0}"
+    )
+    [[ -n "${FILE_COUNT:-}" ]] && _rpw_args+=(--file-count "$FILE_COUNT")
+    [[ -f "$OUT_DIR/files.txt" ]] && _rpw_args+=(--paths-file "$OUT_DIR/files.txt")
+    python3 "$TOOL_TURNS_GATE_HELPER" "${_rpw_args[@]}" >/dev/null 2>&1 || true
+    if [[ -s "$REPROMPT_PROMPT" ]]; then
+      PROMPT="$(cat "$REPROMPT_PROMPT")"
+      # Fresh log offset for attempt-2 slice
+      LOG_OFFSET=0
+      if [[ -f "$LOG_FILE" ]]; then
+        LOG_OFFSET=$(wc -c <"$LOG_FILE" | tr -d ' ')
+      fi
+      echo "$LOG_OFFSET" >"$OUT_DIR/hermes-log-offset-reprompt.txt" || true
+      STDERR_FILE_RP="$OUT_DIR/hermes-${PR_NUMBER}.reprompt.stderr"
+      set +e
+      (
+        cd "$WORKSPACE_ROOT"
+        _hermes_wrap hermes -z "$PROMPT" \
+          --provider openrouter \
+          --model "$MODEL" \
+          -t "$TOOLSETS" \
+          --usage-file "$USAGE_FILE" \
+          >"$RAW_OUT" 2>"$STDERR_FILE_RP"
+      )
+      RC_RP=$?
+      set -e
+      if [[ $RC_RP -eq 124 ]]; then
+        # Do not leave a partial second body; restore attempt-1
+        notice "F49 soft re-prompt TIMED OUT — keeping attempt-1 body"
+        if [[ -f "$OUT_DIR/review-${PR_NUMBER}.attempt1.raw.md" ]]; then
+          cp -f "$OUT_DIR/review-${PR_NUMBER}.attempt1.raw.md" "$RAW_OUT"
+        fi
+        REPROMPT_REASON="reprompt_timeout"
+        RC=$RC_RP
+        TIMED_OUT=1
+      elif [[ $RC_RP -ne 0 || ! -s "$RAW_OUT" ]]; then
+        notice "F49 soft re-prompt failed/empty (rc=$RC_RP) — keeping attempt-1 body"
+        if [[ -f "$OUT_DIR/review-${PR_NUMBER}.attempt1.raw.md" ]]; then
+          cp -f "$OUT_DIR/review-${PR_NUMBER}.attempt1.raw.md" "$RAW_OUT"
+        fi
+        REPROMPT_REASON="reprompt_failed"
+        # Keep original RC if first run was ok
+        [[ $RC -eq 0 ]] || RC=$RC_RP
+      else
+        RC=$RC_RP
+        REPROMPT_REASON="reprompt_ran"
+        # Append reprompt stderr for operators
+        if [[ -s "$STDERR_FILE_RP" ]]; then
+          {
+            echo ""
+            echo "===== F49 soft re-prompt stderr ====="
+            cat "$STDERR_FILE_RP"
+          } >>"$STDERR_FILE" 2>/dev/null || true
+        fi
+        # Re-slice hermes-run.log for attempt-2
+        if [[ -f "$LOG_FILE" ]]; then
+          python3 - <<'PY' "$LOG_FILE" "$OUT_DIR/hermes-run.log" "$LOG_OFFSET"
+import sys
+from pathlib import Path
+src, dest, off = Path(sys.argv[1]), Path(sys.argv[2]), int(sys.argv[3] or 0)
+data = src.read_bytes()
+chunk = data[off:] if off < len(data) else data[-200_000:]
+dest.write_bytes(chunk)
+print(f"hermes-run.log (reprompt) bytes={len(chunk)}", file=sys.stderr)
+PY
+        fi
+        # Re-capture agent loop for the second session
+        export HERMES_LOG_OFFSET="$LOG_OFFSET"
+        rm -rf "$LOOP_DIR"
+        mkdir -p "$LOOP_DIR"
+        python3 "$LUFFY_ROOT/scripts/capture-hermes-loop.py" || notice "capture-hermes-loop (reprompt) soft-failed"
+        TT_AFTER="$(
+          python3 - <<'PY' "$LOOP_DIR/agent-loop.json"
+import json, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+if not p.is_file():
+    print("")
+    raise SystemExit(0)
+try:
+    d = json.loads(p.read_text(encoding="utf-8", errors="replace"))
+    print(d.get("tool_call_turns", ""))
+except Exception:
+    print("")
+PY
+        )"
+        if [[ -n "$TT_AFTER" && "$TT_AFTER" != "0" ]]; then
+          REPROMPT_RECOVERED=1
+          REPROMPT_REASON="reprompt_recovered"
+          notice "F49 soft re-prompt recovered tool_turns=${TT_AFTER} (was ${TT_BEFORE:-0})"
+        else
+          notice "F49 soft re-prompt still tool_turns=${TT_AFTER:-0} — F45 gate may still fire"
+        fi
+      fi
+      {
+        echo "reprompt=1"
+        echo "enabled=1"
+        echo "reason=$REPROMPT_REASON"
+        echo "attempted=1"
+        echo "tool_turns_before=${TT_BEFORE:-}"
+        echo "tool_turns_after=${TT_AFTER:-}"
+        echo "file_count=${FILE_COUNT:-}"
+        echo "recovered=$REPROMPT_RECOVERED"
+        echo "rc=${RC_RP:-}"
+      } >"$OUT_DIR/tool-turns-reprompt.env" || true
+      if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        {
+          echo "### Luffy soft re-prompt (F49 / H15)"
+          echo "- **Attempted:** yes · **reason:** \`${REPROMPT_REASON}\`"
+          echo "- **tool_turns:** before=\`${TT_BEFORE:-?}\` → after=\`${TT_AFTER:-?}\` · recovered=\`${REPROMPT_RECOVERED}\`"
+          echo "- F45 fail-closed still applies if tools remain zero"
+          echo
+        } >>"$GITHUB_STEP_SUMMARY" || true
+      fi
+    else
+      REPROMPT_ATTEMPTED=0
+      REPROMPT_REASON="reprompt_prompt_write_failed"
+      {
+        echo "reprompt=0"
+        echo "enabled=1"
+        echo "reason=$REPROMPT_REASON"
+        echo "attempted=0"
+        echo "tool_turns_before=${TT_BEFORE:-}"
+        echo "file_count=${FILE_COUNT:-}"
+        echo "recovered=0"
+      } >"$OUT_DIR/tool-turns-reprompt.env" || true
+    fi
+  else
+    {
+      echo "reprompt=0"
+      echo "enabled=1"
+      echo "reason=${REPROMPT_REASON:-skipped}"
+      echo "attempted=0"
+      echo "tool_turns_before=${TT_BEFORE:-}"
+      echo "file_count=${FILE_COUNT:-}"
+      echo "recovered=0"
+    } >"$OUT_DIR/tool-turns-reprompt.env" || true
+  fi
+else
+  {
+    echo "reprompt=0"
+    echo "enabled=${LUFFY_TOOL_TURNS_REPROMPT:-1}"
+    echo "reason=preconditions_not_met"
+    echo "attempted=0"
+    echo "file_count=${FILE_COUNT:-}"
+    echo "recovered=0"
+  } >"$OUT_DIR/tool-turns-reprompt.env" || true
+fi
+
 # F46 / H13: detect Hermes actually blocking SOUL.md at load time
 # F48 / H16: only scan *this invocation* artifacts (offset-sliced hermes-run.log +
 # stderr). Do NOT scan the full Hermes agent.log / errors.log history — capture
@@ -711,8 +900,8 @@ if [[ -f "$LUFFY_ROOT/scripts/usage-summary.py" ]]; then
 fi
 
 # F45 / H12: fail closed when tool_turns=0 on multi-file non-docs PRs
-# (cheap chat-fallback can false-APPROVE — odoo e2e #2 mini vs GHA).
-TOOL_TURNS_GATE_HELPER="$LUFFY_ROOT/scripts/tool_turns_gate.py"
+# (after F49 soft re-prompt when applicable — odoo e2e #2/#4 mini vs GHA).
+TOOL_TURNS_GATE_HELPER="${TOOL_TURNS_GATE_HELPER:-$LUFFY_ROOT/scripts/tool_turns_gate.py}"
 if [[ -f "$TOOL_TURNS_GATE_HELPER" && -s "$FINAL_OUT" ]]; then
   _ttg_args=(
     apply
@@ -735,6 +924,7 @@ if [[ -f "$TOOL_TURNS_GATE_HELPER" && -s "$FINAL_OUT" ]]; then
           echo "- **Gate fired:** zero Hermes tool turns on multi-file non-docs PR"
           echo "- **Reason:** \`${_ttg_reason:-zero_tools_multi_file_code}\`"
           echo "- **Action:** APPROVE → COMMENT (fail closed) when applicable; banner injected"
+          echo "- F49 soft re-prompt attempted=\`${REPROMPT_ATTEMPTED:-0}\` recovered=\`${REPROMPT_RECOVERED:-0}\`"
           echo "- Re-run so the agent reads changed files (\`hermes -z\` with tools)"
           echo
         } >>"$GITHUB_STEP_SUMMARY" || true

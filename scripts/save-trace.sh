@@ -71,7 +71,13 @@ copy_if "$OUT_DIR/hermes-usage.json" "$TRACE_DIR/hermes-usage.json"
 copy_if "$OUT_DIR/hermes-run.log" "$TRACE_DIR/hermes-run.log"
 copy_if "$OUT_DIR/hermes-pin.txt" "$TRACE_DIR/hermes-pin.txt"
 copy_if "$OUT_DIR/tool-turns-gate.env" "$TRACE_DIR/tool-turns-gate.env"
+copy_if "$OUT_DIR/tool-turns-reprompt.env" "$TRACE_DIR/tool-turns-reprompt.env"
+copy_if "$OUT_DIR/prompt-reprompt.md" "$TRACE_DIR/prompt-reprompt.md"
 copy_if "$OUT_DIR/hermes-max-turns.env" "$TRACE_DIR/hermes-max-turns.env"
+if [[ -d "$OUT_DIR/agent-loop-attempt1" ]]; then
+  rm -rf "$TRACE_DIR/agent-loop-attempt1"
+  cp -a "$OUT_DIR/agent-loop-attempt1" "$TRACE_DIR/agent-loop-attempt1" 2>/dev/null || true
+fi
 copy_if "$OUT_DIR/model-tier.env" "$TRACE_DIR/model-tier.env"
 copy_if "$OUT_DIR/preflight-cost.env" "$TRACE_DIR/preflight-cost.env"
 copy_if "$OUT_DIR/soul-context.env" "$TRACE_DIR/soul-context.env"

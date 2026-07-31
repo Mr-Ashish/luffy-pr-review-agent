@@ -22,10 +22,10 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | **H12** | **Fail closed when tool_turns=0 on multi-file non-docs PR (COMMENT, not re-prompt)** | **S** | **#2 mini APPROVE missed known test gap; GHA/tools did not** | **Shipped F45** |
 | **H13** | **SOUL.md hermes prompt_injection false-positive workaround** | **S** | **F44 log: SOUL blocked — review discipline may not load** | **Shipped F46** |
 | **H14** | **Make hermes -z reliable; avoid chat -q fallback** | **S** | **-z rc=2 was bogus `--max-turns` CLI flag → chat path** | **Shipped F47** |
-| H15 | Soft re-prompt once when tool_turns=0 + multi-file (after F45 annotate) | M | Recover quality without always failing closed; **now evidenced on #2 and #4** | **P0 next** |
+| **H15** | **Soft re-prompt once when tool_turns=0 + multi-file (before F45 annotate)** | **M** | **Recover quality without always failing closed; evidenced on #2 and #4** | **Shipped F49** |
 | H16 | Live re-score #2 mini after F47 (-z tools + F46 SOUL) | S | Measure D1/D8 lift vs F44/F45 rows | **Done H16** (total 30; -z ok; tools still 0) |
 | **H17** | **Scope SOUL/max-turns detect + agent.log capture to this-invocation log offset** | **S** | **H16: stale agent.log → false soul_blocked=1** | **Shipped F48** |
-| H18 | Hard tool nudge / require ≥1 workspace read on multi-file code PRs | S–M | gpt-4.1-mini single-shots even when -z works | backlog |
+| H18 | Hard tool nudge / require ≥1 workspace read on multi-file code PRs | S–M | gpt-4.1-mini single-shots even when -z works; if F49 stays 0 tools | **P0 next if F49 no recovery** |
 
 ## Selection rule
 
@@ -52,3 +52,5 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 **H17 → F48** (2026-07-31): `HERMES_LOG_OFFSET` into capture; this-invocation agent.log slice; stop SOUL detect on shared errors.log history.
 
 **Corpus #4** (2026-07-31): port odoo#279776 → Mr-Ashish/odoo#4; mini score 31/50; F48 verified `soul_blocked=0`; tool_turns=0 again → H15 still P0.
+
+**H15 → F49** (2026-07-31): soft re-prompt once on zero-tool multi-file code PRs before F45. `reprompt-decide`/`reprompt-write` + second `hermes -z`; `tool-turns-reprompt.env` + chips. F45 still fail-closes if attempt-2 also 0 tools.

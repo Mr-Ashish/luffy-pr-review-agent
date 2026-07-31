@@ -70,8 +70,16 @@ Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luff
 3. **Corpus diversity win:** first multi-module backend PERF PR (vs web JS #1/#2 and pure tools #3).
 4. **Reinforces H15/H18 P0:** second independent PR confirms tool skip is systemic on gpt-4.1-mini, not #2-specific.
 
+## Introspect (F49 / H15)
+
+1. **Soft re-prompt before F45:** recovery attempt is cheaper than inventing findings and honest if it fails (F45 still gates).
+2. **Spend trade:** eligible multi-file zero-tool runs pay a second `hermes -z` (~2× cheap mini). Acceptable vs false APPROVE risk.
+3. **Attempt-1 preserved:** `*.attempt1.raw.md` + `agent-loop-attempt1/` for A/B scoring.
+4. **Next:** live mini re-run #2 or #4 with F49; if still `tool_turns=0` after nudge → H18 hard tool nudge.
+
 ## Next learn targets
 
-- **H15 / H18 (P0):** recover tool use on cheap multi-file path (now evidenced on #2 and #4).
-- Maintain corpus ≥4; optional 5th when H15 ships or idle.
+- **Live verify F49** on #2 or #4 mini (measure tool_turns before/after).
+- **H18 (P0 if F49 no recovery):** hard tool nudge / require ≥1 workspace read.
+- Maintain corpus ≥4; optional 5th after F49 live score.
 - Re-score D1/D8 after next mini that achieves tool_turns>0.

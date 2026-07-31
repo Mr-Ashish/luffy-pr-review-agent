@@ -86,7 +86,13 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 | #4 | 31 (mini) | tool_turns=0; no GHA/full-model run yet |
 
 **Corpus average (best-per-PR): 36.3 / 50** (was 38.0 @3 PRs; #4 mini pulls avg down until tool-using run)  
-**Cheap-path pattern (replicated #2+#4):** gpt-4.1-mini + working `-z` still **0 tools** → F45 COMMENT; D1 stuck ~2 until H15/H18.
+**Cheap-path pattern (replicated #2+#4):** gpt-4.1-mini + working `-z` still **0 tools** → F45 COMMENT; D1 stuck ~2 until F49 recovery or H18.
+
+### Pending re-score after F49
+
+- Re-run #2 and/or #4 mini with F49 soft re-prompt; record `tool_turns_before/after` + recovered flag.
+- If recovered: expect D1/D8 lift and possible F45 skip; update best-per-PR rollup.
+- If not: keep current scores; escalate H18.
 
 ## Comparison notes (D10)
 

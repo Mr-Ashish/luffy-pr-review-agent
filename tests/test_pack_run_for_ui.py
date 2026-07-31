@@ -292,6 +292,42 @@ class PackRunForUiTests(unittest.TestCase):
             self.assertEqual(sig.get("soul_blocked_reason"), "prompt_injection")
             self.assertIn("soul-blocked", sig.get("flags") or [])
 
+    def test_f49_tool_turns_reprompt_signal(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "run"
+            src.mkdir()
+            (src / "review-2.md").write_text("**Verdict:** COMMENT\n", encoding="utf-8")
+            (src / "tool-turns-reprompt.env").write_text(
+                "reprompt=1\nattempted=1\nreason=reprompt_ran\n"
+                "tool_turns_before=0\ntool_turns_after=0\nrecovered=0\n",
+                encoding="utf-8",
+            )
+            out = Path(td) / "bundle.json"
+            r = _run(["--dir", str(src), "-o", str(out), "--host", "local"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            sig = json.loads(out.read_text())["signals"]
+            self.assertTrue(sig.get("tool_turns_reprompt"))
+            self.assertEqual(sig.get("tool_turns_reprompt_reason"), "reprompt_ran")
+            self.assertFalse(sig.get("tool_turns_reprompt_recovered"))
+            self.assertIn("tool-reprompt", sig.get("flags") or [])
+
+    def test_f49_reprompt_recovered_chip(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "run"
+            src.mkdir()
+            (src / "review-4.md").write_text("**Verdict:** REQUEST_CHANGES\n", encoding="utf-8")
+            (src / "tool-turns-reprompt.env").write_text(
+                "reprompt=1\nattempted=1\nreason=reprompt_recovered\n"
+                "tool_turns_before=0\ntool_turns_after=3\nrecovered=1\n",
+                encoding="utf-8",
+            )
+            out = Path(td) / "bundle.json"
+            r = _run(["--dir", str(src), "-o", str(out), "--host", "local"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            sig = json.loads(out.read_text())["signals"]
+            self.assertTrue(sig.get("tool_turns_reprompt_recovered"))
+            self.assertIn("tool-reprompt-ok", sig.get("flags") or [])
+
 
 if __name__ == "__main__":
     unittest.main()

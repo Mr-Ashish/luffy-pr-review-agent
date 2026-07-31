@@ -1,25 +1,36 @@
 #!/usr/bin/env python3
-"""F45: fail closed when tool_turns=0 on multi-file non-docs PRs (H12).
+"""F45 + F49: tool-turns gate (H12) and soft re-prompt (H15).
 
-Agentic review is the product differentiator. A no-tool chat fallback on a
-multi-file code PR can APPROVE while missing real gaps (odoo e2e #2 mini vs GHA).
+Agentic review is the product differentiator. A no-tool run on a multi-file
+code PR can APPROVE while missing real gaps (odoo e2e #2 mini vs GHA).
 
-This gate:
+F45 gate:
   - Detects zero tool-call turns + multi-file + not docs-only
   - Downgrades APPROVE → COMMENT (fail closed on merge-green signal)
   - Injects a visible ⚠️ callout + caps score / confidence
   - Writes tool-turns-gate.env for pack/UI chips
+
+F49 soft re-prompt (H15):
+  - Same eligibility as F45, once per review
+  - Builds a short tool-nudge suffix so hermes -z can re-run before F45 annotate
+  - Writes tool-turns-reprompt.env for pack/UI chips
 
 Usage:
   python3 scripts/tool_turns_gate.py decide \\
     --tool-turns 0 --file-count 4 --path a.js --path b.js
   python3 scripts/tool_turns_gate.py apply \\
     --review review.md --tool-turns 0 --file-count 4 --out review.md
+  python3 scripts/tool_turns_gate.py reprompt-decide \\
+    --tool-turns 0 --file-count 4 --path a.js --path b.js
+  python3 scripts/tool_turns_gate.py reprompt-write \\
+    --prompt-in prompt.md --prompt-out prompt-reprompt.md \\
+    --tool-turns 0 --file-count 4 --path a.js
 
 Env:
   LUFFY_TOOL_TURNS_GATE       1 (default) | 0/off
   LUFFY_TOOL_TURNS_MIN_FILES  default 2 (multi-file threshold)
   LUFFY_TOOL_TURNS_GATE_VERDICTS  comma list; default APPROVE
+  LUFFY_TOOL_TURNS_REPROMPT   1 (default) | 0/off  (F49/H15 soft re-prompt)
 
 Stdout decide key=value:
   gate=0|1 reason=... tool_turns=N file_count=N docs_only=true|false enabled=...
@@ -88,6 +99,17 @@ def enabled(raw: str | None = None) -> bool:
         raw
         if raw is not None
         else (os.environ.get("LUFFY_TOOL_TURNS_GATE") or "1")
+    )
+    s = str(v).strip().lower()
+    return s not in ("0", "false", "off", "no", "none", "disabled")
+
+
+def reprompt_enabled(raw: str | None = None) -> bool:
+    """F49/H15: soft re-prompt once when zero tools on multi-file code (default on)."""
+    v = (
+        raw
+        if raw is not None
+        else (os.environ.get("LUFFY_TOOL_TURNS_REPROMPT") or "1")
     )
     s = str(v).strip().lower()
     return s not in ("0", "false", "off", "no", "none", "disabled")
@@ -288,6 +310,159 @@ def decide(
     return base
 
 
+def should_reprompt(
+    *,
+    tool_turns: int | None,
+    file_count: int = 0,
+    paths: list[str] | None = None,
+    min_files_n: int | None = None,
+    reprompt_on: bool | None = None,
+    already_reprompted: bool = False,
+) -> dict[str, Any]:
+    """F49/H15: whether to soft re-prompt once (independent of F45 gate toggle).
+
+    Eligibility mirrors the zero-tools multi-file code smell, but is controlled
+    by LUFFY_TOOL_TURNS_REPROMPT (not LUFFY_TOOL_TURNS_GATE). F45 still runs
+    after the second attempt if tools remain zero.
+    """
+    on = reprompt_enabled() if reprompt_on is None else bool(reprompt_on)
+    # Reuse decide() with gate forced on so we share docs/min-files logic.
+    d = decide(
+        tool_turns=tool_turns,
+        file_count=file_count,
+        paths=paths,
+        min_files_n=min_files_n,
+        gate_on=True,
+    )
+    out: dict[str, Any] = {
+        "reprompt": 0,
+        "enabled": on,
+        "reason": "ok",
+        "tool_turns": d.get("tool_turns", ""),
+        "file_count": d.get("file_count", 0),
+        "min_files": d.get("min_files", DEFAULT_MIN_FILES),
+        "docs_only": d.get("docs_only", False),
+        "already_reprompted": bool(already_reprompted),
+        "gate_reason": d.get("reason", ""),
+    }
+    if not on:
+        out["reason"] = "reprompt_off"
+        return out
+    if already_reprompted:
+        out["reason"] = "already_reprompted"
+        return out
+    if d.get("tool_turns") == "" or d.get("tool_turns") is None:
+        out["reason"] = "tool_turns_unknown"
+        return out
+    try:
+        tt = int(d["tool_turns"])  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        out["reason"] = "tool_turns_unknown"
+        return out
+    if tt > 0:
+        out["reason"] = "tools_used"
+        return out
+    if d.get("docs_only"):
+        out["reason"] = "docs_only"
+        return out
+    if int(d.get("file_count") or 0) < int(d.get("min_files") or DEFAULT_MIN_FILES):
+        out["reason"] = "below_min_files"
+        return out
+    # Candidate: zero tools + multi-file code
+    out["reprompt"] = 1
+    out["reason"] = "zero_tools_multi_file_code"
+    return out
+
+
+def build_reprompt_suffix(
+    *,
+    tool_turns: int = 0,
+    file_count: int = 0,
+    paths: list[str] | None = None,
+) -> str:
+    """Short soft nudge appended to the original review prompt (H15)."""
+    paths = [normalize_path(p) for p in (paths or []) if normalize_path(p)]
+    sample = paths[:12]
+    more = len(paths) - len(sample)
+    files_block = ""
+    if sample:
+        bullets = "\n".join(f"  - `{p}`" for p in sample)
+        if more > 0:
+            bullets += f"\n  - … and {more} more"
+        files_block = f"\nChanged paths (from the PR):\n{bullets}\n"
+    return (
+        "\n\n---\n\n"
+        "## Soft re-prompt (Luffy H15 / F49)\n\n"
+        f"Your previous reply used **{tool_turns} tool turns** on a multi-file "
+        f"code PR (**{file_count}** files). That is incomplete for an agentic "
+        "review: do **not** finalize from the diff text alone.\n\n"
+        "Before writing the final review you **must** use workspace tools at "
+        "least once:\n"
+        "1. Read or list the changed files under the workspace root\n"
+        "2. Spot-check related tests (or note they are missing)\n"
+        "3. Only then emit the full review in the required Markdown contract\n\n"
+        "Prefer terminal/file tools over guessing. If a path is missing, say so "
+        "explicitly instead of approving on incomplete evidence.\n"
+        f"{files_block}"
+    )
+
+
+def write_reprompt_prompt(
+    *,
+    prompt_in: Path,
+    prompt_out: Path,
+    tool_turns: int = 0,
+    file_count: int = 0,
+    paths: list[str] | None = None,
+) -> str:
+    base = prompt_in.read_text(encoding="utf-8", errors="replace")
+    suffix = build_reprompt_suffix(
+        tool_turns=tool_turns,
+        file_count=file_count,
+        paths=paths,
+    )
+    # Avoid stacking multiple H15 blocks if called twice.
+    marker = "## Soft re-prompt (Luffy H15 / F49)"
+    if marker in base:
+        text = base
+    else:
+        text = base.rstrip() + suffix
+        if not text.endswith("\n"):
+            text += "\n"
+    prompt_out.parent.mkdir(parents=True, exist_ok=True)
+    prompt_out.write_text(text, encoding="utf-8")
+    return text
+
+
+def write_reprompt_env(path: Path, data: dict[str, Any]) -> None:
+    keys = [
+        "reprompt",
+        "enabled",
+        "reason",
+        "attempted",
+        "tool_turns_before",
+        "tool_turns_after",
+        "file_count",
+        "recovered",
+        "rc",
+        "skipped_reason",
+    ]
+    lines: list[str] = []
+    for k in keys:
+        if k not in data:
+            continue
+        v = data[k]
+        if isinstance(v, bool):
+            vv = "1" if v else "0"
+        else:
+            vv = str(v).replace("\n", " ").replace("\r", "")
+        lines.append(f"{k}={vv}")
+    # Always include attempted default
+    if "attempted" not in data:
+        lines.insert(0 if not lines else len(lines), "attempted=0")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def banner_md(*, tool_turns: int, file_count: int, reason: str) -> str:
     return (
         f"> ⚠️ **Incomplete agentic review (F45):** Hermes recorded "
@@ -460,6 +635,66 @@ def cmd_apply(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_reprompt_decide(args: argparse.Namespace) -> int:
+    paths = load_paths(
+        Path(args.paths_file) if args.paths_file else None,
+        list(args.path or []),
+    )
+    tt = read_tool_turns(
+        tool_turns=args.tool_turns,
+        loop_json=Path(args.loop_json) if args.loop_json else None,
+    )
+    d = should_reprompt(
+        tool_turns=tt,
+        file_count=args.file_count if args.file_count is not None else 0,
+        paths=paths,
+        min_files_n=args.min_files,
+        reprompt_on=(
+            reprompt_enabled(args.reprompt_enabled)
+            if args.reprompt_enabled is not None
+            else None
+        ),
+        already_reprompted=bool(args.already),
+    )
+    _emit_kv(d)
+    return 0
+
+
+def cmd_reprompt_write(args: argparse.Namespace) -> int:
+    paths = load_paths(
+        Path(args.paths_file) if args.paths_file else None,
+        list(args.path or []),
+    )
+    tt = read_tool_turns(
+        tool_turns=args.tool_turns,
+        loop_json=Path(args.loop_json) if args.loop_json else None,
+    )
+    if tt is None:
+        tt = 0
+    pin = Path(args.prompt_in)
+    if not pin.is_file():
+        print(f"error: prompt not found: {pin}", file=sys.stderr)
+        return 1
+    pout = Path(args.prompt_out)
+    fc = args.file_count if args.file_count is not None else (len(paths) or 0)
+    write_reprompt_prompt(
+        prompt_in=pin,
+        prompt_out=pout,
+        tool_turns=int(tt),
+        file_count=int(fc),
+        paths=paths,
+    )
+    _emit_kv(
+        {
+            "prompt_out": str(pout),
+            "bytes": pout.stat().st_size if pout.is_file() else 0,
+            "tool_turns": tt,
+            "file_count": fc,
+        }
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -496,6 +731,32 @@ def main(argv: list[str] | None = None) -> int:
         help="Write tool-turns-gate.env key=value for pack/UI",
     )
     a.set_defaults(func=cmd_apply)
+
+    rd = sub.add_parser(
+        "reprompt-decide",
+        help="F49/H15: print soft re-prompt decision key=value",
+    )
+    add_common(rd)
+    rd.add_argument(
+        "--reprompt-enabled",
+        default=None,
+        help="override LUFFY_TOOL_TURNS_REPROMPT (1/0)",
+    )
+    rd.add_argument(
+        "--already",
+        action="store_true",
+        help="already re-prompted once this run (forces skip)",
+    )
+    rd.set_defaults(func=cmd_reprompt_decide)
+
+    rw = sub.add_parser(
+        "reprompt-write",
+        help="F49/H15: write prompt + soft tool-nudge suffix",
+    )
+    add_common(rw)
+    rw.add_argument("--prompt-in", required=True, help="Original prompt path")
+    rw.add_argument("--prompt-out", required=True, help="Nudged prompt output path")
+    rw.set_defaults(func=cmd_reprompt_write)
 
     args = p.parse_args(argv)
     return int(args.func(args))

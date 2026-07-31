@@ -109,6 +109,86 @@ Looks good enough.
         self.assertEqual(new, self.SAMPLE)
 
 
+class RepromptTests(unittest.TestCase):
+    """F49 / H15 soft re-prompt helpers."""
+
+    def test_should_reprompt_zero_tools(self):
+        d = _mod.should_reprompt(
+            tool_turns=0, file_count=4, paths=["a.py", "b.py", "c.py"]
+        )
+        self.assertEqual(d["reprompt"], 1)
+        self.assertEqual(d["reason"], "zero_tools_multi_file_code")
+
+    def test_should_not_reprompt_when_tools(self):
+        d = _mod.should_reprompt(tool_turns=2, file_count=4, paths=["a.py", "b.py"])
+        self.assertEqual(d["reprompt"], 0)
+        self.assertEqual(d["reason"], "tools_used")
+
+    def test_should_not_reprompt_docs_only(self):
+        d = _mod.should_reprompt(
+            tool_turns=0,
+            file_count=3,
+            paths=["README.md", "docs/a.md", "CHANGELOG.md"],
+        )
+        self.assertEqual(d["reprompt"], 0)
+        self.assertEqual(d["reason"], "docs_only")
+
+    def test_should_not_reprompt_already(self):
+        d = _mod.should_reprompt(
+            tool_turns=0,
+            file_count=3,
+            paths=["a.py", "b.py"],
+            already_reprompted=True,
+        )
+        self.assertEqual(d["reprompt"], 0)
+        self.assertEqual(d["reason"], "already_reprompted")
+
+    def test_reprompt_off_env(self):
+        d = _mod.should_reprompt(
+            tool_turns=0,
+            file_count=3,
+            paths=["a.py", "b.py"],
+            reprompt_on=False,
+        )
+        self.assertEqual(d["reprompt"], 0)
+        self.assertEqual(d["reason"], "reprompt_off")
+
+    def test_build_suffix_contains_nudge(self):
+        s = _mod.build_reprompt_suffix(
+            tool_turns=0, file_count=3, paths=["a.py", "b.py", "c.py"]
+        )
+        self.assertIn("Soft re-prompt (Luffy H15 / F49)", s)
+        self.assertIn("0 tool turns", s)
+        self.assertIn("`a.py`", s)
+
+    def test_write_reprompt_idempotent(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_p = Path(td)
+            pin = td_p / "prompt.md"
+            pin.write_text("hello review prompt\n", encoding="utf-8")
+            pout = td_p / "out.md"
+            _mod.write_reprompt_prompt(
+                prompt_in=pin,
+                prompt_out=pout,
+                tool_turns=0,
+                file_count=2,
+                paths=["x.js", "y.js"],
+            )
+            once = pout.read_text(encoding="utf-8")
+            # second write from already-nudged prompt must not stack
+            _mod.write_reprompt_prompt(
+                prompt_in=pout,
+                prompt_out=pout,
+                tool_turns=0,
+                file_count=2,
+                paths=["x.js", "y.js"],
+            )
+            twice = pout.read_text(encoding="utf-8")
+            self.assertEqual(once.count("Soft re-prompt (Luffy H15 / F49)"), 1)
+            self.assertEqual(twice.count("Soft re-prompt (Luffy H15 / F49)"), 1)
+            self.assertIn("hello review prompt", twice)
+
+
 class CliTests(unittest.TestCase):
     def test_decide_cli(self):
         r = subprocess.run(
@@ -131,6 +211,29 @@ class CliTests(unittest.TestCase):
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("gate=1", r.stdout)
+        self.assertIn("reason=zero_tools_multi_file_code", r.stdout)
+
+    def test_reprompt_decide_cli(self):
+        r = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "reprompt-decide",
+                "--tool-turns",
+                "0",
+                "--file-count",
+                "4",
+                "--path",
+                "a.js",
+                "--path",
+                "b.js",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("reprompt=1", r.stdout)
         self.assertIn("reason=zero_tools_multi_file_code", r.stdout)
 
     def test_apply_cli_and_env(self):
@@ -207,6 +310,13 @@ class WireTests(unittest.TestCase):
         self.assertIn("tool_turns_gate.py", text)
         self.assertIn("F45", text)
         self.assertIn("tool-turns-gate.env", text)
+
+    def test_run_hermes_mentions_f49(self):
+        text = (ROOT / "scripts" / "run-hermes-review.sh").read_text(encoding="utf-8")
+        self.assertIn("F49", text)
+        self.assertIn("reprompt-decide", text)
+        self.assertIn("tool-turns-reprompt.env", text)
+        self.assertIn("LUFFY_TOOL_TURNS_REPROMPT", text)
 
     def test_install_pack_lists_script(self):
         text = (ROOT / "scripts" / "install-luffy.sh").read_text(encoding="utf-8")

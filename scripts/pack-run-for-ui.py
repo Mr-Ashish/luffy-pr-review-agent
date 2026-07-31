@@ -139,6 +139,7 @@ def collect_signals(
       model-tier.env (F42)                              → model_tier / selected_tier
       preflight-cost.env (F43)                          → preflight_refuse / forced_cheap
       tool-turns-gate.env (F45)                         → tool_turns_gate (H12)
+      tool-turns-reprompt.env (F49)                     → tool_turns_reprompt (H15)
       soul-context.env (F46)                            → soul_blocked (H13)
     """
     signals: dict = {
@@ -158,6 +159,9 @@ def collect_signals(
         "preflight_estimated_usd": None,
         "tool_turns_gate": False,
         "tool_turns_gate_reason": None,
+        "tool_turns_reprompt": False,
+        "tool_turns_reprompt_reason": None,
+        "tool_turns_reprompt_recovered": False,
         "soul_blocked": False,
         "soul_blocked_reason": None,
         "flags": [],  # short chip labels for UI
@@ -330,6 +334,36 @@ def collect_signals(
         signals["tool_turns_gate"] = True
         signals["tool_turns_gate_reason"] = signals.get("tool_turns_gate_reason") or "review_banner"
 
+    # F49 soft re-prompt (H15)
+    ttr = _parse_env_file(dir_path / "tool-turns-reprompt.env")
+    if ttr.get("attempted") in ("1", "true", "yes") or ttr.get("reprompt") in (
+        "1",
+        "true",
+        "yes",
+    ):
+        signals["tool_turns_reprompt"] = True
+        if ttr.get("reason"):
+            signals["tool_turns_reprompt_reason"] = ttr["reason"]
+        if ttr.get("recovered") in ("1", "true", "yes"):
+            signals["tool_turns_reprompt_recovered"] = True
+        if ttr.get("tool_turns_before") not in (None, ""):
+            try:
+                signals["tool_turns_before"] = int(ttr["tool_turns_before"])
+            except ValueError:
+                signals["tool_turns_before"] = ttr["tool_turns_before"]
+        if ttr.get("tool_turns_after") not in (None, ""):
+            try:
+                signals["tool_turns_after"] = int(ttr["tool_turns_after"])
+            except ValueError:
+                signals["tool_turns_after"] = ttr["tool_turns_after"]
+    if not signals["tool_turns_reprompt"] and (
+        "soft re-prompt (f49" in low or "soft re-prompt (luffy h15" in low
+    ):
+        signals["tool_turns_reprompt"] = True
+        signals["tool_turns_reprompt_reason"] = (
+            signals.get("tool_turns_reprompt_reason") or "review_banner"
+        )
+
     # F46 SOUL.md blocked by Hermes context scanner
     sce = _parse_env_file(dir_path / "soul-context.env")
     scp = _parse_env_file(dir_path / "soul-context-preflight.env")
@@ -370,6 +404,11 @@ def collect_signals(
         flags.append("preflight-cheap")
     if signals.get("tool_turns_gate"):
         flags.append("tool-turns-gate")
+    if signals.get("tool_turns_reprompt"):
+        if signals.get("tool_turns_reprompt_recovered"):
+            flags.append("tool-reprompt-ok")
+        else:
+            flags.append("tool-reprompt")
     if signals.get("soul_blocked"):
         flags.append("soul-blocked")
     # Surface auto/cheap/full when tier mode is active (not plain off/default)
