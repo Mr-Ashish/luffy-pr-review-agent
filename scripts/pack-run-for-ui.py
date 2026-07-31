@@ -87,6 +87,7 @@ def parse_review(md: str) -> dict:
         "confidence": field("Confidence"),
         "summary": section("Summary"),
         "walkthrough": section("Walkthrough"),
+        "multi_lens": section("Multi-lens checklist"),
         "blocking": blocking,
         "findings": findings,
         "security": section("Security audit") or field("Security audit"),

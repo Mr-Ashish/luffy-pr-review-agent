@@ -2,11 +2,11 @@
 
 Primary checkout: `/Users/ashishmishra/Documents/experiments/pr-review-agent` (main).
 
-Worktree root convention: `/Users/ashishmishra/Documents/experiments/pr-review-agent-wt/<feature-slug>` (create when building parallel features).
+Worktree root convention: `/Users/ashishmishra/Documents/experiments/pr-review-agent-wt/<feature-slug>`.
 
 | Worktree | Branch | PR | Status | Notes |
 |----------|--------|-----|--------|-------|
-| *(none active)* | — | — | — | Last product ship F51 on main; H27 score-only fire |
+| `…/pr-review-agent-wt/f52-multi-lens` | `feature/f52-multi-lens` | (opening) | active | F52 H28 multi-lens checklist |
 
 ## Open Luffy PRs (Mr-Ashish/luffy-pr-review-agent)
 
@@ -20,4 +20,4 @@ Worktree root convention: `/Users/ashishmishra/Documents/experiments/pr-review-a
 |----|--------|--------|
 | [#1](https://github.com/Mr-Ashish/odoo/pull/1)–[#6](https://github.com/Mr-Ashish/odoo/pull/6) | fix/* | OPEN luffy-eval |
 
-Updated: 2026-07-31 (H27).
+Updated: 2026-07-31 (F52).
