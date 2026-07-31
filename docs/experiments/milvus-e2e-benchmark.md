@@ -37,7 +37,7 @@ Milvus #2 **37/50** slightly above #1; memory compound + multi-module mermaid.
 
 - **#3 F49 mini:** Soft re-prompt recovered `tool_turns` **0→10** (sessions `20260801_000121_833521` → `20260801_000138_88d5da`); **APPROVE 95** high · ~$0.023 · 11 API · **63s**; MEMORY local ~5kB; security audit cites validation/URI/mutual exclusion; F57 2 groups pkg/internal; score **39/50** (best milvus so far on cost+security narrative).
 
-### Corpus summary (n=3)
+### Corpus summary (n=3) — local F49 baseline
 
 | PR | Total | Tools | Cost | Lat | Memory | Verdict |
 |----|------:|------:|-----:|----:|--------|---------|
@@ -46,3 +46,21 @@ Milvus #2 **37/50** slightly above #1; memory compound + multi-module mermaid.
 | #3 Azure broker | 39 | 0→10 | $0.02 | 63s | local | APPROVE 95 |
 
 **Mean:** ~37.3/50. F49 recovery 100%. Gap: D1/D3/D5 soft findings + inline anchors.
+
+## Modal re-score (F66 / F54–F64 stack, 2026-08-01)
+
+Host: Modal bit-3 · model `openai/gpt-4.1-mini` · version **`0.7.0-f66`** · `LUFFY_LENS_PACK=auto`.
+
+| PR | D1 | D2 | D3 | D4 | D5 | D6 | D7 | D8 | D9 | D10 | Total/50 | Host score | Tools | Lat | Verdict |
+|----|----|----|----|----|----|----|----|----|-----|----------|---------|------------|------|-----|---------|
+| #1 Modal F66 | 3 | 4 | 3 | 4 | 3 | 4 | 5 | 3 | 5 | 4 | **38** | 69 | F49 ok | ~120s | REQUEST CHANGES (F50 test-gap) |
+| #2 Modal F66 | 3 | 4 | 3 | 4 | 3 | 4 | 5 | 4 | 4 | 4 | **38** | 95 | 0→3 | ~78s | APPROVE |
+| #3 Modal F66 | 4 | 4 | 3 | 4 | 3 | 4 | 5 | 4 | 4 | 4 | **39** | 95 | 0→15 | ~97s | APPROVE |
+
+**Modal mean:** ~38.3/50 (+1 vs local F49 mean). All `BIT3_OK` + posted comments. Soft gap: `verdict_rc=2` (formal PR review/labels). Gap still D1/D3/D5 soft path:LINE findings on mini.
+
+### Modal evidence links
+
+- #1: https://github.com/Mr-Ashish/milvus/pull/1#issuecomment-5146512078  
+- #2: https://github.com/Mr-Ashish/milvus/pull/2#issuecomment-5146562459  
+- #3: https://github.com/Mr-Ashish/milvus/pull/3#issuecomment-5146576251  
