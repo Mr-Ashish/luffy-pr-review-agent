@@ -111,6 +111,10 @@ REPO=owner/name HERMES_HOME=/tmp/hh LUFFY_MEMORY_MODE=local bash scripts/preload
 - Exercise the F27 local ingest offline against any checkout: `CLIENT_PAYLOAD_FILE=path/to/client_payload.json LUFFY_INGEST_LAYOUT=local LUFFY_MEMORY_ROOT=/path/to/target python3 scripts/hub-ingest-run.py` — prints `MEMORY=`, `RUN_DIR=`, `LAYOUT=local` and writes `.luffy-ingest-summary.txt` at the root.
 - Check which memory source a run would use: `REPO=owner/name HERMES_HOME=/tmp/hh LUFFY_MEMORY_MODE=local bash scripts/preload-hub-memory.sh` (needs network or a curl stub); the `MEMORY_SOURCE=` line on stdout tells you local vs hub vs seed.
 
+- Inline comments (F9) can be exercised with zero GitHub API calls: set `LUFFY_INLINE_FIXTURE=<path>` and `post-inline-comments.py` writes the review payload JSON to that path instead of calling `gh api` — this is the hook the tests use, and the same trick works for inspecting a real run's intended anchors.
+- `LUFFY_INLINE_DIFF` overrides which diff file the anchor resolution reads, so you can replay anchoring against a saved `pr.diff` (e.g. from a showcase trace) without re-assembling context.
+- Identify Luffy's inline output by its markers when auditing a PR: each comment body carries `<!-- luffy-inline -->` and the enclosing review body carries `<!-- luffy-inline-review pr=N -->`.
+
 ## Troubleshooting
 
 - Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` (`mode=pack|caller`, `source_sha`) and compare with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`. For `mode=caller`, runtime tracks hub `main`, not the stamp alone.

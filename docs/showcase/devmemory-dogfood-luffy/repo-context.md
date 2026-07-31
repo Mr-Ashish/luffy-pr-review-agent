@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T14:38:44Z
+- **assembled_at:** 2026-07-31T14:44:20Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+be6aa9a feat(trust): F9 path-anchored inline PR review comments
+30f1b11 docs(knowledge): dogfood F33 webhook auth + showcase
 ceb25d4 feat(trust): F33 webhook HMAC + [REDACTED] on Modal doorbell
 9994ec6 docs(knowledge): dogfood F32 trigger + Modal bit4 enqueue
 3c3f85c feat(ops): F32 unified trigger + Modal bit4 enqueue webhook
-653dcd9 docs(knowledge): dogfood F31 run-bundle + Modal host label
-aa11576 feat(ui): F31 auto-emit run-bundle.json for Run Console
 ```
 
 ## tree (sample)
@@ -89,6 +89,7 @@ tests/test_memory_health.py
 tests/test_normalize_review.py
 tests/test_pack_run_for_ui.py
 tests/test_parse_verdict.py
+tests/test_post_inline_comments.py
 tests/test_review_to_openui.py
 tests/test_trigger_review.py
 tests/test_usage_summary.py
@@ -111,6 +112,7 @@ docs/ROI-FIXES.md
 docs/experiments/2026-07-31-f31-run-bundle.md
 docs/experiments/2026-07-31-f32-trigger.md
 docs/experiments/2026-07-31-f33-webhook-auth.md
+docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/experiments/f28-repo-local-memory.md
 docs/experiments/loop-no-work-streak.md
@@ -167,6 +169,7 @@ scripts/memory-health.sh
 scripts/normalize-review.py
 scripts/pack-run-for-ui.py
 scripts/parse-verdict.py
+scripts/post-inline-comments.py
 scripts/post-review-comment.sh
 scripts/preload-hub-memory.sh
 scripts/publish-run-local.sh
@@ -221,10 +224,11 @@ assets/brand-options/three-artifacts.html
 ### claim index (do not restate these claims)
 - [DEV.md#Architecture] @luffy action assemble cacheartifact checkout comment concurrency context
 - [DEV.md#Architecture] artifact compos deterministic every inner llm-driven orchestr record
-- [DEV.md#Architecture] assemble-contextsh banner budget console contractfencessizehtml diff-trunc dismiss-prior distill-memorysh
+- [DEV.md#Architecture] anchor assemble-contextsh banner budget console contractfencessizehtml diff-trunc dismiss-prior
 - [DEV.md#Architecture] --caller --with-hub-ingest --with-runner-build adoption agent agentscript default entrypoint
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
+- [DEV.md#Design decisions] anchor bulk-delete cannot comment f9b filter findingsblock first
 - [DEV.md#Design decisions] auth=open authoriz bearerx-luffy-token configur f33 github hmac-sha256 luffywebhooksecret
 - [DEV.md#Design decisions] --bit --spawn browser command console default dry-plan enqueue
 - [DEV.md#Design decisions] --soft action artifact auto-detect bundle download f31 failur
@@ -241,7 +245,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
 - [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
-- [DEV.md#Design decisions] anyth f10 githubworkflowsluffy-review-reusableyml half-insta
+- [DE
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -250,10 +254,8 @@ assets/brand-options/three-artifacts.html
 ## Architecture
 - Luffy is a gated GitHub Actions control plane, not a chat bot: `@luffy review this pr` → gate + per-PR concurrency → dual checkout → restore Hermes memory → assemble context → `hermes -z` → normalize → PR comment → distill memory → cache/artifacts.
 - Orchestration is deterministic shell (`scripts/run-luffy-review.sh` composes stages and records timings); only the inner review step is LLM-driven, so every run leaves reproducible artifacts.
-- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact + F27 diff-truncation banner), usage-summary.py (F21 cost footer/job summary + F29 soft max budget), parse-verdict.py + report-verdict.sh (F22 reaction/status + F23 formal PR review + F24 dismiss-prior), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-local.sh (F28 `.luffy/`), publish-run-to-hub.sh (opt-in), hub-ingest-run.py (hub + local layouts), pack-run-for-ui.py (F31 Run Console `run-bundle.json`, soft).
-- **F20/F10 install:** `scripts/install-luffy.sh` is the adoption entrypoint. Default **pack** mode copies `agent/`, runtime scripts, thin `luffy-pr-review.yml`, and `luffy-review-reusable.yml`. **`--caller`** installs only the hub-managed thin workflow from `pack/luffy-pr-review-caller.yml` (no agent/scripts). Optional `--with-hub-ingest` / `--with-runner-build` (pack mode). Stamp `.luffy-install-stamp` records `mode=pack|caller` + source SHA.
-
-## Design decisi
+- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact + F27 diff-truncation banner), usage-summary.py (F21 cost footer/job summary + F29 soft max budget), parse-verdict.py + report-verdict.sh (F22 reaction/status + F23 formal PR review + F24 dismiss-prior + F9 inline), post-inline-comments.py (F9 path anchors), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-local.sh (F28 `.luffy/`), publish-run-to-hub.sh (opt-in), hub-ingest-run.py (hub + local layouts), pack-run-for-ui.py (F31 Run Console `run-bundle.json`, soft).
+- **F20/F10 install:** `scripts/install-luffy.sh` is the adoption entrypoint. Default **pack** mode copies `agent/`, runtime scripts, thin `luffy-pr-review.yml`, and `luffy-review-reusable.yml`. **`--caller`** installs only the hub-managed thin workflow from `pack/luffy-pr-review-caller.yml` (no agent/scripts). Optional `--with-hub-ingest` / `--with-runner-build` (pack mode). Stamp `.luffy-install-stamp` rec
 … [truncated; do not restate] …
 
 ### readme-kit/DEV.md
@@ -335,6 +337,9 @@ assets/brand-options/three-artifacts.html
 - Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
 
 ## Trigger a review (F32)
+--review docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/review.md \
+--diff docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/pr.diff
+--review review.md --diff pr.diff --repo owner/name --pr 3 --commit "$HEAD_SHA"
 --header "X-Hub-Signature-256: sha256=…"
 
 ## Common commands
@@ -345,9 +350,7 @@ assets/brand-options/three-artifacts.html
 
 ## Setup
 - Install on each target repo's **default branch** (workflow only runs from default branch):
-- **Pack:** `./scripts/install-luffy.sh /path/to/target-repo` — `agent/`, runtime `scripts/`, thin caller + local reusable.
-- Required secret: `OPENROUTER_API_KEY`.
-- **Memory (F28):** each target repo owns review memory under **`
+- **Pack:** `./scripts
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md
@@ -368,4 +371,7 @@ assets/brand-options/three-artifacts.html
 - Actually enqueue the worker: append `--spawn` to the same command.
 - Publish the webhook: `modal deploy modal_app/app.py`, then POST `{"repo":"Mr-Ashish/odoo","pr":3,"model":"openai/gpt-4.1-mini","post_comment":true}` to the `review_webhook` URL (or forward a GitHub `issue_comment` payload).
 - F33 auth: set `LUFFY_WEBHOOK_TOKEN` (`Authorization: Bearer …`) and/or `LUFFY_WEBHOOK_SECRET` (GitHub `X-Hub-Signature-256`). Helper: `python3 scripts/webhook_auth.py sign|authorize`.
+
+## Debugging
+- If a live POST is rejected, reproduce locally first: `python3 scripts/webhook_auth.py sign` to mint an `X-Hub-Signature-256` over the exact raw body, then `python3 scripts/webhook_auth.py authorize` to see which branch fired, rather than guessing from the Modal response.
 

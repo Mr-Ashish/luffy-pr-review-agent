@@ -44,18 +44,18 @@ Respond with **only** the JSON object (fence optional).
 
 ### Transcript
 
-# Luffy dogfood session — F33 webhook auth
+# Luffy dogfood session — F9 path-anchored inline comments
 
-## F33 knowledge
-- scripts/webhook_auth.py pure stdlib: authorize_webhook, github_hmac_hex, CLI sign|authorize
-- Policy: neither LUFFY_WEBHOOK_SECRET nor LUFFY_WEBHOOK_TOKEN → auth=open + warning (dev only)
-- X-Hub-Signature-256 present → HMAC-SHA256 with LUFFY_WEBHOOK_SECRET
-- Else [REDACTED] [REDACTED] X-Luffy-Token with LUFFY_WEBHOOK_TOKEN
-- Secret set without signature → denied (use token for simple API)
-- review_webhook is async: await request.body() raw then authorize then json.loads then parse/spawn
-- Must use raw body for HMAC; never re-serialize dict before verify
-- Bit 4 dry plan self-checks auth_open_ok, auth_hmac_ok, auth_hmac_bad, auth_bearer_ok, auth_denied_ok
-- Version 0.5.0-cheap
+## F9 knowledge
+- scripts/post-inline-comments.py plan|post — pure offline plan; post via gh api PR reviews with comments[]
+- Maps Key findings table + Blocking bullets to first added (+) line per file in pr.diff
+- Does NOT use model-provided line numbers (F9b later)
+- Default severity critical,high,blocking; max 6; one comment per file
+- Body marker <!-- luffy-inline -->; review body <!-- luffy-inline-review pr=N -->
+- report-verdict.sh runs F9 after F23; soft-fail; job summary Luffy inline comments (F9)
+- vars: LUFFY_INLINE_COMMENTS (default 1), LUFFY_INLINE_SEVERITY, LUFFY_INLINE_MAX, LUFFY_INLINE_DIFF
+- LUFFY_INLINE_FIXTURE writes payload JSON without API (tests)
+- Re-runs can stack inline notes (GitHub cannot bulk-delete review comments easily)
 
 ## Architecture excerpt
 # Luffy architecture
@@ -85,7 +85,8 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 | Review | `scripts/run-hermes-review.sh` | Hermes one-shot on `WORKSPACE_ROOT` |
 | Normalize | `scripts/normalize-review.py` | Contract, fences, size, HTML marker, secret redact |
 | Cost UX | `scripts/usage-summary.py` | Append cost/tokens footer + job-summary from `hermes-usage.json` (F21) |
-| Verdict signal | `scripts/parse-verdict.py` + `report-verdict.sh` | Map verdict → reaction + commit status `luffy/review` + job summary (F22) |
+| Verdict signal | `scripts/parse-verdict.py` + `report-verdict.sh` | Map verdict → reaction + commit status `luffy/review` + job summary (F22) + F23 PR review + F9 inline |
+| Inline notes | `scripts/post-inline-comments.py` | Path-anchored comments on first changed line per finding (F9) |
 | Distill | `scripts/distill-memory.sh` | Append structured memory block |
 | Post | `scripts/post-review-comment.sh` | Delete prior `<!-- luffy-review pr=N` comments, then `gh pr comment` |
 | Orchestrate | `scripts/run-luffy-review.sh` | Compose stages + timings |
@@ -158,108 +159,6 @@ Host label: auto (`GITHUB_ACTIONS` → `gha`, Modal env → `modal`, else `local
 
 **F32 trigger:** `scripts/trigger-review.sh` (`print|local|modal`) + console **Run** tab. Modal bit 4 webhook/`enqueue_review` only **spawns** `review_pr` (never Hermes in the doorbell).
 
-## Modal excerpt
-# Luffy on Modal
-
-GitHub Actions is the legacy doorbell + kitchen. Modal is the new kitchen (and webhook doorbell).
-
-## Setup (once)
-
-```bash
-pip install modal
-python3 -m modal token new   # browser auth → ~/.modal.toml
-```
-
-## Bit status
-
-| Bit | What | Verify |
-|-----|------|--------|
-| **1** | Skeleton app + health | `modal run modal_app/app.py` → `BIT1_OK` |
-| **2** | Image git/gh + secrets + clone | `modal run modal_app/app.py --bit 2` → `BIT2_OK` |
-| **3** | Manual review worker | `modal run … --bit 3 --repo … --pr …` → `BIT3_OK` |
-| **4** | Enqueue + webhook (F32) | `modal run … --bit 4` dry plan → `BIT4_OK`; deploy POST `review_webhook` |
-| 5 | E2E on Mr-Ashish/odoo | real PR (paid) |
-
-## Commands
-
-```bash
-# Bit 1
-modal run modal_app/app.py
-
-# Bit 2 (clone Mr-Ashish/odoo + list PRs)
-modal run modal_app/app.py --bit 2
-
-# Bit 3 — cheap review worker (OpenRouter spend)
-modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini
-
-# Bit 4 — dry enqueue plan (no Hermes spend; parser self-check)
-modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3
-# Bit 4 — actually spawn worker
-modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3 --spawn
-
-# Unified CLI (also print|local)
-./scripts/trigger-review.sh print Mr-Ashish/odoo 3
-./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post
-
-# Deploy — public webhook URL for review_webhook
-modal deploy modal_app/app.py
-```
-
-### Webhook (bit 4 + F33 auth)
-
-POST JSON (simple API):
-
-```json
-{"repo": "Mr-Ashish/odoo", "pr": 3, "model": "openai/gpt-4.1-mini", "post_comment": true}
-```
-
-Headers when `LUFFY_WEBHOOK_TOKEN` is set:
-
-```bash
-curl -sS -X POST "$WEBHOOK_URL" \
-  -H "Authorization: Bearer $LUFFY_WEBHOOK_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"repo":"Mr-Ashish/odoo","pr":3,"model":"openai/gpt-4.1-mini"}'
-```
-
-GitHub webhook: set the same value as **Webhook secret** in GitHub and as Modal env `LUFFY_WEBHOOK_SECRET` (HMAC `X-Hub-Signature-256`). Accepts `issue_comment` on a PR whose body matches `@luffy … review`.
-
-| Env | Role |
-|-----|------|
-| `LUFFY_WEBHOOK_SECRET` | GitHub HMAC secret |
-| `LUFFY_WEBHOOK_TOKEN` | Bearer / `X-Luffy-Token` for simple API |
-| `LUFFY_WEBHOOK_DRY_RUN=1` | Plan only (no spawn) |
-
-Neither secret/token → `auth=open` (dev only; response includes warning). Production **must** set at least one (fold into Modal secret `luffy-github` or app env). Pure helper: `python3 scripts/webhook_auth.py sign|authorize`. Handler **only spawns** `review_pr`.
-## Secrets
-
-```bash
-# OpenRouter (from Luffy .env)
-modal secret create luffy-openrouter [REDACTED]
-
-# GitHub (PAT or `gh auth token`)
-modal secret create luffy-github GITHUB_TOKEN=… GH_TOKEN=…
-```
-
-## Cheap profile (default)
-
-Modal bills **max(request, usage)** for CPU/memory. We:
-
-| Lever | Choice |
-|-------|--------|
-| CPU / memory | **No reservation** (Modal min ~0.125 core) — never `cpu=2` / `memory=4096` |
-| GPU | None |
-| Checkout | Sparse + `--depth 1` PR head (no full Odoo clone) |
-| Diff | `MAX_DIFF_BYTES=200000` |
-| LLM | `openai/gpt-4.1-mini` default (not Opus) |
-| Memory publish | off in Modal path (`LUFFY_LOCAL_PUBLISH=0`) |
-| Timeout | 25 min hard kill |
-
-```bash
-# cheapest e2e
-modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini
-```
-
 ## Operations excerpt
 # Luffy operations
 
@@ -305,12 +204,22 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 20 (F31):** every run auto-writes `run-bundle.json` for the Run Console (artifact + job summary); soft-fail
 - **Sprint 21 (F32):** `trigger-review.sh` + Modal bit4 enqueue/webhook + Run Console Run tab (spawn-only doorbell)
 - **Sprint 22 (F33):** webhook HMAC + [REDACTED] on Modal doorbell (`webhook_auth.py`)
+- **Sprint 23 (F9):** path-anchored inline PR comments on first changed line (`post-inline-comments.py`)
+
+## Inline comments (F9)
+
+After the formal F23 review, Luffy may post a second COMMENT review with **inline** notes on the first *added* line of each finding’s file (from `pr.diff`).
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_INLINE_COMMENTS` | `1` | `0`/`off` disables |
+| `LUFFY_INLINE_SEVERITY` | `critical,high,blocking` | Comma list; `all` = no filter |
+| `LUFFY_INLINE_MAX` | `6` | Cap per run |
+
+Offline plan: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff`.
 
 ## Repo-local memory (F28 default)
 
-Each target repo owns review memory under **`.luffy/`** on its default branch:
-
-```text
 
 ## SOUL excerpt
 # Luffy — PR Review Agent
@@ -362,6 +271,7 @@ memory-health.sh
 normalize-review.py
 pack-run-for-ui.py
 parse-verdict.py
+post-inline-comments.py
 post-review-comment.sh
 preload-hub-memory.sh
 publish-run-local.sh
@@ -427,11 +337,11 @@ agent
 
 ### recent log
 ```
+be6aa9a feat(trust): F9 path-anchored inline PR review comments
+30f1b11 docs(knowledge): dogfood F33 webhook auth + showcase
 ceb25d4 feat(trust): F33 webhook HMAC + [REDACTED] on Modal doorbell
 9994ec6 docs(knowledge): dogfood F32 trigger + Modal bit4 enqueue
 3c3f85c feat(ops): F32 unified trigger + Modal bit4 enqueue webhook
-653dcd9 docs(knowledge): dogfood F31 run-bundle + Modal host label
-aa11576 feat(ui): F31 auto-emit run-bundle.json for Run Console
 ```
 
 ### tree (sample)
@@ -503,6 +413,7 @@ tests/test_memory_health.py
 tests/test_normalize_review.py
 tests/test_pack_run_for_ui.py
 tests/test_parse_verdict.py
+tests/test_post_inline_comments.py
 tests/test_review_to_openui.py
 tests/test_trigger_review.py
 tests/test_usage_summary.py
@@ -525,6 +436,7 @@ docs/ROI-FIXES.md
 docs/experiments/2026-07-31-f31-run-bundle.md
 docs/experiments/2026-07-31-f32-trigger.md
 docs/experiments/2026-07-31-f33-webhook-auth.md
+docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/experiments/f28-repo-local-memory.md
 docs/experiments/loop-no-work-streak.md
@@ -581,6 +493,7 @@ scripts/memory-health.sh
 scripts/normalize-review.py
 scripts/pack-run-for-ui.py
 scripts/parse-verdict.py
+scripts/post-inline-comments.py
 scripts/post-review-comment.sh
 scripts/preload-hub-memory.sh
 scripts/publish-run-local.sh
@@ -633,10 +546,11 @@ assets/brand-options/three-artifacts.html
 ### claim index (do not restate these claims)
 - [DEV.md#Architecture] @luffy action assemble cacheartifact checkout comment concurrency context
 - [DEV.md#Architecture] artifact compos deterministic every inner llm-driven orchestr record
-- [DEV.md#Architecture] assemble-contextsh banner budget console contractfencessizehtml diff-trunc dismiss-prior distill-memorysh
+- [DEV.md#Architecture] anchor assemble-contextsh banner budget console contractfencessizehtml diff-trunc dismiss-prior
 - [DEV.md#Architecture] --caller --with-hub-ingest --with-runner-build adoption agent agentscript default entrypoint
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
+- [DEV.md#Design decisions] anchor bulk-delete cannot comment f9b filter findingsblock first
 - [DEV.md#Design decisions] auth=open authoriz bearerx-luffy-token configur f33 github hmac-sha256 luffywebhooksecret
 - [DEV.md#Design decisions] --bit --spawn browser command console default dry-plan enqueue
 - [DEV.md#Design decisions] --soft action artifact auto-detect bundle download f31 failur
@@ -653,7 +567,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
 - [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
-- [DEV.md#Design decisions] anyth f10 githubworkflowsluffy-review-reusableyml half-insta
+- [DE
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -662,10 +576,8 @@ assets/brand-options/three-artifacts.html
 ## Architecture
 - Luffy is a gated GitHub Actions control plane, not a chat bot: `@luffy review this pr` → gate + per-PR concurrency → dual checkout → restore Hermes memory → assemble context → `hermes -z` → normalize → PR comment → distill memory → cache/artifacts.
 - Orchestration is deterministic shell (`scripts/run-luffy-review.sh` composes stages and records timings); only the inner review step is LLM-driven, so every run leaves reproducible artifacts.
-- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact + F27 diff-truncation banner), usage-summary.py (F21 cost footer/job summary + F29 soft max budget), parse-verdict.py + report-verdict.sh (F22 reaction/status + F23 formal PR review + F24 dismiss-prior), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-local.sh (F28 `.luffy/`), publish-run-to-hub.sh (opt-in), hub-ingest-run.py (hub + local layouts), pack-run-for-ui.py (F31 Run Console `run-bundle.json`, soft).
-- **F20/F10 install:** `scripts/install-luffy.sh` is the adoption entrypoint. Default **pack** mode copies `agent/`, runtime scripts, thin `luffy-pr-review.yml`, and `luffy-review-reusable.yml`. **`--caller`** installs only the hub-managed thin workflow from `pack/luffy-pr-review-caller.yml` (no agent/scripts). Optional `--with-hub-ingest` / `--with-runner-build` (pack mode). Stamp `.luffy-install-stamp` records `mode=pack|caller` + source SHA.
-
-## Design decisi
+- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact + F27 diff-truncation banner), usage-summary.py (F21 cost footer/job summary + F29 soft max budget), parse-verdict.py + report-verdict.sh (F22 reaction/status + F23 formal PR review + F24 dismiss-prior + F9 inline), post-inline-comments.py (F9 path anchors), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-local.sh (F28 `.luffy/`), publish-run-to-hub.sh (opt-in), hub-ingest-run.py (hub + local layouts), pack-run-for-ui.py (F31 Run Console `run-bundle.json`, soft).
+- **F20/F10 install:** `scripts/install-luffy.sh` is the adoption entrypoint. Default **pack** mode copies `agent/`, runtime scripts, thin `luffy-pr-review.yml`, and `luffy-review-reusable.yml`. **`--caller`** installs only the hub-managed thin workflow from `pack/luffy-pr-review-caller.yml` (no agent/scripts). Optional `--with-hub-ingest` / `--with-runner-build` (pack mode). Stamp `.luffy-install-stamp` rec
 … [truncated; do not restate] …
 
 ### readme-kit/DEV.md
@@ -747,6 +659,9 @@ assets/brand-options/three-artifacts.html
 - Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
 
 ## Trigger a review (F32)
+--review docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/review.md \
+--diff docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/pr.diff
+--review review.md --diff pr.diff --repo owner/name --pr 3 --commit "$HEAD_SHA"
 --header "X-Hub-Signature-256: sha256=…"
 
 ## Common commands
@@ -757,9 +672,7 @@ assets/brand-options/three-artifacts.html
 
 ## Setup
 - Install on each target repo's **default branch** (workflow only runs from default branch):
-- **Pack:** `./scripts/install-luffy.sh /path/to/target-repo` — `agent/`, runtime `scripts/`, thin caller + local reusable.
-- Required secret: `OPENROUTER_API_KEY`.
-- **Memory (F28):** each target repo owns review memory under **`
+- **Pack:** `./scripts
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md
@@ -780,6 +693,9 @@ assets/brand-options/three-artifacts.html
 - Actually enqueue the worker: append `--spawn` to the same command.
 - Publish the webhook: `modal deploy modal_app/app.py`, then POST `{"repo":"Mr-Ashish/odoo","pr":3,"model":"openai/gpt-4.1-mini","post_comment":true}` to the `review_webhook` URL (or forward a GitHub `issue_comment` payload).
 - F33 auth: set `LUFFY_WEBHOOK_TOKEN` (`Authorization: Bearer …`) and/or `LUFFY_WEBHOOK_SECRET` (GitHub `X-Hub-Signature-256`). Helper: `python3 scripts/webhook_auth.py sign|authorize`.
+
+## Debugging
+- If a live POST is rejected, reproduce locally first: `python3 scripts/webhook_auth.py sign` to mint an `X-Hub-Signature-256` over the exact raw body, then `python3 scripts/webhook_auth.py authorize` to see which branch fired, rather than guessing from the Modal response.
 
 
 ## Final instruction

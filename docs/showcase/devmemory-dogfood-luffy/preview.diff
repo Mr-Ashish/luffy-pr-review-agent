@@ -1,24 +1,14 @@
-diff --git a/DEV.md b/DEV.md
---- a/DEV.md
-+++ b/DEV.md
-@@ -38,6 +38,8 @@
- - When a budget *is* enabled the cost footer changes shape in both directions: under budget appends ` · budget max $X`, over budget appends ` · ⚠️ OVER BUDGET (max $X)`. The presence of the `budget max` suffix is the cheapest way to confirm from a posted PR comment that the var was actually parsed.
- - `budget_status` compares strictly (`cost > max`), and returns `cost: None` when the usage file is missing/empty — so `over_budget` is `False` whenever cost telemetry is absent, keeping the missing-usage case a soft no-op consistent with the other modes.
- - Cost rendering is threshold-based, not fixed precision: `>= $0.01` → 2 decimals, `> 0` but smaller → 4 decimals, `0`/unknown → `$0`; cheap-model runs therefore show `$0.0034`-style values on the same line format.
-+
-+- `scripts/webhook_auth.py` is **pure stdlib** (`hmac`/`hashlib`/`json` only) exposing `authorize_webhook()` + `github_hmac_hex()` plus a `sign|authorize` CLI, so the Modal image needs no extra dependency and the auth decision is unit-testable outside Modal (`tests/test_webhook_auth.py`).
+diff --git a/USAGE.md b/USAGE.md
+--- a/USAGE.md
++++ b/USAGE.md
+@@ -111,6 +111,10 @@
+ - Exercise the F27 local ingest offline against any checkout: `CLIENT_PAYLOAD_FILE=path/to/client_payload.json LUFFY_INGEST_LAYOUT=local LUFFY_MEMORY_ROOT=/path/to/target python3 scripts/hub-ingest-run.py` — prints `MEMORY=`, `RUN_DIR=`, `LAYOUT=local` and writes `.luffy-ingest-summary.txt` at the root.
+ - Check which memory source a run would use: `REPO=owner/name HERMES_HOME=/tmp/hh LUFFY_MEMORY_MODE=local bash scripts/preload-hub-memory.sh` (needs network or a curl stub); the `MEMORY_SOURCE=` line on stdout tells you local vs hub vs seed.
  
- ## Pitfalls
++- Inline comments (F9) can be exercised with zero GitHub API calls: set `LUFFY_INLINE_FIXTURE=<path>` and `post-inline-comments.py` writes the review payload JSON to that path instead of calling `gh api` — this is the hook the tests use, and the same trick works for inspecting a real run's intended anchors.
++- `LUFFY_INLINE_DIFF` overrides which diff file the anchor resolution reads, so you can replay anchoring against a saved `pr.diff` (e.g. from a showcase trace) without re-assembling context.
++- Identify Luffy's inline output by its markers when auditing a PR: each comment body carries `<!-- luffy-inline -->` and the enclosing review body carries `<!-- luffy-inline-review pr=N -->`.
++
+ ## Troubleshooting
  
-
-diff --git a/modal_app/USAGE.md b/modal_app/USAGE.md
---- a/modal_app/USAGE.md
-+++ b/modal_app/USAGE.md
-@@ -9,3 +9,7 @@
- - Publish the webhook: `modal deploy modal_app/app.py`, then POST `{"repo":"Mr-Ashish/odoo","pr":3,"model":"openai/gpt-4.1-mini","post_comment":true}` to the `review_webhook` URL (or forward a GitHub `issue_comment` payload).
- - F33 auth: set `LUFFY_WEBHOOK_TOKEN` (`Authorization: Bearer …`) and/or `LUFFY_WEBHOOK_SECRET` (GitHub `X-Hub-Signature-256`). Helper: `python3 scripts/webhook_auth.py sign|authorize`.
- - Unified trigger CLI wraps all hosts: `./scripts/trigger-review.sh print <repo> <pr>` (no spend, just prints the commands), `local` (delegates to `scripts/review-local.sh`), `modal` (bit-3 worker) — e.g. `./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post`.
-+
-+## Debugging
-+
-+- If a live POST is rejected, reproduce locally first: `python3 scripts/webhook_auth.py sign` to mint an `X-Hub-Signature-256` over the exact raw body, then `python3 scripts/webhook_auth.py authorize` to see which branch fired, rather than guessing from the Modal response.
+ - Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` (`mode=pack|caller`, `source_sha`) and compare with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`. For `mode=caller`, runtime tracks hub `main`, not the stamp alone.
