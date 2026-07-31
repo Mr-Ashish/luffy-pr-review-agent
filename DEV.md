@@ -11,7 +11,7 @@
 
 ## Design decisions
 
-- Cost/abuse controls are layered: author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout.
+- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after successful Luffy comment; failures do not start the window; `@luffy review force` bypasses), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout.
 - Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (default known-good SHA; `latest`/`main`/`floating`/empty = float), emits `install.sh` args (`--skip-setup --commit … --force-commit`), and supplies the Actions cache key suffix (`v4-<12-char-pin>`). Pin mismatch on a warm cache triggers reinstall.
 - Re-runs replace prior Luffy comments by deleting bodies matching the `<!-- luffy-review pr=N` marker before posting; set `LUFFY_REPLACE_PREVIOUS=0` to stack instead.
 - Failure UX is always-publish: missing OpenRouter secret, Hermes/model failure, and job crash before the review file each still produce a PR comment (failure stub / low-confidence COMMENT verdict) rather than a silent red X.

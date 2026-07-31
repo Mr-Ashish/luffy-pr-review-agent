@@ -29,9 +29,9 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 13 | **F17** | Drop dead `RUNNER_TEMP` Hermes tree copy after cold install | XS | Faster cold path | **Shipped** |
 | 14 | **F18** | Redact secrets in **posted** review (`normalize-review.py` choke-point) | XS | 🔥 Trust — no keys on PR comments | **Shipped** |
 | 15 | **F7** | Pin Hermes install (`scripts/hermes-pin.sh` + `LUFFY_HERMES_COMMIT` + cache key `v4-<pin>`) | S | 🔥 Repro CI | **Shipped** |
-| 16 | F19 | Per-PR re-trigger cooldown (skip paid run after recent success) | S | Cost/abuse | Next |
-| 17 | F20 | `scripts/install-luffy.sh` copy pack to target repo | S | Adoption | Later |
-| 18 | F8 | Docker image with Hermes preinstalled | M | Fastest CI | Later |
+| 16 | **F19** | Per-PR re-trigger cooldown (`scripts/cooldown-check.sh`, default 900s) | S | 🔥 Cost/abuse | **Shipped** |
+| 17 | F20 | `scripts/install-luffy.sh` copy pack to target repo | S | Adoption | Next |
+| 18 | **F8** | Prebaked Hermes runner image + startup benchmark | M | 🔥 Fast CI startup | **Shipped** (docker/ + build workflow + benchmark script) |
 | 19 | F9 | Inline GitHub review comments | L | Product | Later |
 | 20 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
 
@@ -54,6 +54,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 5 (shipped)
 
 **F7** pin Hermes via `LUFFY_HERMES_COMMIT` (default known-good SHA in `scripts/hermes-pin.sh` + workflow env); install uses `install.sh --skip-setup --commit … --force-commit`; Actions cache key `luffy-hermes-bin-*-v4-<pin>`; set var to `latest`/`main` to float. Trace includes `hermes-pin.txt`.
+
+### Sprint 6 (shipped)
+
+**F19** per-PR re-trigger cooldown: after a *successful* Luffy PR comment, further `@luffy review` within `LUFFY_COOLDOWN_SECONDS` (default **900**) skips Hermes/OpenRouter (rocket reaction + job summary). Failures do not start the window. Bypass: `@luffy review force`, `workflow_dispatch`, or set cooldown to `0`/`off`.
 
 ### readme-kit (shipped)
 
