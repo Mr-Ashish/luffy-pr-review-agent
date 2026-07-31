@@ -6,7 +6,7 @@ Worktree root convention: `/Users/ashishmishra/Documents/experiments/pr-review-a
 
 | Worktree | Branch | PR | Status | Notes |
 |----------|--------|-----|--------|-------|
-| `issue-context` | `feature/f53-linked-issue-context` | (open) | in flight | F53 H30 ISSUE_CTX |
+| *(none active)* | — | — | — | F53 ISSUE_CTX merged via PR #3 |
 
 ## Open Luffy PRs (Mr-Ashish/luffy-pr-review-agent)
 
@@ -14,6 +14,7 @@ Worktree root convention: `/Users/ashishmishra/Documents/experiments/pr-review-a
 |----|--------|-------|
 | [#1](https://github.com/Mr-Ashish/luffy-pr-review-agent/pull/1) | e2e/luffy-demo | demo e2e only |
 | [#2](https://github.com/Mr-Ashish/luffy-pr-review-agent/pull/2) | feature/f52-multi-lens | **MERGED** F52 H28 multi-lens |
+| [#3](https://github.com/Mr-Ashish/luffy-pr-review-agent/pull/3) | feature/f53-linked-issue-context | **MERGED** F53 H30 ISSUE_CTX |
 
 ## Eval corpus (Mr-Ashish/odoo)
 
@@ -21,4 +22,4 @@ Worktree root convention: `/Users/ashishmishra/Documents/experiments/pr-review-a
 |----|--------|--------|
 | [#1](https://github.com/Mr-Ashish/odoo/pull/1)–[#6](https://github.com/Mr-Ashish/odoo/pull/6) | fix/* | OPEN luffy-eval |
 
-Updated: 2026-07-31 (F53 worktree).
+Updated: 2026-07-31 (F53 merged).
