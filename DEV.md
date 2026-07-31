@@ -48,6 +48,10 @@
 - F36 and F29 are complementary, not overlapping: F29's soft `LUFFY_MAX_COST_USD` annotates a run that already *finished*, while F36 is the only mechanism that stops a run that never finishes.
 - Timeout evidence lands in the trace as `hermes-timeout.env` and `hermes-timeout-seconds.txt`, so a 124 can be distinguished from a model/contract failure after the fact.
 
+- Exactly **one** managed label is applied per run and the other three managed labels from a prior run are removed, so a PR never carries two contradictory Luffy verdicts: `APPROVE→{prefix}:approve`, `REQUEST_CHANGES→{prefix}:request-changes`, `COMMENT→{prefix}:comment`, `UNKNOWN`/pipeline failure→`{prefix}:error`.
+- Pipeline failure always wins over the parsed verdict (`--pipeline-ok false` ⇒ `error`) — the label channel is deliberately not allowed to green-wash a broken run.
+- Labels are created on demand with hardcoded hex colors in `COLORS` (e.g. approve `0E8A16`), so adoption needs no manual label setup on the target repo; the label namespace is `{prefix}:` with prefix from `LUFFY_LABEL_PREFIX` (default `luffy`).
+
 ## Pitfalls
 
 - `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403), so the hub publish default is `mode=direct` (clone hub → ingest → push `main`); the dispatch path needs a classic PAT on the target repo.
@@ -103,3 +107,5 @@
 - Gate helpers follow a stdout-contract pattern: `scripts/cooldown-check.sh` prints `allowed=`, `reason=`, `age_s=`, `remaining_s=` key=value lines that the workflow parses straight into `$GITHUB_OUTPUT`, and signals decisions through exit codes — `0` allow, `2` cooldown active (skip paid run), `1` hard error.
 - Exit `1` is deliberately **fail-open**: the workflow logs `::warning::F19 cooldown check failed (rc=$RC); fail-open allow` and sets `allowed=true`, so a GitHub API hiccup never blocks reviews (the trade-off is it can also leak a paid run).
 - The script is designed for hermetic tests: `LUFFY_COOLDOWN_FIXTURE` supplies a JSON array of `{created_at, body}` comments (no network) and `NOW_EPOCH` pins the clock — see `tests/test_cooldown_check.py`.
+
+- `scripts/apply-verdict-labels.py` follows the repo's plan/apply split: `plan` computes the label decision with no network, `apply` performs it. `LUFFY_LABELS_FIXTURE=path.json` makes `apply` **write the planned GitHub API operations to a file instead of invoking `gh`** — that seam is what lets `tests/test_apply_verdict_labels.py` cover the mutation path with no token and no live PR. Prefer this env-fixture pattern over mocking `subprocess` when adding new gh-calling scripts.

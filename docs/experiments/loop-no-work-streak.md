@@ -6,5 +6,5 @@ Track consecutive scheduled fires that found **no P0/P1** Luffy product work
 | Field | Value |
 |-------|------:|
 | streak | **0** |
-| last_fire | 2026-07-31 (F36 review wall-clock timeout shipped) |
-| note | P1 cost work found and shipped → streak stays 0. |
+| last_fire | 2026-07-31 (F37 verdict PR labels shipped) |
+| note | P1 ops work found and shipped → streak stays 0. |

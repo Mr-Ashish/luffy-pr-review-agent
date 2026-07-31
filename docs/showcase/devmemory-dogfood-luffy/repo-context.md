@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T15:03:26Z
+- **assembled_at:** 2026-07-31T15:08:15Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+bbe2cfa feat(ops): F37 verdict-aware PR labels
+293d95a docs(experiments): streak 0 after F36 ship
+22c068b docs(knowledge): dogfood F36 review timeout + showcase
 72da566 feat(cost): F36 Hermes review wall-clock timeout
 c536e10 docs(knowledge): dogfood F35 ops footer + showcase
-0eb582f feat(ops): F35 PR comment deep-link footer (Actions + run-bundle)
-7524aa2 docs(knowledge): dogfood F9b precise anchors + showcase
-f94fd08 feat(trust): F9b precise inline anchors from path:LINE
 ```
 
 ## tree (sample)
@@ -77,6 +77,7 @@ modal_app/DEV.md
 modal_app/USAGE.md
 modal_app/__init__.py
 modal_app/app.py
+tests/test_apply_verdict_labels.py
 tests/test_cooldown_check.py
 tests/test_default_model.py
 tests/test_dismiss_prior_pr_reviews.py
@@ -117,6 +118,7 @@ docs/experiments/2026-07-31-f33-webhook-auth.md
 docs/experiments/2026-07-31-f34-webhook-fail-closed.md
 docs/experiments/2026-07-31-f35-ops-footer.md
 docs/experiments/2026-07-31-f36-review-timeout.md
+docs/experiments/2026-07-31-f37-verdict-labels.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-roi-fire.md
@@ -159,6 +161,7 @@ docs/showcase/devmemory-dogfood-luffy/units.json
 docs/showcase/openui-luffy/README.md
 docs/showcase/openui-luffy/review-modal-e2e.openui
 docs/showcase/openui-luffy/review.openui
+scripts/apply-verdict-labels.py
 scripts/assemble-context.sh
 scripts/association-allowed.sh
 scripts/benchmark-hermes-startup.sh

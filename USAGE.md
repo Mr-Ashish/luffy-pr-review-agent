@@ -120,6 +120,10 @@ devmemory extract --fixture sample-auth-module --apply
 - Both `--seconds N -- cmd …` and the positional `N -- cmd …` forms are accepted; regression coverage is `tests/test_run_with_timeout.py`.
 - Override per repo with `vars.LUFFY_REVIEW_TIMEOUT_SECONDS`; set `0` or `off` to disable the timeout entirely.
 
+- Preview the F37 label decision without touching GitHub: `python3 scripts/apply-verdict-labels.py plan --verdict REQUEST_CHANGES --pipeline-ok true`.
+- Capture the intended API calls instead of executing them: `LUFFY_LABELS_FIXTURE=ops.json python3 scripts/apply-verdict-labels.py apply …`.
+- Disable / rename per target repo with repo variables `LUFFY_PR_LABELS=0` and `LUFFY_LABEL_PREFIX=<prefix>`; the run's outcome is echoed in the job summary section **Luffy PR labels (F37)**.
+
 ## Setup
 
 - Install on each target repo's **default branch** (workflow only runs from default branch):

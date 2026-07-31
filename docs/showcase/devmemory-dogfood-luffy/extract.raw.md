@@ -1,6 +1,6 @@
 ```json
 {
-  "summary": "New durable knowledge is the F36 review wall-clock timeout: scripts/run-with-timeout.py wraps hermes -z (and the chat fallback) as a process group with a 1500s default, exits 124, discards partial output and skips the fallback to avoid double spend, plus its CLI/trace surface. Everything else in the session (F35 footer, F9/F9b anchors, F28 local memory, packaging, SOUL contract) restates the existing claim index.",
+  "summary": "The session's only new durable content is F37 verdict-aware PR labels: a fourth trust/ops signal channel implemented by scripts/apply-verdict-labels.py, with its plan/apply CLI, env knobs, fixture-based dry-run seam, and a label-vs-commit-status divergence for UNKNOWN verdicts. F36 timeout, architecture, SOUL, and packaging content in the transcript restate already-indexed claims.",
   "session_ids": ["dogfood-luffy-session"],
   "units": [
     {
@@ -8,52 +8,50 @@
       "path": ".",
       "action": "merge",
       "section": "Design decisions",
-      "content": "- **F36 review timeout:** `scripts/run-with-timeout.py` wraps `hermes -z` (and the chat fallback) as a child **process group** and kills it after a wall-clock limit, so a hung agent/OpenRouter loop cannot burn the full job cap (GHA 90m / Modal ~25m). Default `LUFFY_REVIEW_TIMEOUT_SECONDS=1500`; `0`/`off`/`false`/`no` disables.\n- Timeout semantics are deliberately conservative: exit code **124** (GNU `timeout` convention), partial model output is **discarded**, and the chat fallback is **skipped** — retrying after a timeout would double the spend that the limit exists to cap. The run then posts an honest COMMENT failure stub plus a job-summary section **Luffy review timeout (F36)**.\n- The helper never rewrites the child's exit code except timeout→124 (`125` is reserved for invalid usage / empty command), so normal Hermes failures still surface unchanged upstream.\n- F36 and F29 are complementary, not overlapping: F29's soft `LUFFY_MAX_COST_USD` annotates a run that already *finished*, while F36 is the only mechanism that stops a run that never finishes.\n- Timeout evidence lands in the trace as `hermes-timeout.env` and `hermes-timeout-seconds.txt`, so a 124 can be distinguished from a model/contract failure after the fact.",
+      "content": "- **F37 verdict PR labels** close the trust/ops signal stack (F22 reaction + `luffy/review` commit status → F23 formal PR review → F37 labels), so boards, search, and branch automations can filter on Luffy outcomes instead of reading comment bodies.\n- Exactly **one** managed label is applied per run and the other three managed labels from a prior run are removed, so a PR never carries two contradictory Luffy verdicts: `APPROVE→{prefix}:approve`, `REQUEST_CHANGES→{prefix}:request-changes`, `COMMENT→{prefix}:comment`, `UNKNOWN`/pipeline failure→`{prefix}:error`.\n- Pipeline failure always wins over the parsed verdict (`--pipeline-ok false` ⇒ `error`) — the label channel is deliberately not allowed to green-wash a broken run.\n- Labels are created on demand with hardcoded hex colors in `COLORS` (e.g. approve `0E8A16`), so adoption needs no manual label setup on the target repo; the label namespace is `{prefix}:` with prefix from `LUFFY_LABEL_PREFIX` (default `luffy`).\n- Like the other signal stages this is **soft-fail**: `apply` never raises and prints a JSON result on stdout; `vars.LUFFY_PR_LABELS=0`/`off` opts out. It rides the workflow's existing `issues: write` permission — no new grant was added.",
       "evidence": [
-        "F36: portable wall-clock timeout for a child process group.",
-        "124 on wall-clock timeout (GNU `timeout` convention)",
-        "partial model output discarded, chat fallback **skipped** (would double spend)",
-        "Complements F29 (soft $ budget annotates after a finished run; F36 stops a hung loop)."
+        "applies one managed label on the PR (creates labels if missing) and removes the other managed labels from a prior run",
+        "Pipeline failures always get `error` (never green-wash)",
+        "Soft-fail: apply never raises; prints JSON result on stdout.",
+        "Needs `issues: write` (already on the workflow)."
       ],
       "confidence": "high"
+    },
+    {
+      "kind": "dev",
+      "path": ".",
+      "action": "merge",
+      "section": "Patterns",
+      "content": "- `scripts/apply-verdict-labels.py` follows the repo's plan/apply split: `plan` computes the label decision with no network, `apply` performs it. `LUFFY_LABELS_FIXTURE=path.json` makes `apply` **write the planned GitHub API operations to a file instead of invoking `gh`** — that seam is what lets `tests/test_apply_verdict_labels.py` cover the mutation path with no token and no live PR. Prefer this env-fixture pattern over mocking `subprocess` when adding new gh-calling scripts.",
+      "evidence": [
+        "LUFFY_LABELS_FIXTURE=path.json  — write planned API ops instead of calling gh",
+        "python3 scripts/apply-verdict-labels.py plan --verdict REQUEST_CHANGES"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "kind": "dev",
+      "path": ".",
+      "action": "merge",
+      "section": "Pitfalls",
+      "content": "- The verdict channels disagree on `UNKNOWN` by design and it is easy to misread: F22 treats `UNKNOWN` as *non-blocking* (reaction `eyes`, commit status `success`), while F37's `LABEL_BY_VERDICT` maps `UNKNOWN → error`. A PR can therefore show a green `luffy/review` status alongside a `luffy:error` label — the label, not the status, is the signal that the prompt contract broke.",
+      "evidence": [
+        "\"UNKNOWN\": \"error\",",
+        "Pipeline fail / UNKNOWN | `luffy:error`"
+      ],
+      "confidence": "medium"
     },
     {
       "kind": "usage",
       "path": ".",
       "action": "merge",
       "section": "Common commands",
-      "content": "- Show the effective review timeout (resolves `LUFFY_REVIEW_TIMEOUT_SECONDS`, else the 1500s default): `python3 scripts/run-with-timeout.py resolve`.\n- Self-check the killer without spending on a model: `python3 scripts/run-with-timeout.py --seconds 2 -- sleep 10` → exits **124**.\n- Both `--seconds N -- cmd …` and the positional `N -- cmd …` forms are accepted; regression coverage is `tests/test_run_with_timeout.py`.\n- Override per repo with `vars.LUFFY_REVIEW_TIMEOUT_SECONDS`; set `0` or `off` to disable the timeout entirely.",
+      "content": "- Preview the F37 label decision without touching GitHub: `python3 scripts/apply-verdict-labels.py plan --verdict REQUEST_CHANGES --pipeline-ok true`.\n- Apply for real (needs `GH_TOKEN`/`GITHUB_TOKEN`): `python3 scripts/apply-verdict-labels.py apply --repo owner/name --pr 3 --verdict APPROVE --pipeline-ok true`.\n- Capture the intended API calls instead of executing them: `LUFFY_LABELS_FIXTURE=ops.json python3 scripts/apply-verdict-labels.py apply …`.\n- Disable / rename per target repo with repo variables `LUFFY_PR_LABELS=0` and `LUFFY_LABEL_PREFIX=<prefix>`; the run's outcome is echoed in the job summary section **Luffy PR labels (F37)**.",
       "evidence": [
-        "python3 scripts/run-with-timeout.py resolve          # effective seconds",
-        "python3 scripts/run-with-timeout.py --seconds 2 -- sleep 10   # exits 124",
-        "python3 scripts/run-with-timeout.py 1500 -- cmd [args...]"
+        "python3 scripts/apply-verdict-labels.py apply --repo owner/name --pr 3 \\\n  --verdict APPROVE --pipeline-ok true",
+        "opt-out `vars.LUFFY_PR_LABELS=0`; prefix override `vars.LUFFY_LABEL_PREFIX`. Job summary **Luffy PR labels (F37)**"
       ],
       "confidence": "high"
-    },
-    {
-      "kind": "usage",
-      "path": ".",
-      "action": "merge",
-      "section": "Troubleshooting",
-      "content": "- A review that comes back as a COMMENT failure stub with **no findings** is often an F36 timeout, not a bad model run: check the job summary for **Luffy review timeout (F36)** and the trace for `hermes-timeout.env` / `hermes-timeout-seconds.txt` before blaming the prompt or contract.\n- After a timeout there is intentionally no chat-fallback review body — do not read the missing fallback as a broken fallback path.\n- If long PRs legitimately need more wall time, raise `LUFFY_REVIEW_TIMEOUT_SECONDS` rather than disabling it; on Modal the 1500s default is already aligned with the `review_pr` hard cap, so a larger value will be cut off by the host instead.",
-      "evidence": [
-        "job summary section **Luffy review timeout (F36)**. Trace: `hermes-timeout.env`, `hermes-timeout-seconds.txt`.",
-        "Align with Modal review_pr hard cap (~25m). 0 = disabled."
-      ],
-      "confidence": "medium"
-    },
-    {
-      "kind": "dev",
-      "path": "modal_app",
-      "action": "merge",
-      "section": "Design decisions",
-      "content": "- The F36 default of **1500s** is chosen to sit just under Modal's `review_pr` hard cap (~25m) rather than under the GHA job cap (90m) — the tighter host sets the shared default, so the same number is safe on both. Changing `DEFAULT_SECONDS` in `scripts/run-with-timeout.py` without re-checking the Modal function timeout would let a Modal run be killed by the platform instead of by the helper (losing the honest 124 stub and job-summary section).",
-      "evidence": [
-        "# Align with Modal review_pr hard cap (~25m). 0 = disabled.",
-        "default **1500s** (aligned with Modal hard cap)",
-        "full job timeout (GHA 90m / Modal 25m)"
-      ],
-      "confidence": "medium"
     }
   ]
 }
