@@ -106,6 +106,7 @@ RUNTIME_SCRIPTS=(
   run-luffy-review.sh
   save-trace.sh
   sparse-pr-paths.sh
+  usage-summary.py
   write-failure-review.sh
 )
 

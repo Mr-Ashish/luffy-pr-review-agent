@@ -59,6 +59,7 @@ class InstallLuffyTests(unittest.TestCase):
             self.assertTrue((dest / "scripts" / "hermes-pin.sh").is_file())
             self.assertTrue((dest / "scripts" / "cooldown-check.sh").is_file())
             self.assertTrue((dest / "scripts" / "install-luffy.sh").is_file())
+            self.assertTrue((dest / "scripts" / "usage-summary.py").is_file())
             self.assertTrue(
                 (dest / ".github" / "workflows" / "luffy-pr-review.yml").is_file()
             )

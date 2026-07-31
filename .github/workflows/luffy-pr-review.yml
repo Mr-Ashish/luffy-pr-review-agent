@@ -443,6 +443,12 @@ jobs:
           export LUFFY_STATUS="${LUFFY_STATUS:-complete}"
           export LUFFY_STARTED_AT="${LUFFY_STARTED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
           "$LUFFY_ROOT/scripts/save-trace.sh"
+          # F21: cost/token summary before trace meta (ops visibility without artifact download)
+          if [[ -f "$LUFFY_ROOT/scripts/usage-summary.py" ]]; then
+            python3 "$LUFFY_ROOT/scripts/usage-summary.py" step-summary \
+              --usage "$OUT_DIR/hermes-usage.json" \
+              --timings "$OUT_DIR/timings.json" >> "$GITHUB_STEP_SUMMARY" || true
+          fi
           echo "### Luffy trace" >> "$GITHUB_STEP_SUMMARY"
           if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
             TRACE_DIR="$(cat "$OUT_DIR/latest-trace-dir.txt")"

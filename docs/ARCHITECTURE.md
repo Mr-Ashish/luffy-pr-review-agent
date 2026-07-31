@@ -21,7 +21,8 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 |-------|--------|----------------|
 | Assemble | `scripts/assemble-context.sh` | `gh pr` meta + diff + prompt (no LLM) |
 | Review | `scripts/run-hermes-review.sh` | Hermes one-shot on `WORKSPACE_ROOT` |
-| Normalize | `scripts/normalize-review.py` | Contract, fences, size, HTML marker |
+| Normalize | `scripts/normalize-review.py` | Contract, fences, size, HTML marker, secret redact |
+| Cost UX | `scripts/usage-summary.py` | Append cost/tokens footer + job-summary from `hermes-usage.json` (F21) |
 | Distill | `scripts/distill-memory.sh` | Append structured memory block |
 | Post | `scripts/post-review-comment.sh` | Delete prior `<!-- luffy-review pr=N` comments, then `gh pr comment` |
 | Orchestrate | `scripts/run-luffy-review.sh` | Compose stages + timings |

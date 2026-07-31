@@ -25,6 +25,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 6 (F19):** per-PR re-trigger cooldown after successful review
 - **Sprint 7 (F8):** prebaked Hermes runner image (`docker/luffy-runner/`, `vars.LUFFY_RUNNER_IMAGE`)
 - **Sprint 8 (F20):** `scripts/install-luffy.sh` one-command pack install into target repos
+- **Sprint 9 (F21):** cost/usage line on PR comments + job summary from `hermes-usage.json`
 
 ## Central hub memory (cross-repo)
 
@@ -97,6 +98,7 @@ Requires: `gh` authenticated, network for Hermes install + OpenRouter.
 - Job timeout 45 minutes
 - Re-runs **replace** prior Luffy comments on the same PR (marker `<!-- luffy-review pr=N`); set `LUFFY_REPLACE_PREVIOUS=0` to stack
 - **Per-PR cooldown (F19):** default 900s after a *successful* Luffy comment — skip paid run (rocket reaction). Override `vars.LUFFY_COOLDOWN_SECONDS` (`0`/`off` disables). Bypass: `@luffy review force` or workflow_dispatch
+- **Cost visibility (F21):** each successful review footer includes estimated OpenRouter cost + token/API counts from `hermes-usage.json`; the Actions job summary has a matching **Luffy cost / usage** section (no artifact download required)
 
 ## Memory
 

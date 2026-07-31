@@ -264,6 +264,13 @@ python3 "$LUFFY_ROOT/scripts/normalize-review.py" \
   --pr "$PR_NUMBER" \
   --run-id "${GITHUB_RUN_ID:-local}"
 
+# F21: surface cost/tokens on the posted comment (soft-fail if no usage file)
+if [[ -f "$LUFFY_ROOT/scripts/usage-summary.py" ]]; then
+  python3 "$LUFFY_ROOT/scripts/usage-summary.py" append \
+    --usage "$USAGE_FILE" \
+    --review "$FINAL_OUT" || notice "usage-summary append soft-failed"
+fi
+
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   {
     echo "review_file=$FINAL_OUT"
