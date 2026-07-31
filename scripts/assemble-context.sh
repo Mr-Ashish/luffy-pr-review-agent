@@ -199,6 +199,34 @@ except Exception as _lens_exc:
     lens_packs_on = "0"
     lens_pack_id = os.environ.get("LUFFY_LENS_PACK") or "default"
 
+# F57: Mermaid architecture from changed files (soft)
+mermaid_on = "0"
+mermaid_nodes = "0"
+try:
+    import sys as _sys2
+    _sys2.path.insert(0, str(luffy_root / "scripts"))
+    from mermaid_architecture import (  # type: ignore
+        enabled as mermaid_enabled,
+        collect_paths,
+        render_section,
+        apply_to_prompt,
+    )
+
+    if mermaid_enabled():
+        file_paths = [f.get("path") or f.get("filename") or "" for f in files]
+        file_paths = [p for p in file_paths if p]
+        paths = collect_paths(paths=file_paths)
+        section = render_section(paths, title=f"PR #{pr_number} changed modules")
+        (out_dir / "architecture.md").write_text(section, encoding="utf-8")
+        prompt = apply_to_prompt(prompt, section)
+        Path(os.environ["PROMPT_PATH"]).write_text(prompt, encoding="utf-8")
+        mermaid_on = "1"
+        mermaid_nodes = str(len(paths))
+    else:
+        mermaid_on = "0"
+except Exception:
+    mermaid_on = "0"
+
 # Shell-safe meta for later steps
 meta = {
     "REPO": repo,
@@ -220,6 +248,8 @@ meta = {
     "LINKED_ISSUES_MD": str(linked_path),
     "LENS_PACK": lens_pack_id,
     "LENS_PACKS": lens_packs_on,
+    "MERMAID": mermaid_on,
+    "MERMAID_FILES": mermaid_nodes,
 }
 with open(os.environ["META_PATH"], "w") as fh:
     for k, v in meta.items():

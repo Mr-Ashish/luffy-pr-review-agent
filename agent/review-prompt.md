@@ -96,6 +96,10 @@ Use this structure **exactly** (headings and bold labels). Fill every section.
 ### Walkthrough
 - <bullet per major behavioral change; cite `path` / `symbol`>
 
+### Architecture diagram
+Paste or adapt the auto Mermaid from context (F57). If none, write `n/a` (docs-only / single-file nit).
+Do **not** invent runtime dependencies — group adjacency from changed paths is enough.
+
 ### Blocking
 - <file + issue + concrete trigger scenario, or `None`>
 

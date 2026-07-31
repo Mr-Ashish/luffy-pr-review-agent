@@ -891,6 +891,17 @@ python3 "$LUFFY_ROOT/scripts/normalize-review.py" \
   --run-id "${GITHUB_RUN_ID:-local}" \
   "${_NORM_EXTRA[@]+"${_NORM_EXTRA[@]}"}"
 
+# F57: soft-inject Mermaid architecture if model omitted it (never fails review)
+if [[ -f "$LUFFY_ROOT/scripts/mermaid_architecture.py" && -s "$FINAL_OUT" ]]; then
+  _mm_args=(apply --review "$FINAL_OUT")
+  if [[ -f "${OUT_DIR:-}/pr.json" ]]; then
+    _mm_args+=(--pr-json "$OUT_DIR/pr.json")
+  elif [[ -f "${OUT_DIR:-}/files.txt" ]]; then
+    _mm_args+=(--files "$OUT_DIR/files.txt")
+  fi
+  python3 "$LUFFY_ROOT/scripts/mermaid_architecture.py" "${_mm_args[@]}"     >/dev/null 2>&1 || notice "F57 mermaid inject soft-failed"
+fi
+
 if [[ "${#_NORM_EXTRA[@]}" -gt 0 ]]; then
   notice "F27 diff was truncated — banner injected into posted review"
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then

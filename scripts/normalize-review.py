@@ -23,6 +23,7 @@ REQUIRED_SNIPPETS = (
 # Soft sections we try to ensure exist (repair path only)
 SOFT_SECTIONS = (
     "### Walkthrough",
+    "### Architecture diagram",
     "### Key findings",
     "### Multi-lens checklist",
     "### Suggestions",
@@ -136,6 +137,7 @@ _HERMES_FOOTER_RX = re.compile(
 _SECTION_ALIASES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"^#{0,3}\s*Summary\s*$", re.I | re.M), "### Summary"),
     (re.compile(r"^#{0,3}\s*Walkthrough\s*$", re.I | re.M), "### Walkthrough"),
+    (re.compile(r"^#{0,3}\s*Architecture(?:\s+diagram)?\s*$", re.I | re.M), "### Architecture diagram"),
     (re.compile(r"^#{0,3}\s*Blocking\s*$", re.I | re.M), "### Blocking"),
     (re.compile(r"^#{0,3}\s*Key findings\s*$", re.I | re.M), "### Key findings"),
     (re.compile(r"^#{0,3}\s*Security audit\s*$", re.I | re.M), "### Security audit"),

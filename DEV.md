@@ -13,6 +13,8 @@
 
 ## Design decisions
 
+- **F57 Mermaid architecture:** `scripts/mermaid_architecture.py` builds a flowchart from PR changed paths (grouped by package; adjacency edges only — not invented runtime deps). Assemble injects into prompt; post-normalize soft-injects if the model omitted `### Architecture diagram`. Toggle `LUFFY_MERMAID` / F55 keys `mermaid`, `mermaid_max_nodes`.
+
 - **F56 lens recipes / named packs:** `agent/packs/*.json` declare multi-lens recipes (default, security, docs, odoo, performance). `scripts/lens_recipes.py` loads + rewrites the Multi-lens pass/checklist in the assembled prompt. Active pack via `LUFFY_LENS_PACK` (F55 key `lens_pack`); opt-out `LUFFY_LENS_PACKS=0`. Judgment remains model-side; pack selection and checklist shape are code.
 
 - **F55 feature toggles:** `scripts/feature_toggles.py` is the single registry for product/quality/ops gates (`fixit_prompts`, `issue_context`, inline, labels, …). Precedence **env > `.luffy/toggles.json` (or `LUFFY_TOGGLES_FILE`) > default**. CLI `list|get|enabled|dump|product|shell` is the agent/operator tool surface; judgment stays out of the registry. New product flags add a `ToggleSpec` + tests, then wire consumers via `is_enabled()` / `get_value()`.
