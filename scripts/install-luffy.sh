@@ -133,6 +133,7 @@ RUNTIME_SCRIPTS=(
   model_tier.py
   preflight_cost.py
   pr_description_filler.py
+  testplan_generation.py
   tool_turns_gate.py
   severity_calibration.py
   soul_context_scan.py

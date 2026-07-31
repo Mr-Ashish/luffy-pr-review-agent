@@ -912,6 +912,21 @@ if [[ -f "$LUFFY_ROOT/scripts/mermaid_architecture.py" && -s "$FINAL_OUT" ]]; th
   python3 "$LUFFY_ROOT/scripts/mermaid_architecture.py" "${_mm_args[@]}"     >/dev/null 2>&1 || notice "F57 mermaid inject soft-failed"
 fi
 
+# F61: soft-inject Suggested test plan if model omitted / left placeholder
+if [[ -f "$LUFFY_ROOT/scripts/testplan_generation.py" && -s "$FINAL_OUT" ]]; then
+  _tp_args=(apply --review "$FINAL_OUT")
+  if [[ -f "${OUT_DIR:-}/pr.json" ]]; then
+    _tp_args+=(--pr-json "$OUT_DIR/pr.json")
+  fi
+  if [[ -f "${OUT_DIR:-}/pr.diff" ]]; then
+    _tp_args+=(--diff "$OUT_DIR/pr.diff")
+  elif [[ -f "${OUT_DIR:-}/diff.patch" ]]; then
+    _tp_args+=(--diff "$OUT_DIR/diff.patch")
+  fi
+  python3 "$LUFFY_ROOT/scripts/testplan_generation.py" "${_tp_args[@]}" \
+    >/dev/null 2>&1 || notice "F61 testplan inject soft-failed"
+fi
+
 if [[ "${#_NORM_EXTRA[@]}" -gt 0 ]]; then
   notice "F27 diff was truncated — banner injected into posted review"
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then

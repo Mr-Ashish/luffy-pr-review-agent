@@ -152,6 +152,16 @@ If none: `None`
 ### Nits
 - <style/naming/docs only if worth author time, or `None`>
 
+### Suggested test plan
+Paste or refine the auto F61 checklist from context (P0 first). Prefer a table:
+
+| Pri | Kind | Target | Scenario |
+|-----|------|--------|----------|
+| P0/P1/P2 | unit/integration/… | `path` or `path::symbol` | concrete trigger / assertion |
+
+If context had no auto plan and tests fully cover risk: `None — coverage already adequate.`
+Do **not** invent symbols you did not see; keep scenarios actionable (D3).
+
 ### Tests & risk
 - Relevant tests added/updated: < yes | no >
 - Coverage: <what is covered / missing for the risky paths>

@@ -244,6 +244,24 @@ REGISTRY: list[ToggleSpec] = [
         "Scope review diff to commits since last Luffy head= marker",
         "F59",
     ),
+    ToggleSpec(
+        "testplan",
+        "LUFFY_TESTPLAN",
+        "bool",
+        True,
+        "product",
+        "Inject deterministic suggested test plan (F61) into prompt + review",
+        "F61",
+    ),
+    ToggleSpec(
+        "testplan_max_cases",
+        "LUFFY_TESTPLAN_MAX_CASES",
+        "int",
+        12,
+        "product",
+        "Max cases in auto suggested test plan",
+        "F61",
+    ),
     # --- quality / agent ---
     ToggleSpec(
         "soul_scan",
