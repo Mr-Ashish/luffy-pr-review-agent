@@ -13,9 +13,9 @@ Luffy SoT: this repo only.
 | [#3](https://github.com/Mr-Ashish/odoo/pull/3) | luffy-eval: #271153 tools Unicode XML control-char strip | odoo#271153 | 3 (py+test) | +88/−18 | OPEN |
 | [#4](https://github.com/Mr-Ashish/odoo/pull/4) | luffy-eval: #279776 stock, mrp replenishment horizon PERF | odoo#279776 | 7 (py+test) | +234/−22 | OPEN |
 | [#5](https://github.com/Mr-Ashish/odoo/pull/5) | luffy-eval: #279360 point_of_sale ticket screen responsiveness | odoo#279360 | 6 (JS/XML/SCSS) | +109/−122 | OPEN |
-| [#6](https://github.com/Mr-Ashish/odoo/pull/6) | luffy-eval: #279777 tools street_split regex + address fixtures | odoo#279777 | 14 (py+test+l10n fixtures) | +138/−100 | OPEN — F49 scored 34/50 |
+| [#6](https://github.com/Mr-Ashish/odoo/pull/6) | luffy-eval: #279777 tools street_split regex + address fixtures | odoo#279777 | 14 (py+test+l10n fixtures) | +138/−100 | OPEN — F51 H27 **39/50** (was F49 34) |
 
-Corpus size: **6** open eval PRs (all have ≥1 score row; #6 baseline H24).
+Corpus size: **6** open eval PRs (all have ≥1 score row; #6 best = H27/F51).
 
 ## Runs
 
@@ -33,8 +33,9 @@ Corpus size: **6** open eval PRs (all have ≥1 score row; #6 baseline H24).
 | **2026-07-31 H22 F49 #5** | **#5** | **local / pr5-runlocal-a1** (`.luffy-out-e2e-pr5-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→8**; F45 skipped; APPROVE 92; ~$0.026 · 9 API · 56s; soul_blocked=0; chip `tool-reprompt-ok`; score **37/50** |
 | **2026-07-31 F50 offline** | **#2/#5** | **post-process F49 bodies** | n/a | local | **H20/F50:** #2 APPROVE→REQUEST CHANGES (test gap in Suggestions); #5 tests:no → RC; #4 clean; scores **42** / **40** |
 | **2026-07-31 H24 F49 #6** | **#6** | **local / pr6-runlocal-a1** (`.luffy-out-e2e-pr6-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→1**; F45 skipped; F50 no-op; APPROVE 95; ~$0.005 · 2 API · 32s hermes; soul_blocked=0; shallow `head` only; score **34/50** |
+| **2026-07-31 H27 F51 #6** | **#6** | **local / pr6-runlocal-a1** (`.luffy-out-e2e-pr6-f51`) | **openai/gpt-4.1-mini** | local | **F51 depth:** tool_turns **0→17**; F45 skipped; F50 no-op; APPROVE 95; ~$0.034 · 18 API · 80s; soul_blocked=0; `rg`+`sed -n 1940,1980p` on street_split; score **39/50** (+5 vs H24) |
 
-Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`; F49 #2: `.luffy-out-e2e-pr2-f49/`; F49 #4: `.luffy-out-e2e-pr4-f49/`; F49 #5: `.luffy-out-e2e-pr5-f49/`; F49 #6: `.luffy-out-e2e-pr6-f49/`.
+Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`; F49 #2: `.luffy-out-e2e-pr2-f49/`; F49 #4: `.luffy-out-e2e-pr4-f49/`; F49 #5: `.luffy-out-e2e-pr5-f49/`; F49 #6: `.luffy-out-e2e-pr6-f49/`; F51 #6: `.luffy-out-e2e-pr6-f51/`.
 
 ## Introspect (F46)
 
@@ -134,5 +135,13 @@ Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luff
 1. **Root cause of #6 shallow recovery:** F49 only required *some* tool use; mini satisfied with parallel `head -80` and never hit the changed regex region.
 2. **Minimal fix (prompt control-plane, no second hermes loop):** F49 `build_reprompt_suffix` now includes **Tool depth (H26 / F51)** — forbid head-only large files; prefer unified diff + `rg`/line-range on changed symbols. Same guidance in `agent/review-prompt.md` Workspace and one SOUL Scope bullet.
 3. **Idempotency:** re-prompt marker relaxed to `## Soft re-prompt (Luffy H15` so F49+F51 title does not double-append.
-4. **Not yet live-verified on #6:** H27 backlog — re-run mini F49+F51 and re-score D1/D8 vs 34/50.
-5. **Next P0:** H27 live #6 re-score, or H25 7th corpus PR if growth preferred.
+4. **Live-verified on #6 (H27):** see below.
+5. **Was next P0:** H27 — **done**.
+
+## Introspect (H27 / F51 live #6)
+
+1. **F51 depth lift confirmed:** same 14-file PR; re-prompt tool_turns **0→17** (H24 was **0→1**). F45 skipped; F50 no-op; APPROVE 95; soul_blocked=0.
+2. **Hunk-aware tools worked:** agent used `rg -w 'def street_split'` then `sed -n 1940,1980p odoo/tools/misc.py` (read full function + ADDRESS_REGEXES tail), plus `sed` on `res_partner` compute/inverse and test ranges — **not** misc.py header-only.
+3. **Score 34→39/50:** D8 2→4, D2/D3/D5/D7/D10 up; D6 5→3 (attempt-2 ~$0.034 · 18 API · 80s vs H24 ~$0.005 · 2 API). Findings still soft (docstring) — no multi-lens security/perf pass.
+4. **Residual waste:** several failed/awkward `rg --json` flag combos before simple `-w` hit; product ROI next is multi-lens structured findings or codebase packs, not more tool gates.
+5. **Next P0 product:** H25 7th corpus PR **or** multi-lens review mode (PRODUCT_FEATURE) for D10 depth gap.

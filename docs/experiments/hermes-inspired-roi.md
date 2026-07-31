@@ -33,8 +33,10 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | H23 | Source 6th+ complex odoo/odoo PR → luffy-eval corpus | S | Keep multi-PR evidence growing beyond 5 | **Done H23** (#6 odoo#279777) |
 | H24 | Live F49 mini e2e + score odoo#6 (street_split) | S | Fresh corpus member needs baseline dims (+ F50 if test-gap) | **Done H24** (34/50; 0→1 tools) |
 | H25 | Source 7th+ complex odoo/odoo PR → luffy-eval corpus | S | Keep multi-PR evidence growing beyond 6 | backlog |
-| **H26** | **Tool-depth after F49: nudge read changed hunks not file heads** | **S** | **#6 0→1 with head-only missed street_split region; D8=2** | **Shipped F51** (prompt + F49 suffix; live re-score pending) |
-| H27 | Live F51 mini re-score odoo#6 (street_split tool depth) | S | Measure D1/D8 lift vs H24 34/50 head-only | backlog P0 |
+| **H26** | **Tool-depth after F49: nudge read changed hunks not file heads** | **S** | **#6 0→1 with head-only missed street_split region; D8=2** | **Shipped F51** + **H27 verified** |
+| H27 | Live F51 mini re-score odoo#6 (street_split tool depth) | S | Measure D1/D8 lift vs H24 34/50 head-only | **Done H27** (39/50; 0→17 tools; +5 vs H24) |
+| H28 | Multi-lens review modes (security / tests / design merge) | M | D10 multi-lens thin after F51; PRODUCT_FEATURE | backlog P0 product |
+| H29 | Structured findings schema (severity+confidence+hunk cite) | S–M | Actionability + trust; merge multi-lens | backlog |
 
 ## Selection rule
 
@@ -76,4 +78,6 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 
 **H24 F49 #6** (2026-07-31): `.luffy-out-e2e-pr6-f49` — recovered tool_turns **0→1**; F50 no-op; APPROVE 95; ~$0.005 · 32s; score **34/50**. Weakest F49 depth (head-only). **Next: H26** tool-depth nudge or **H25** 7th upstream.
 
-**H26 → F51** (2026-07-31): tool-depth nudge — F49 re-prompt suffix + `review-prompt.md` Workspace + SOUL Scope forbid `head`-only large-file reads; require diff hunks / `rg`+line-range on changed symbols. Tests green; SOUL preflight clean. **Next: H27** live mini re-score #6 or **H25** 7th upstream.
+**H26 → F51** (2026-07-31): tool-depth nudge — F49 re-prompt suffix + `review-prompt.md` Workspace + SOUL Scope forbid `head`-only large-file reads; require diff hunks / `rg`+line-range on changed symbols. Tests green; SOUL preflight clean.
+
+**H27** (2026-07-31): live F51 mini re-score #6 — `.luffy-out-e2e-pr6-f51`; tool_turns **0→17**; `rg`+`sed -n 1940,1980p` on street_split; score **39/50** (H24 was 34); ~$0.034 · 18 API · 80s. **Next: H28** multi-lens PRODUCT_FEATURE or **H25** 7th upstream corpus PR.

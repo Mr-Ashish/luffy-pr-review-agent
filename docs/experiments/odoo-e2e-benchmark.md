@@ -32,6 +32,7 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 | #5 POS ticket (F49 mini re-prompt) | 3 | 4 | 3 | 4 | 3 | 4 | 5 | 3 | 4 | 4 | **37** | tools 0→8; soft i18n/import nits; no deep layout/responsive hazards |
 | #5 POS ticket (F50 offline on F49) | 3 | 4 | 4 | 5 | 3 | 4 | 5 | 3 | 5 | 4 | **40** | F50 tests:no under APPROVE → REQUEST CHANGES; score 92→69 |
 | #6 street_split (F49 mini re-prompt) | 3 | 3 | 3 | 4 | 3 | 5 | 4 | 2 | 4 | 3 | **34** | tools 0→1 only; head-only misses street_split region; soft regex nits |
+| #6 street_split (F51 mini H27) | 3 | 4 | 4 | 4 | 4 | 3 | 5 | 4 | 4 | 4 | **39** | tools 0→17; rg+sed on street_split L1950; soft doc only; multi-lens still thin |
 
 ### Evidence (one line)
 
@@ -49,6 +50,17 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 - **#5 F50 offline:** match=`tests_no_line` (Relevant tests: no) under APPROVE 92 → **REQUEST CHANGES** + score 69; #4 F49 clean (no gap signal, stays APPROVE).
 - **#6 port (H23):** odoo#279777 → Mr-Ashish/odoo#6; 14 files tools/misc street_split + base_address_extended tests + l10n_dk_nemhandel/oioubl fixtures; apply clean 3way onto 19.0.
 - **#6 F49 mini (H24):** recovered tool_turns **0→1** (sessions `20260731_225136_8453c3` → `20260731_225149_76bc30`); F45 skipped; F50 no-op (`no_test_gap_signal`, tests:yes); APPROVE 95 · attempt-2 ~$0.005 · 2 API · hermes ~32s wall; soul_blocked=0; chip `tool-reprompt-ok`; **shallow tools:** one turn with 4× `head -80` (misc.py header only — street_split ~L1925 never read); soft medium regex-complexity nits; score **34/50**.
+- **#6 F51 mini (H27):** F49+F51 re-prompt recovered tool_turns **0→17** (sessions `20260731_230213_7d82f2` → `20260731_230226_bba7bf`); F45 skipped; F50 no-op; APPROVE 95 · attempt-2 ~$0.034 · 18 API · total ~80s; soul_blocked=0; chip `tool-reprompt-ok`; **deep tools:** `rg -w 'def street_split'` → `sed -n 1940,1980p odoo/tools/misc.py` (read function body) + partner compute/inverse + test_street_fields ranges; soft docstring suggestion only; score **39/50** (+5 vs H24). D8 2→4; D6 5→3 (cost ↑ with depth).
+
+### #6 F51 sub-dims (H27; D6=3, D8=4)
+
+| Sub | Score | Note |
+|-----|------:|------|
+| D2a symbol coverage | 4 | street_split + res_partner compute/inverse + tests touched |
+| D5a line-range reads | 4 | `sed -n 1940,1980p` on misc.py (not head-80 header) |
+| D6a attempt cost | 3 | ~$0.034 · 18 API vs H24 ~$0.005 · 2 API |
+| D8b tool/workspace use | 4 | 17 turns; rg locate + sed hunk; some wasted rg json flags |
+| D10a multi-lens | 3 | still single-pass; no security/perf/API lenses |
 
 ### #2 F44 sub-dims (D1=2, D3=2, D8=1)
 
