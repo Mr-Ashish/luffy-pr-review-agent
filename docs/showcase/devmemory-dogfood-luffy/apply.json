@@ -1,38 +1,20 @@
 [
   {
-    "path": "modal_app/DEV.md",
+    "path": "DEV.md",
     "kind": "dev",
     "action": "merge",
-    "section": "Architecture",
-    "bytes": 1280,
+    "section": "Design decisions",
+    "bytes": 17726,
     "applied": true,
-    "unit_path": "modal_app"
-  },
-  {
-    "path": "modal_app/DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Pitfalls",
-    "bytes": 2066,
-    "applied": true,
-    "unit_path": "modal_app"
+    "unit_path": "."
   },
   {
     "path": "modal_app/USAGE.md",
     "kind": "usage",
     "action": "merge",
-    "section": "Common commands",
-    "bytes": 828,
+    "section": "Debugging",
+    "bytes": 1305,
     "applied": true,
     "unit_path": "modal_app"
-  },
-  {
-    "path": "pack/DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Design decisions",
-    "bytes": 1985,
-    "applied": true,
-    "unit_path": "pack"
   }
 ]

@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T14:33:15Z
+- **assembled_at:** 2026-07-31T14:38:44Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+ceb25d4 feat(trust): F33 webhook HMAC + [REDACTED] on Modal doorbell
+9994ec6 docs(knowledge): dogfood F32 trigger + Modal bit4 enqueue
 3c3f85c feat(ops): F32 unified trigger + Modal bit4 enqueue webhook
 653dcd9 docs(knowledge): dogfood F31 run-bundle + Modal host label
 aa11576 feat(ui): F31 auto-emit run-bundle.json for Run Console
-6acd3df feat(ui): Impeccable run console for full Luffy runs
-877d047 docs(showcase): OpenUI fixture from Modal e2e odoo PR #3
 ```
 
 ## tree (sample)
@@ -74,6 +74,7 @@ memory/repos/Mr-Ashish--odoo/latest.json
 memory/repos/Mr-Ashish--luffy-pr-review-agent/MEMORY.md
 memory/repos/Mr-Ashish--luffy-pr-review-agent/latest.json
 modal_app/DEV.md
+modal_app/USAGE.md
 modal_app/__init__.py
 modal_app/app.py
 tests/test_cooldown_check.py
@@ -91,6 +92,7 @@ tests/test_parse_verdict.py
 tests/test_review_to_openui.py
 tests/test_trigger_review.py
 tests/test_usage_summary.py
+tests/test_webhook_auth.py
 pack/DEV.md
 pack/README.md
 pack/luffy-pr-review-caller.yml
@@ -108,6 +110,7 @@ docs/README-KIT-MVP.md
 docs/ROI-FIXES.md
 docs/experiments/2026-07-31-f31-run-bundle.md
 docs/experiments/2026-07-31-f32-trigger.md
+docs/experiments/2026-07-31-f33-webhook-auth.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/experiments/f28-repo-local-memory.md
 docs/experiments/loop-no-work-streak.md
@@ -177,6 +180,7 @@ scripts/save-trace.sh
 scripts/sparse-pr-paths.sh
 scripts/trigger-review.sh
 scripts/usage-summary.py
+scripts/webhook_auth.py
 scripts/write-failure-review.sh
 assets/README.md
 assets/favicon-32.png
@@ -221,6 +225,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] --caller --with-hub-ingest --with-runner-build adoption agent agentscript default entrypoint
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
+- [DEV.md#Design decisions] auth=open authoriz bearerx-luffy-token configur f33 github hmac-sha256 luffywebhooksecret
 - [DEV.md#Design decisions] --bit --spawn browser command console default dry-plan enqueue
 - [DEV.md#Design decisions] --soft action artifact auto-detect bundle download f31 failur
 - [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
@@ -236,8 +241,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
 - [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
-- [DEV.md#Design decisions] anyth f10 githubworkflowsluffy-review-reusableyml half-install install-luffysh packluffy-pr-review-calleryml preflight produc
-- [DEV.md#Design decisions] actually append budget c
+- [DEV.md#Design decisions] anyth f10 githubworkflowsluffy-review-reusableyml half-insta
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -286,6 +290,15 @@ assets/brand-options/three-artifacts.html
 - The Modal entrypoint is a first-class host in the F31 Run Console contract: `review_pr` exports `LUFFY_HOST=modal` so `pack-run-for-ui.py` stamps the bundle's host label as `modal` instead of falling through the `GITHUB_ACTIONS`/else auto-detect to `local`.
 - `review_pr` also returns the `run_bundle` path in its result, so a Modal caller gets the console bundle handle back directly rather than having to download an Actions artifact (the GHA path's only option).
 
+## Architecture
+- Bit 4 (F32) splits the enqueue path into four units in `modal_app/app.py`: `parse_enqueue_payload` (normalize an incoming request into repo/pr/model/post_comment), `plan_enqueue` (pure plan, no side effects), `enqueue_review` (the spawn call), and `review_webhook` (the HTTP entrypoint). Parsing/planning are separable from spawning so the parser can be self-checked without any OpenRouter spend.
+- `review_webhook` accepts two payload shapes: the simple API `{repo, pr, model, post_comment}`, and a raw GitHub `issue_comment` event whose comment body matches `@luffy … review` and whose issue is a PR. There is no third shape — non-PR issue comments and non-matching bodies are not enqueued.
+
+## Pitfalls
+- **F33:** production must set `LUFFY_WEBHOOK_SECRET` and/or `LUFFY_WEBHOOK_TOKEN` on the Modal function (e.g. fold into `luffy-github`). If neither is set, `review_webhook` still accepts traffic with `auth=open` + warning — fine for local smoke, unsafe once the URL is public.
+- HMAC verification needs the **raw** request body (not a re-serialized dict). The webhook reads `await reque
+… [truncated; do not restate] …
+
 ### pack/DEV.md
 
 ## Architecture
@@ -321,6 +334,9 @@ assets/brand-options/three-artifacts.html
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
 - Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
 
+## Trigger a review (F32)
+--header "X-Hub-Signature-256: sha256=…"
+
 ## Common commands
 - Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).
 - Hub-managed thin install (F10, no agent/scripts copy): `./scripts/install-luffy.sh --caller /path/to/target-repo`.
@@ -331,7 +347,7 @@ assets/brand-options/three-artifacts.html
 - Install on each target repo's **default branch** (workflow only runs from default branch):
 - **Pack:** `./scripts/install-luffy.sh /path/to/target-repo` — `agent/`, runtime `scripts/`, thin caller + local reusable.
 - Required secret: `OPENROUTER_API_KEY`.
-- **Memory (F28):** each target repo owns review memory under **`.luffy/`** (committed slim pack: `MEMORY.md` + `runs/{trace}/`). Ins
+- **Memory (F28):** each target repo owns review memory under **`
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md
@@ -344,4 +360,12 @@ assets/brand-options/three-artifacts.html
 ## Troubleshooting
 - A stale `LUFFY_RUNNER_IMAGE` pin is invisible: the prebaked short-circuit returns before any pin comparison, so a container built from an older `HERMES_COMMIT` will run happily against a newer `scripts/hermes-pin.sh` default. Compare the image tag's 12-char pin against `scripts/hermes-pin.sh default` when Hermes behaviour differs between the container path and the host path.
 - Self-hosted runners can opt into the same fast path without the image by placing `hermes` on PATH plus a `/root/.hermes-pin` (or `$HOME/.hermes-pin`) marker file.
+
+### modal_app/USAGE.md
+
+## Common commands
+- Bit 4 dry enqueue plan (no LLM spend, self-checks the payload parser): `modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3` → `BIT4_OK`.
+- Actually enqueue the worker: append `--spawn` to the same command.
+- Publish the webhook: `modal deploy modal_app/app.py`, then POST `{"repo":"Mr-Ashish/odoo","pr":3,"model":"openai/gpt-4.1-mini","post_comment":true}` to the `review_webhook` URL (or forward a GitHub `issue_comment` payload).
+- F33 auth: set `LUFFY_WEBHOOK_TOKEN` (`Authorization: Bearer …`) and/or `LUFFY_WEBHOOK_SECRET` (GitHub `X-Hub-Signature-256`). Helper: `python3 scripts/webhook_auth.py sign|authorize`.
 

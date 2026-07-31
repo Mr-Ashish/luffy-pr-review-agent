@@ -1,9 +1,9 @@
-# Run run-20260731T200314-c4311b
+# Run run-20260731T200844-9e7f32
 
 - session: `dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
-- units: 4
-- summary: The F32 session adds durable detail about the Modal bit-4 enqueue/webhook layer: its function chain, the two accepted webhook payload shapes, the spawn-only doorbell rule with its dry-run switch and missing signature verification, plus the concrete bit-4 / deploy / unified-trigger commands and the fact that pack installs now ship trigger-review.sh.
-- at: 2026-07-31T14:33:55Z
-- timings: {"assemble_s": 0.106, "extract_s": 40.645, "normalize_s": 0.003}
+- units: 3
+- summary: F33 webhook auth adds durable detail beyond what's already recorded: the exact precedence ladder inside scripts/webhook_auth.py (open → HMAC → bearer → deny), the fact that a deployment with only LUFFY_WEBHOOK_SECRET set rejects unsigned token-style calls, that the helper is pure-stdlib with a sign|authorize CLI, and the named auth self-checks emitted by the Modal bit 4 dry plan.
+- at: 2026-07-31T14:39:17Z
+- timings: {"assemble_s": 0.133, "extract_s": 32.907, "normalize_s": 0.001}

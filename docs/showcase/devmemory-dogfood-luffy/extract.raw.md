@@ -1,31 +1,29 @@
 ```json
 {
-  "summary": "The F32 session adds durable detail about the Modal bit-4 enqueue/webhook layer: its function chain, the two accepted webhook payload shapes, the spawn-only doorbell rule with its dry-run switch and missing signature verification, plus the concrete bit-4 / deploy / unified-trigger commands and the fact that pack installs now ship trigger-review.sh.",
+  "summary": "F33 webhook auth adds durable detail beyond what's already recorded: the exact precedence ladder inside scripts/webhook_auth.py (open → HMAC → bearer → deny), the fact that a deployment with only LUFFY_WEBHOOK_SECRET set rejects unsigned token-style calls, that the helper is pure-stdlib with a sign|authorize CLI, and the named auth self-checks emitted by the Modal bit 4 dry plan.",
   "session_ids": ["dogfood-luffy-session"],
   "units": [
     {
       "kind": "dev",
-      "path": "modal_app",
+      "path": ".",
       "action": "merge",
-      "section": "Architecture",
-      "content": "- Bit 4 (F32) splits the enqueue path into four units in `modal_app/app.py`: `parse_enqueue_payload` (normalize an incoming request into repo/pr/model/post_comment), `plan_enqueue` (pure plan, no side effects), `enqueue_review` (the spawn call), and `review_webhook` (the HTTP entrypoint). Parsing/planning are separable from spawning so the parser can be self-checked without any OpenRouter spend.\n- `review_webhook` accepts two payload shapes: the simple API `{repo, pr, model, post_comment}`, and a raw GitHub `issue_comment` event whose comment body matches `@luffy … review` and whose issue is a PR. There is no third shape — non-PR issue comments and non-matching bodies are not enqueued.\n- The doorbell and the kitchen are separate processes: the HTTP handler only ever `spawn`s `review_pr`, so Hermes never executes inside the webhook request. `modal deploy modal_app/app.py` is what turns `review_webhook` into a public URL; `modal run … --bit 4` exercises the same code path from the CLI.",
+      "section": "Design decisions",
+      "content": "- `scripts/webhook_auth.py` is **pure stdlib** (`hmac`/`hashlib`/`json` only) exposing `authorize_webhook()` + `github_hmac_hex()` plus a `sign|authorize` CLI, so the Modal image needs no extra dependency and the auth decision is unit-testable outside Modal (`tests/test_webhook_auth.py`).\n- Auth is a single ordered ladder, not a set of independent checks: (1) neither `LUFFY_WEBHOOK_SECRET` nor `LUFFY_WEBHOOK_TOKEN` configured → `auth=open` + warning; (2) `X-Hub-Signature-256` present → HMAC-SHA256 against `LUFFY_WEBHOOK_SECRET`; (3) otherwise `Authorization: Bearer` **or** `X-Luffy-Token` compared against `LUFFY_WEBHOOK_TOKEN`; (4) anything else → denied. Header presence, not deployment config, selects the HMAC branch.",
       "evidence": [
-        "Modal bit 4: parse_enqueue_payload, plan_enqueue, enqueue_review, review_webhook",
-        "Webhook accepts simple API {repo,pr,model,post_comment} or GitHub issue_comment with @luffy review on a PR",
-        "HTTP path only spawns review_pr — Hermes never runs in the doorbell"
+        "scripts/webhook_auth.py pure stdlib: authorize_webhook, github_hmac_hex, CLI sign|authorize",
+        "X-Hub-Signature-256 present → HMAC-SHA256 with LUFFY_WEBHOOK_SECRET",
+        "Else [REDACTED] [REDACTED] X-Luffy-Token with LUFFY_WEBHOOK_TOKEN"
       ],
       "confidence": "high"
     },
     {
       "kind": "dev",
-      "path": "modal_app",
+      "path": ".",
       "action": "merge",
       "section": "Pitfalls",
-      "content": "- The webhook is unauthenticated: signature verification of GitHub deliveries is explicitly deferred hardening, so a deployed `review_webhook` URL is a spend-capable open endpoint. Treat the URL itself as the only secret until verification lands.\n- Two independent dry switches exist and they are easy to confuse: `LUFFY_WEBHOOK_DRY_RUN=1` makes the *deployed HTTP handler* plan-only, while the CLI `--bit 4` is dry by default and needs `--spawn` to actually enqueue. Setting one does not affect the other — a \"dry\" CLI run says nothing about the deployed webhook's behaviour.\n- Do not add work (Hermes, cloning, review assembly) to the HTTP handler even for convenience; the spawn-only rule is what keeps the request short-lived and the billed work inside `review_pr`.",
+      "content": "- A deployment that sets **only** `LUFFY_WEBHOOK_SECRET` denies plain JSON callers: with a secret configured and no `X-Hub-Signature-256` header the request falls through to the [REDACTED], finds no `LUFFY_WEBHOOK_TOKEN`, and is rejected. If you want the simple `{repo, pr, …}` API (curl, Run Console, scripts) you must set `LUFFY_WEBHOOK_TOKEN` too — the GitHub secret alone only authenticates real GitHub deliveries.",
       "evidence": [
-        "LUFFY_WEBHOOK_DRY_RUN=1 plans only; CLI modal run --bit 4 dry by default, --spawn to enqueue",
-        "Handler **only spawns** `review_pr` (set `LUFFY_WEBHOOK_DRY_RUN=1` to plan-only). Signature verification = later hardening.",
-        "Do not run Hermes inside the webhook HTTP handler — always `spawn`."
+        "Secret set without signature → denied (use token for simple API)"
       ],
       "confidence": "high"
     },
@@ -33,23 +31,13 @@
       "kind": "usage",
       "path": "modal_app",
       "action": "merge",
-      "section": "Common commands",
-      "content": "- Bit 4 dry enqueue plan (no LLM spend, self-checks the payload parser): `modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3` → `BIT4_OK`.\n- Actually enqueue the worker: append `--spawn` to the same command.\n- Publish the webhook: `modal deploy modal_app/app.py`, then POST `{\"repo\":\"Mr-Ashish/odoo\",\"pr\":3,\"model\":\"openai/gpt-4.1-mini\",\"post_comment\":true}` to the `review_webhook` URL (or forward a GitHub `issue_comment` payload).\n- Unified trigger CLI wraps all hosts: `./scripts/trigger-review.sh print <repo> <pr>` (no spend, just prints the commands), `local` (delegates to `scripts/review-local.sh`), `modal` (bit-3 worker) — e.g. `./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post`.",
+      "section": "Debugging",
+      "content": "- The bit 4 dry plan doubles as the auth regression harness: `modal run modal_app/app.py --bit 4 --repo … --pr …` prints named self-checks `auth_open_ok`, `auth_hmac_ok`, `auth_hmac_bad`, `auth_bearer_ok`, `auth_denied_ok` before `BIT4_OK` — no OpenRouter spend and no spawn, so it is the cheapest way to confirm the auth ladder after changing `scripts/webhook_auth.py` or the webhook env.\n- If a live POST is rejected, reproduce locally first: `python3 scripts/webhook_auth.py sign` to mint an `X-Hub-Signature-256` over the exact raw body, then `python3 scripts/webhook_auth.py authorize` to see which branch fired, rather than guessing from the Modal response.",
       "evidence": [
-        "scripts/trigger-review.sh modes: print (no spend), local (review-local.sh), modal (bit 3 worker)",
-        "modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3 --spawn",
-        "Deploy — public webhook URL for review_webhook"
+        "Bit 4 dry plan self-checks auth_open_ok, auth_hmac_ok, auth_hmac_bad, auth_bearer_ok, auth_denied_ok",
+        "Pure helper: `python3 scripts/webhook_auth.py sign|authorize`"
       ],
       "confidence": "high"
-    },
-    {
-      "kind": "dev",
-      "path": "pack",
-      "action": "merge",
-      "section": "Design decisions",
-      "content": "- The install pack now ships `scripts/trigger-review.sh`, so an installed target repo can drive reviews from any host (print/local/modal) without cloning the hub. Adding a new top-level trigger script therefore requires updating the pack's copied-scripts list, not just the hub repo.",
-      "evidence": ["install pack includes trigger-review.sh"],
-      "confidence": "medium"
     }
   ]
 }

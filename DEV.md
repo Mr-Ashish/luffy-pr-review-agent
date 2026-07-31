@@ -39,6 +39,8 @@
 - `budget_status` compares strictly (`cost > max`), and returns `cost: None` when the usage file is missing/empty — so `over_budget` is `False` whenever cost telemetry is absent, keeping the missing-usage case a soft no-op consistent with the other modes.
 - Cost rendering is threshold-based, not fixed precision: `>= $0.01` → 2 decimals, `> 0` but smaller → 4 decimals, `0`/unknown → `$0`; cheap-model runs therefore show `$0.0034`-style values on the same line format.
 
+- `scripts/webhook_auth.py` is **pure stdlib** (`hmac`/`hashlib`/`json` only) exposing `authorize_webhook()` + `github_hmac_hex()` plus a `sign|authorize` CLI, so the Modal image needs no extra dependency and the auth decision is unit-testable outside Modal (`tests/test_webhook_auth.py`).
+
 ## Pitfalls
 
 - `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403), so the hub publish default is `mode=direct` (clone hub → ingest → push `main`); the dispatch path needs a classic PAT on the target repo.

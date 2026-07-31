@@ -1,27 +1,21 @@
 {
   "stats": {
-    "files": 3,
-    "lines_added": 23,
+    "files": 2,
+    "lines_added": 6,
     "lines_removed": 0,
-    "changes": 4
+    "changes": 2
   },
   "files": [
     {
-      "path": "modal_app/DEV.md",
+      "path": "DEV.md",
       "is_new": false,
-      "lines_added": 11,
+      "lines_added": 2,
       "lines_removed": 0
     },
     {
       "path": "modal_app/USAGE.md",
-      "is_new": true,
-      "lines_added": 10,
-      "lines_removed": 0
-    },
-    {
-      "path": "pack/DEV.md",
       "is_new": false,
-      "lines_added": 2,
+      "lines_added": 4,
       "lines_removed": 0
     }
   ]
