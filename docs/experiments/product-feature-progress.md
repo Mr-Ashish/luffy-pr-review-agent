@@ -18,7 +18,7 @@
 | F53 | Linked issue context | product | PR #3 merged |
 | F54 | Fix-it prompt per inline comment | product | PR #4 merged |
 | F55 | Feature toggle system | product | PR #5 merged |
-| F56 | Lens recipes + named packs | product | **this fire** — agent/packs + lens_recipes.py |
+| F56 | Lens recipes + named packs | product | **MERGED** PR #6 — `lens_recipes.py` + packs |
 
 ## IN_PROGRESS
 
@@ -53,9 +53,9 @@
 - **left_count:** 11 (items 4–15; 1–3 done)
 - **progress_pct:** ~60% of 15-item product backlog (9 product-ish of 15 ≈ 60)
 - **eta:** 4–8 more productive fires
-- **active_worktrees:** f56-lens-recipes
+- **active_worktrees:** none (F56 merged)
 - **federated_memory_note:** deferred; toggle keys exist
 
 ## Status line
 
-`features_built_count=13 types_built=agent_quality,product left_count=11 progress_pct=60 eta=4-8fires active_worktrees=1 federated_memory_note=deferred`
+`features_built_count=13 types_built=agent_quality,product left_count=11 progress_pct=60 eta=4-8fires active_worktrees=0 federated_memory_note=deferred`

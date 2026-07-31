@@ -1,7 +1,7 @@
 # F56 — Review lens recipes + named prompt packs
 
 **Date:** 2026-07-31  
-**Status:** shipped (control-plane)  
+**Status:** shipped (MERGED PR #6)  
 **Tag:** PRODUCT_FEATURE | AGENT_QUALITY | MULTI_LENS
 
 ## Problem
