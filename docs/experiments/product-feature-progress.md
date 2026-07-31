@@ -13,7 +13,7 @@
 | F64 | Durable fp-rules.json self-learn | product, memory | MERGED PR #15 |
 | F65 | Multi-tenant federated hub memory | product, memory | **MERGED** PR #16 |
 | F66 | Modal default prod live e2e host | product, ops | **MERGED** PR #16 (`0.7.0-f66`) |
-| F67 | Modal live Hermes/orch log streaming | product, ops | **shipping** (`0.8.0-f67`) |
+| F67 | Modal live Hermes/orch log streaming | product, ops | **MERGED** main `35adc74` (`0.8.0-f67`) |
 
 ## IN_PROGRESS
 
@@ -37,7 +37,7 @@
 - **federated_memory_note:** F65 LUFFY_MEMORY_TENANT → memory/tenants/{t}/repos/{slug}
 - **agent_design_note:** F62–F66 pure code I/O; prompt judgment only
 - **meta_loop_note:** F65+F66 shipped; Modal milvus corpus re-scored mean 38.3
-- **milvus_corpus:** 3 (Modal F66 re-score complete)
+- **milvus_corpus:** 3 + complex #6 F67 stream e2e (APPROVE 95, tools 0→21)
 
 ## Status line
 
