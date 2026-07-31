@@ -1,7 +1,7 @@
 # F59 — Incremental review
 
 **Date:** 2026-07-31  
-**Status:** shipped (control-plane)  
+**Status:** shipped (MERGED PR #9)  
 **Tag:** PRODUCT_FEATURE | DETERMINISTIC
 
 ## Problem

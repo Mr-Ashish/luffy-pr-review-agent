@@ -15,7 +15,7 @@
 | F56 | Lens recipes + packs | product | PR #6 |
 | F57 | Mermaid architecture | product | PR #7 |
 | F58 | PR description filler | product | PR #8 |
-| F59 | Incremental review | product | **this fire** — incremental_review.py |
+| F59 | Incremental review | product | **MERGED** PR #9 — `incremental_review.py` |
 
 ## IN_PROGRESS
 
@@ -38,9 +38,9 @@
 - **left_count:** 8
 - **progress_pct:** ~80%
 - **eta:** 3–5 fires
-- **active_worktrees:** f59-incremental
+- **active_worktrees:** none (F59 merged)
 - **federated_memory_note:** deferred
 
 ## Status line
 
-`features_built_count=16 types_built=agent_quality,product left_count=8 progress_pct=80 eta=3-5fires active_worktrees=1 federated_memory_note=deferred`
+`features_built_count=16 types_built=agent_quality,product left_count=8 progress_pct=80 eta=3-5fires active_worktrees=0 federated_memory_note=deferred`
