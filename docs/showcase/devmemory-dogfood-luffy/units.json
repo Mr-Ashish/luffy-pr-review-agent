@@ -1,34 +1,22 @@
 {
   "units": [
     {
-      "kind": "dev",
-      "path": "agent",
+      "kind": "usage",
+      "path": ".",
       "action": "merge",
-      "section": "Design decisions",
-      "content": "- F9b splits the precise-anchor feature across prompt and script: the model side is `agent/SOUL.md` rule 10 (\"when a defect is on a specific **new** line you saw in the diff, cite `path:LINE`\") plus the `agent/review-prompt.md` Key findings **File** column preferring `path:LINE` when the line is visible in the diff. Without those two, `scripts/post-inline-comments.py` has no `line_hint` to consume and always degrades to the F9 nearest/first anchor.\n- The citation rule is deliberately scoped to **new** (`+`) lines only, matching the reviewer's added-lines scope — a `path:LINE` pointing at unchanged context is not a usable anchor for a GitHub review comment.",
+      "section": "Common commands",
+      "content": "- Ops footer toggles (F35): set repo/env var `LUFFY_OPS_FOOTER=0` to suppress the italic ops line on posted reviews; set `LUFFY_CONSOLE_URL` to a hosted Run Console base URL to add a hosted console link next to the Actions run link (empty by default, so only the workflow-run link plus the `run-bundle.json` → `ui/review-console` Load-bundle tip are emitted).",
       "evidence": [
-        "agent/SOUL.md rule 10: cite path:LINE for new lines only; never invent",
-        "agent/review-prompt.md Key findings File column prefers path:LINE when seen in diff"
+        "| `LUFFY_OPS_FOOTER` | `1` | `0` disables |",
+        "| `LUFFY_CONSOLE_URL` | empty | Optional hosted Run Console base URL |"
       ],
-      "confidence": "high"
-    },
-    {
-      "kind": "dev",
-      "path": "agent",
-      "action": "merge",
-      "section": "Pitfalls",
-      "content": "- \"Never invent LINE\" in SOUL rule 10 is a hard API constraint, not style: a hallucinated line number that is not a changed `+` line makes GitHub reject the inline review comment (HTTP 422), so a confidently wrong citation is worse than no citation at all.\n- Reformatting or dropping the `path:LINE` convention from the Key findings **File** column silently downgrades anchors to nearest/first instead of erroring — the same class of invisible prompt/parser drift as the `**Verdict:**` textual contract.",
-      "evidence": [
-        "Do not invent line numbers (422 risk on GitHub)",
-        "Only pins to changed + lines so GitHub accepts the review comment"
-      ],
-      "confidence": "high"
+      "confidence": "medium"
     }
   ],
-  "summary": "The only durable knowledge not already in the claim index is the prompt-side half of the F9b contract: agent/SOUL.md rule 10 and agent/review-prompt.md now require the model to emit `path:LINE` citations for new lines, which is what makes precise inline anchoring possible, plus the explicit no-invented-line-numbers rule.",
+  "summary": "The session is almost entirely a restatement of already-indexed knowledge (F35 ops footer design decision, Luffy architecture/stage map, memory layers, install/ops setup, SOUL trust model). The only knowledge not visibly present in the existing USAGE excerpts is the operator-facing toggle pair for the ops footer.",
   "session_ids": [
     "dogfood-luffy-session"
   ],
   "model": "anthropic/claude-opus-5",
-  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T202354-5e0090/extract.raw.md"
+  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T202739-756109/extract.raw.md"
 }

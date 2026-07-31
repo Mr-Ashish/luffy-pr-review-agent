@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T14:53:55Z
+- **assembled_at:** 2026-07-31T14:57:39Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+0eb582f feat(ops): F35 PR comment deep-link footer (Actions + run-bundle)
+7524aa2 docs(knowledge): dogfood F9b precise anchors + showcase
 f94fd08 feat(trust): F9b precise inline anchors from path:LINE
 989ef7e docs(knowledge): dogfood F34 webhook fail-closed + showcase
 b263892 feat(trust): F34 webhook fail-closed by default
-39d7bbb docs(knowledge): dogfood F9 inline comments + showcase
-be6aa9a feat(trust): F9 path-anchored inline PR review comments
 ```
 
 ## tree (sample)
@@ -87,6 +87,7 @@ tests/test_install_luffy.py
 tests/test_local_memory.py
 tests/test_memory_health.py
 tests/test_normalize_review.py
+tests/test_ops_footer.py
 tests/test_pack_run_for_ui.py
 tests/test_parse_verdict.py
 tests/test_post_inline_comments.py
@@ -113,6 +114,7 @@ docs/experiments/2026-07-31-f31-run-bundle.md
 docs/experiments/2026-07-31-f32-trigger.md
 docs/experiments/2026-07-31-f33-webhook-auth.md
 docs/experiments/2026-07-31-f34-webhook-fail-closed.md
+docs/experiments/2026-07-31-f35-ops-footer.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-roi-fire.md
@@ -169,6 +171,7 @@ scripts/hub-ingest-run.py
 scripts/install-luffy.sh
 scripts/memory-health.sh
 scripts/normalize-review.py
+scripts/ops_footer.py
 scripts/pack-run-for-ui.py
 scripts/parse-verdict.py
 scripts/post-inline-comments.py
@@ -230,6 +233,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] --caller --with-hub-ingest --with-runner-build adoption agent agentscript default entrypoint
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
+- [DEV.md#Design decisions] action append comment complet console deep-link f35 footer
 - [DEV.md#Design decisions] 422 actually added chang comment f9b f9f9b findingsblock
 - [DEV.md#Design decisions] authoriz bearerx-luffy-token escape f33f34 f34 fail-clos github hmac-sha256
 - [DEV.md#Design decisions] --bit --spawn browser command console default dry-plan enqueue
@@ -246,8 +250,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] --max-usd alert already budget estimat exceed f29 footerjob-summary
 - [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
-- [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
-- [DEV.md#Design decisions]
+- [DEV.md#Design decisions] contrac
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -323,9 +326,9 @@ assets/brand-options/three-artifacts.html
 - Every review must emit structured judgment fields: Score 0–100, review effort 1–5, security audit verdict, relevant-tests yes/no, key findings, optional concrete code suggestions.
 
 ## Pitfalls
-- The F22/F23 signal depends on a *textual* contract with the model output, not a structured field: `scripts/parse-verdict.py` matches `^\*\*Verdict:\*\*\s*(.+)$` (MULTILINE, case-insensitive), so the verdict must be a bold `**Verdict:**` label at the start of a line in the normalized body. Reformatting that line in `agent/review-prompt.md` (plain text, inline, indented, inside a fence) silently degrades every run to `UNKNOWN` (and F23 posts a neutral COMMENT review event).
 - Same anchoring applies to `**Score:** <int>[/100]` and `**Confidence:** low|medium|high` — score/confidence are parsed only for reporting, and a missed match yields empty strings rather than an error.
-- `UNKNOWN` is deliberately non-blocking (reaction `eyes
+- `UNKNOWN` is deliberately non-blocking (reaction `eyes`, status `success`, review_event `COMMENT`), so a broken prompt contract looks like a healthy neutral review instead of failing loudly. Verify the posted body still carries the bold verdict line after any prompt/template edit.
+- F23 dual-channel: the full Markdown is still the issue comment (F12 replace via `<!-- luffy-review pr=N`); the formal PR Review body is intentionally short so the Reviews panel is not a second full dump. Marker `<!-- luffy-pr-review pr=N` tags Luffy
 … [truncated; do not restate] …
 
 ### USAGE.md

@@ -85,6 +85,8 @@ devmemory extract --fixture sample-auth-module --apply
 
 - Regenerate the Hermes startup comparison: `./scripts/benchmark-hermes-startup.sh` writes `docs/benchmarks/hermes-startup-latest.md` (cold Hermes install measured at ~1–2 min, which is what the cache/prebaked-image paths are traded against).
 
+- Ops footer toggles (F35): set repo/env var `LUFFY_OPS_FOOTER=0` to suppress the italic ops line on posted reviews; set `LUFFY_CONSOLE_URL` to a hosted Run Console base URL to add a hosted console link next to the Actions run link (empty by default, so only the workflow-run link plus the `run-bundle.json` → `ui/review-console` Load-bundle tip are emitted).
+
 ## Setup
 
 - Install on each target repo's **default branch** (workflow only runs from default branch):

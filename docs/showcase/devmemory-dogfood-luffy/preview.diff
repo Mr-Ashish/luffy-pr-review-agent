@@ -1,17 +1,12 @@
-diff --git a/agent/DEV.md b/agent/DEV.md
---- a/agent/DEV.md
-+++ b/agent/DEV.md
-@@ -13,10 +13,11 @@
- - Verdict text is normalized rather than required to be exact: aliases map `APPROVED`/`LGTM` → `APPROVE`, `REQUEST_CHANGES`/`REQUEST-CHANGES`/`CHANGES REQUESTED` → `REQUEST_CHANGES`, `COMMENTS`/`NEUTRAL` → `COMMENT`; whitespace is collapsed, trailing `.` stripped, and any trailing parenthetical/bracket note removed.
- - After exact-alias lookup there is a prefix pass, so decorated verdicts like `REQUEST CHANGES — see blocking` still resolve. This tolerance is intentional: the model is allowed prose after the token, but not allowed to move the label off the line start.
+diff --git a/USAGE.md b/USAGE.md
+--- a/USAGE.md
++++ b/USAGE.md
+@@ -85,6 +85,8 @@
  
-+- F9b splits the precise-anchor feature across prompt and script: the model side is `agent/SOUL.md` rule 10 ("when a defect is on a specific **new** line you saw in the diff, cite `path:LINE`") plus the `agent/review-prompt.md` Key findings **File** column preferring `path:LINE` when the line is visible in the diff. Without those two, `scripts/post-inline-comments.py` has no `line_hint` to consume and always degrades to the F9 nearest/first anchor.
-+- The citation rule is deliberately scoped to **new** (`+`) lines only, matching the reviewer's added-lines scope — a `path:LINE` pointing at unchanged context is not a usable anchor for a GitHub review comment.
+ - Regenerate the Hermes startup comparison: `./scripts/benchmark-hermes-startup.sh` writes `docs/benchmarks/hermes-startup-latest.md` (cold Hermes install measured at ~1–2 min, which is what the cache/prebaked-image paths are traded against).
+ 
++- Ops footer toggles (F35): set repo/env var `LUFFY_OPS_FOOTER=0` to suppress the italic ops line on posted reviews; set `LUFFY_CONSOLE_URL` to a hosted Run Console base URL to add a hosted console link next to the Actions run link (empty by default, so only the workflow-run link plus the `run-bundle.json` → `ui/review-console` Load-bundle tip are emitted).
 +
- ## Pitfalls
+ ## Setup
  
--- The F22/F23 signal depends on a *textual* contract with the model output, not a structured field: `scripts/parse-verdict.py` matches `^\*\*Verdict:\*\*\s*(.+)$` (MULTILINE, case-insensitive), so the verdict must be a bold `**Verdict:**` label at the start of a line in the normalized body. Reformatting that line in `agent/review-prompt.md` (plain text, inline, indented, inside a fence) silently degrades every run to `UNKNOWN` (and F23 posts a neutral COMMENT review event).
- - Same anchoring applies to `**Score:** <int>[/100]` and `**Confidence:** low|medium|high` — score/confidence are parsed only for reporting, and a missed match yields empty strings rather than an error.
- - `UNKNOWN` is deliberately non-blocking (reaction `eyes`, status `success`, review_event `COMMENT`), so a broken prompt contract looks like a healthy neutral review instead of failing loudly. Verify the posted body still carries the bold verdict line after any prompt/template edit.
- - F23 dual-channel: the full Markdown is still the issue comment (F12 replace via `<!-- luffy-review pr=N`); the formal PR Review body is intentionally short so the Reviews panel is not a second full dump. Marker `<!-- luffy-pr-review pr=N` tags Luffy-owned PR reviews.
--- F24 dismisses prior Luffy formal reviews with that marker (APPROVED/CHANGES_REQUESTED only) before posting a new one; COMMENTED cannot be dismissed by GitHub.
+ - Install on each target repo's **default branch** (workflow only runs from default branch):

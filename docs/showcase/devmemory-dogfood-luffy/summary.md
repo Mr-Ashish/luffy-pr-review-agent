@@ -1,9 +1,9 @@
-# Run run-20260731T202354-5e0090
+# Run run-20260731T202739-756109
 
 - session: `dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
-- units: 2
-- summary: The only durable knowledge not already in the claim index is the prompt-side half of the F9b contract: agent/SOUL.md rule 10 and agent/review-prompt.md now require the model to emit `path:LINE` citations for new lines, which is what makes precise inline anchoring possible, plus the explicit no-invented-line-numbers rule.
-- at: 2026-07-31T14:54:18Z
-- timings: {"assemble_s": 0.137, "extract_s": 23.621, "normalize_s": 0.002}
+- units: 1
+- summary: The session is almost entirely a restatement of already-indexed knowledge (F35 ops footer design decision, Luffy architecture/stage map, memory layers, install/ops setup, SOUL trust model). The only knowledge not visibly present in the existing USAGE excerpts is the operator-facing toggle pair for the ops footer.
+- at: 2026-07-31T14:58:00Z
+- timings: {"assemble_s": 0.14, "extract_s": 21.282, "normalize_s": 0.001}

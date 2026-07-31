@@ -7,16 +7,16 @@
 
 ## Transcript / notes
 
-# Luffy dogfood session — F9b precise inline anchors
+# Luffy dogfood session — F35 ops deep-link footer
 
-## F9b knowledge
-- post-inline-comments.py: path:LINE / #L / line N / optional Line column → line_hint
-- Anchor resolution: exact (hint is a + line) | nearest changed | first (F9 fallback)
-- Only pins to changed + lines so GitHub accepts the review comment
-- Plan JSON fields: line_hint, anchor
-- agent/review-prompt.md Key findings File column prefers path:LINE when seen in diff
-- agent/SOUL.md rule 10: cite path:LINE for new lines only; never invent
-- Do not invent line numbers (422 risk on GitHub)
+## F35 knowledge
+- scripts/ops_footer.py modes: line, append, step-summary
+- Wired in post-review-comment.sh before gh pr comment; soft-fail
+- Builds Actions URL from GITHUB_SERVER_URL + GITHUB_REPOSITORY + GITHUB_RUN_ID
+- Optional LUFFY_CONSOLE_URL for hosted Run Console link
+- Always mentions run-bundle.json Load bundle path for ui/review-console
+- Opt-out LUFFY_OPS_FOOTER=0
+- OpenUI phase 4b deep-link partial (no live stream)
 
 ## Architecture excerpt
 # Luffy architecture
@@ -99,16 +99,6 @@ Vars: `LUFFY_MEMORY_MODE` (`local` default | `hub` | `both`), `LUFFY_MEMORY_PATH
 ## Packaging (F10)
 
 | Mode | What lives on the target | Runtime source |
-|------|--------------------------|----------------|
-| **Caller** (`install-luffy.sh --caller`) | Thin `.github/workflows/luffy-pr-review.yml` only | Hub `agent/`+`scripts/` via `luffy-review-reusable.yml@main` |
-| **Pack** (default install) | `agent/`, runtime `scripts/`, thin caller + local copy of reusable | Target default branch |
-
-Hub implementation file: `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`, inputs `luffy_repository` + `luffy_ref`).
-
-## Run console (ops UI)
-
-Luffy’s PR comment remains Markdown. The **Run Console** (`ui/review-console/`) is the full-run ops surface (Impeccable Operate / Neo kinpaku):
-
 
 ## Operations excerpt
 # Luffy operations
@@ -154,10 +144,24 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 19 (F30):** memory health job summary + loud local-publish failure; README local-first
 - **Sprint 20 (F31):** every run auto-writes `run-bundle.json` for the Run Console (artifact + job summary); soft-fail
 - **Sprint 21 (F32):** `trigger-review.sh` + Modal bit4 enqueue/webhook + Run Console Run tab (spawn-only doorbell)
-- **Sprint 22 (F33):** webhook HMAC + bearer auth on Modal doorbell (`webhook_auth.py`)
+- **Sprint 22 (F33):** webhook HMAC + [REDACTED] on Modal doorbell (`webhook_auth.py`)
 - **Sprint 23 (F9):** path-anchored inline PR comments on first changed line (`post-inline-comments.py`)
 - **Sprint 24 (F34):** Modal webhook fail-closed by default (`LUFFY_WEBHOOK_ALLOW_OPEN=1` for dev)
 - **Sprint 25 (F9b):** inline comments prefer `path:LINE` when that line is a changed `+` line
+- **Sprint 26 (F35):** PR comment ops footer with Actions run link + run-bundle tip
+
+## Ops footer (F35)
+
+Posted review gets an italic ops line (after cost footer when present):
+
+```text
+*Ops (F35): [workflow run](…) · artifact `run-bundle.json` → `ui/review-console` Load bundle*
+```
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_OPS_FOOTER` | `1` | `0` disables |
+| `LUFFY_CONSOLE_URL` | empty | Optional hosted Run Console base URL |
 
 ## Inline comments (F9 / F9b)
 
@@ -167,20 +171,42 @@ After the formal F23 review, Luffy may post a second COMMENT review with **inlin
 2. else nearest changed line on that file → **nearest**
 3. else first added line → **first** (F9)
 
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `LUFFY_INLINE_COMMENTS` | `1` | `0`/`off` disables |
-| `LUFFY_INLINE_SEVERITY` | `critical,high,blocking` | Comma list; `all` = no filter |
-| `LUFFY_INLINE_MAX` | `6` | Cap per run |
 
-Offline plan: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff` (see `anchor` / `line_hint` in JSON).
-
-## Repo-local memory (F28 default)
-
-Each target repo owns review memory under **`.luffy/`** on its default branch:
-
-```text
-.luffy/
+## Scripts
+__pycache__
+assemble-context.sh
+association-allowed.sh
+benchmark-hermes-startup.sh
+build-hub-payload.py
+build-luffy-runner-image.sh
+capture-hermes-loop.py
+cooldown-check.sh
+dismiss-prior-pr-reviews.sh
+distill-memory.sh
+hermes-pin.sh
+hub-ingest-run.py
+install-luffy.sh
+memory-health.sh
+normalize-review.py
+ops_footer.py
+pack-run-for-ui.py
+parse-verdict.py
+post-inline-comments.py
+post-review-comment.sh
+preload-hub-memory.sh
+publish-run-local.sh
+publish-run-to-hub.sh
+report-verdict.sh
+review-local.sh
+review-to-openui.py
+run-hermes-review.sh
+run-luffy-review.sh
+save-trace.sh
+sparse-pr-paths.sh
+trigger-review.sh
+usage-summary.py
+webhook_auth.py
+write-failure-review.sh
 
 ## SOUL excerpt
 # Luffy — PR Review Agent
@@ -208,54 +234,4 @@ You are **Luffy**, a staff-level code reviewer running inside CI. You review **t
 ## Finding discipline (quality bar)
 1. **Bugs & security:** be thorough. Do not skip a genuine defect just because the trigger is narrow — name the scenario.
 2. **Lower severity:** high bar. If you cannot explain a concrete trigger, do not flag it.
-3. Each finding must be **discrete and actionable** (file + symbol + why + realistic input/path).
-4. Do not speculate about breakage elsewhere unless you can name the affected path from the diff/workspace.
-5. Do not flag intentional design or pure style unless it causes a clear defect.
-6. Limited confidence + high impact (data loss, security, money): report with an explicit uncertainty note.
-7. Otherwise **prefer silence over guesses**. Empty “Blocking” is fine when the PR is solid.
-8. Communicate severity accurately — if it only fails under specific inputs, say so up front.
-9. When citing code, use backticks for paths/symbols (`path/to/file.py`, `` `func_name` ``).
-10. When a defect is on a specific **new** line you saw in the diff, cite `` `path:LINE` `` (enables precise inline comments). Never invent LINE.
-
-## Priority order
-1. Correctness / regressions  
-2. Security / auth / injection / secrets / XSS / unsafe deserialization  
-3. Data loss / concurrency / race conditions  
-4. API / contract / payload shape breaks  
-5. Missing tests for risky paths  
-
-## Scripts
-__pycache__
-assemble-context.sh
-association-allowed.sh
-benchmark-hermes-startup.sh
-build-hub-payload.py
-build-luffy-runner-image.sh
-capture-hermes-loop.py
-cooldown-check.sh
-dismiss-prior-pr-reviews.sh
-distill-memory.sh
-hermes-pin.sh
-hub-ingest-run.py
-install-luffy.sh
-memory-health.sh
-normalize-review.py
-pack-run-for-ui.py
-parse-verdict.py
-post-inline-comments.py
-post-review-comment.sh
-preload-hub-memory.sh
-publish-run-local.sh
-publish-run-to-hub.sh
-report-verdict.sh
-review-local.sh
-review-to-openui.py
-run-hermes-review.sh
-run-luffy-review.sh
-save-trace.sh
-sparse-pr-paths.sh
-trigger-review.sh
-usage-summary.py
-webhook_auth.py
-write-failure-review.sh
 

@@ -44,16 +44,16 @@ Respond with **only** the JSON object (fence optional).
 
 ### Transcript
 
-# Luffy dogfood session — F9b precise inline anchors
+# Luffy dogfood session — F35 ops deep-link footer
 
-## F9b knowledge
-- post-inline-comments.py: path:LINE / #L / line N / optional Line column → line_hint
-- Anchor resolution: exact (hint is a + line) | nearest changed | first (F9 fallback)
-- Only pins to changed + lines so GitHub accepts the review comment
-- Plan JSON fields: line_hint, anchor
-- agent/review-prompt.md Key findings File column prefers path:LINE when seen in diff
-- agent/SOUL.md rule 10: cite path:LINE for new lines only; never invent
-- Do not invent line numbers (422 risk on GitHub)
+## F35 knowledge
+- scripts/ops_footer.py modes: line, append, step-summary
+- Wired in post-review-comment.sh before gh pr comment; soft-fail
+- Builds Actions URL from GITHUB_SERVER_URL + GITHUB_REPOSITORY + GITHUB_RUN_ID
+- Optional LUFFY_CONSOLE_URL for hosted Run Console link
+- Always mentions run-bundle.json Load bundle path for ui/review-console
+- Opt-out LUFFY_OPS_FOOTER=0
+- OpenUI phase 4b deep-link partial (no live stream)
 
 ## Architecture excerpt
 # Luffy architecture
@@ -136,16 +136,6 @@ Vars: `LUFFY_MEMORY_MODE` (`local` default | `hub` | `both`), `LUFFY_MEMORY_PATH
 ## Packaging (F10)
 
 | Mode | What lives on the target | Runtime source |
-|------|--------------------------|----------------|
-| **Caller** (`install-luffy.sh --caller`) | Thin `.github/workflows/luffy-pr-review.yml` only | Hub `agent/`+`scripts/` via `luffy-review-reusable.yml@main` |
-| **Pack** (default install) | `agent/`, runtime `scripts/`, thin caller + local copy of reusable | Target default branch |
-
-Hub implementation file: `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`, inputs `luffy_repository` + `luffy_ref`).
-
-## Run console (ops UI)
-
-Luffy’s PR comment remains Markdown. The **Run Console** (`ui/review-console/`) is the full-run ops surface (Impeccable Operate / Neo kinpaku):
-
 
 ## Operations excerpt
 # Luffy operations
@@ -191,10 +181,24 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 19 (F30):** memory health job summary + loud local-publish failure; README local-first
 - **Sprint 20 (F31):** every run auto-writes `run-bundle.json` for the Run Console (artifact + job summary); soft-fail
 - **Sprint 21 (F32):** `trigger-review.sh` + Modal bit4 enqueue/webhook + Run Console Run tab (spawn-only doorbell)
-- **Sprint 22 (F33):** webhook HMAC + bearer auth on Modal doorbell (`webhook_auth.py`)
+- **Sprint 22 (F33):** webhook HMAC + [REDACTED] on Modal doorbell (`webhook_auth.py`)
 - **Sprint 23 (F9):** path-anchored inline PR comments on first changed line (`post-inline-comments.py`)
 - **Sprint 24 (F34):** Modal webhook fail-closed by default (`LUFFY_WEBHOOK_ALLOW_OPEN=1` for dev)
 - **Sprint 25 (F9b):** inline comments prefer `path:LINE` when that line is a changed `+` line
+- **Sprint 26 (F35):** PR comment ops footer with Actions run link + run-bundle tip
+
+## Ops footer (F35)
+
+Posted review gets an italic ops line (after cost footer when present):
+
+```text
+*Ops (F35): [workflow run](…) · artifact `run-bundle.json` → `ui/review-console` Load bundle*
+```
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_OPS_FOOTER` | `1` | `0` disables |
+| `LUFFY_CONSOLE_URL` | empty | Optional hosted Run Console base URL |
 
 ## Inline comments (F9 / F9b)
 
@@ -204,20 +208,42 @@ After the formal F23 review, Luffy may post a second COMMENT review with **inlin
 2. else nearest changed line on that file → **nearest**
 3. else first added line → **first** (F9)
 
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `LUFFY_INLINE_COMMENTS` | `1` | `0`/`off` disables |
-| `LUFFY_INLINE_SEVERITY` | `critical,high,blocking` | Comma list; `all` = no filter |
-| `LUFFY_INLINE_MAX` | `6` | Cap per run |
 
-Offline plan: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff` (see `anchor` / `line_hint` in JSON).
-
-## Repo-local memory (F28 default)
-
-Each target repo owns review memory under **`.luffy/`** on its default branch:
-
-```text
-.luffy/
+## Scripts
+__pycache__
+assemble-context.sh
+association-allowed.sh
+benchmark-hermes-startup.sh
+build-hub-payload.py
+build-luffy-runner-image.sh
+capture-hermes-loop.py
+cooldown-check.sh
+dismiss-prior-pr-reviews.sh
+distill-memory.sh
+hermes-pin.sh
+hub-ingest-run.py
+install-luffy.sh
+memory-health.sh
+normalize-review.py
+ops_footer.py
+pack-run-for-ui.py
+parse-verdict.py
+post-inline-comments.py
+post-review-comment.sh
+preload-hub-memory.sh
+publish-run-local.sh
+publish-run-to-hub.sh
+report-verdict.sh
+review-local.sh
+review-to-openui.py
+run-hermes-review.sh
+run-luffy-review.sh
+save-trace.sh
+sparse-pr-paths.sh
+trigger-review.sh
+usage-summary.py
+webhook_auth.py
+write-failure-review.sh
 
 ## SOUL excerpt
 # Luffy — PR Review Agent
@@ -245,56 +271,6 @@ You are **Luffy**, a staff-level code reviewer running inside CI. You review **t
 ## Finding discipline (quality bar)
 1. **Bugs & security:** be thorough. Do not skip a genuine defect just because the trigger is narrow — name the scenario.
 2. **Lower severity:** high bar. If you cannot explain a concrete trigger, do not flag it.
-3. Each finding must be **discrete and actionable** (file + symbol + why + realistic input/path).
-4. Do not speculate about breakage elsewhere unless you can name the affected path from the diff/workspace.
-5. Do not flag intentional design or pure style unless it causes a clear defect.
-6. Limited confidence + high impact (data loss, security, money): report with an explicit uncertainty note.
-7. Otherwise **prefer silence over guesses**. Empty “Blocking” is fine when the PR is solid.
-8. Communicate severity accurately — if it only fails under specific inputs, say so up front.
-9. When citing code, use backticks for paths/symbols (`path/to/file.py`, `` `func_name` ``).
-10. When a defect is on a specific **new** line you saw in the diff, cite `` `path:LINE` `` (enables precise inline comments). Never invent LINE.
-
-## Priority order
-1. Correctness / regressions  
-2. Security / auth / injection / secrets / XSS / unsafe deserialization  
-3. Data loss / concurrency / race conditions  
-4. API / contract / payload shape breaks  
-5. Missing tests for risky paths  
-
-## Scripts
-__pycache__
-assemble-context.sh
-association-allowed.sh
-benchmark-hermes-startup.sh
-build-hub-payload.py
-build-luffy-runner-image.sh
-capture-hermes-loop.py
-cooldown-check.sh
-dismiss-prior-pr-reviews.sh
-distill-memory.sh
-hermes-pin.sh
-hub-ingest-run.py
-install-luffy.sh
-memory-health.sh
-normalize-review.py
-pack-run-for-ui.py
-parse-verdict.py
-post-inline-comments.py
-post-review-comment.sh
-preload-hub-memory.sh
-publish-run-local.sh
-publish-run-to-hub.sh
-report-verdict.sh
-review-local.sh
-review-to-openui.py
-run-hermes-review.sh
-run-luffy-review.sh
-save-trace.sh
-sparse-pr-paths.sh
-trigger-review.sh
-usage-summary.py
-webhook_auth.py
-write-failure-review.sh
 
 
 ## Existing directories (allowed `path` values)
@@ -345,11 +321,11 @@ agent
 
 ### recent log
 ```
+0eb582f feat(ops): F35 PR comment deep-link footer (Actions + run-bundle)
+7524aa2 docs(knowledge): dogfood F9b precise anchors + showcase
 f94fd08 feat(trust): F9b precise inline anchors from path:LINE
 989ef7e docs(knowledge): dogfood F34 webhook fail-closed + showcase
 b263892 feat(trust): F34 webhook fail-closed by default
-39d7bbb docs(knowledge): dogfood F9 inline comments + showcase
-be6aa9a feat(trust): F9 path-anchored inline PR review comments
 ```
 
 ### tree (sample)
@@ -419,6 +395,7 @@ tests/test_install_luffy.py
 tests/test_local_memory.py
 tests/test_memory_health.py
 tests/test_normalize_review.py
+tests/test_ops_footer.py
 tests/test_pack_run_for_ui.py
 tests/test_parse_verdict.py
 tests/test_post_inline_comments.py
@@ -445,6 +422,7 @@ docs/experiments/2026-07-31-f31-run-bundle.md
 docs/experiments/2026-07-31-f32-trigger.md
 docs/experiments/2026-07-31-f33-webhook-auth.md
 docs/experiments/2026-07-31-f34-webhook-fail-closed.md
+docs/experiments/2026-07-31-f35-ops-footer.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-roi-fire.md
@@ -501,6 +479,7 @@ scripts/hub-ingest-run.py
 scripts/install-luffy.sh
 scripts/memory-health.sh
 scripts/normalize-review.py
+scripts/ops_footer.py
 scripts/pack-run-for-ui.py
 scripts/parse-verdict.py
 scripts/post-inline-comments.py
@@ -560,6 +539,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] --caller --with-hub-ingest --with-runner-build adoption agent agentscript default entrypoint
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
+- [DEV.md#Design decisions] action append comment complet console deep-link f35 footer
 - [DEV.md#Design decisions] 422 actually added chang comment f9b f9f9b findingsblock
 - [DEV.md#Design decisions] authoriz bearerx-luffy-token escape f33f34 f34 fail-clos github hmac-sha256
 - [DEV.md#Design decisions] --bit --spawn browser command console default dry-plan enqueue
@@ -576,8 +556,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] --max-usd alert already budget estimat exceed f29 footerjob-summary
 - [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
-- [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
-- [DEV.md#Design decisions]
+- [DEV.md#Design decisions] contrac
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -653,9 +632,9 @@ assets/brand-options/three-artifacts.html
 - Every review must emit structured judgment fields: Score 0–100, review effort 1–5, security audit verdict, relevant-tests yes/no, key findings, optional concrete code suggestions.
 
 ## Pitfalls
-- The F22/F23 signal depends on a *textual* contract with the model output, not a structured field: `scripts/parse-verdict.py` matches `^\*\*Verdict:\*\*\s*(.+)$` (MULTILINE, case-insensitive), so the verdict must be a bold `**Verdict:**` label at the start of a line in the normalized body. Reformatting that line in `agent/review-prompt.md` (plain text, inline, indented, inside a fence) silently degrades every run to `UNKNOWN` (and F23 posts a neutral COMMENT review event).
 - Same anchoring applies to `**Score:** <int>[/100]` and `**Confidence:** low|medium|high` — score/confidence are parsed only for reporting, and a missed match yields empty strings rather than an error.
-- `UNKNOWN` is deliberately non-blocking (reaction `eyes
+- `UNKNOWN` is deliberately non-blocking (reaction `eyes`, status `success`, review_event `COMMENT`), so a broken prompt contract looks like a healthy neutral review instead of failing loudly. Verify the posted body still carries the bold verdict line after any prompt/template edit.
+- F23 dual-channel: the full Markdown is still the issue comment (F12 replace via `<!-- luffy-review pr=N`); the formal PR Review body is intentionally short so the Reviews panel is not a second full dump. Marker `<!-- luffy-pr-review pr=N` tags Luffy
 … [truncated; do not restate] …
 
 ### USAGE.md
