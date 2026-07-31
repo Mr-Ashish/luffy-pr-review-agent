@@ -1,9 +1,9 @@
-# Run run-20260731T201945-39f2db
+# Run run-20260731T202354-5e0090
 
 - session: `dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
 - units: 2
-- summary: The session adds two details not present in existing knowledge: the F34 fail-closed default is reachable through three distinct escape surfaces (env var, function kwarg, CLI flag) as a deliberate flip of F33's open+warn behaviour, and the bit-4 dry plan now doubles as an auth self-check asserting both auth_fail_closed_ok and auth_open_ok. Everything else in the transcript restates existing DEV/USAGE claims.
-- at: 2026-07-31T14:50:08Z
-- timings: {"assemble_s": 0.136, "extract_s": 22.954, "normalize_s": 0.001}
+- summary: The only durable knowledge not already in the claim index is the prompt-side half of the F9b contract: agent/SOUL.md rule 10 and agent/review-prompt.md now require the model to emit `path:LINE` citations for new lines, which is what makes precise inline anchoring possible, plus the explicit no-invented-line-numbers rule.
+- at: 2026-07-31T14:54:18Z
+- timings: {"assemble_s": 0.137, "extract_s": 23.621, "normalize_s": 0.002}

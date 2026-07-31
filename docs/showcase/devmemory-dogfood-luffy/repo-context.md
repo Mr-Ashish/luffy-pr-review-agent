@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T14:49:45Z
+- **assembled_at:** 2026-07-31T14:53:55Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+f94fd08 feat(trust): F9b precise inline anchors from path:LINE
+989ef7e docs(knowledge): dogfood F34 webhook fail-closed + showcase
 b263892 feat(trust): F34 webhook fail-closed by default
 39d7bbb docs(knowledge): dogfood F9 inline comments + showcase
 be6aa9a feat(trust): F9 path-anchored inline PR review comments
-30f1b11 docs(knowledge): dogfood F33 webhook auth + showcase
-ceb25d4 feat(trust): F33 webhook HMAC + [REDACTED] on Modal doorbell
 ```
 
 ## tree (sample)
@@ -114,6 +114,7 @@ docs/experiments/2026-07-31-f32-trigger.md
 docs/experiments/2026-07-31-f33-webhook-auth.md
 docs/experiments/2026-07-31-f34-webhook-fail-closed.md
 docs/experiments/2026-07-31-f9-inline-comments.md
+docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/experiments/f28-repo-local-memory.md
 docs/experiments/loop-no-work-streak.md
@@ -229,7 +230,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] --caller --with-hub-ingest --with-runner-build adoption agent agentscript default entrypoint
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
-- [DEV.md#Design decisions] anchor bulk-delete cannot comment f9b filter findingsblock first
+- [DEV.md#Design decisions] 422 actually added chang comment f9b f9f9b findingsblock
 - [DEV.md#Design decisions] authoriz bearerx-luffy-token escape f33f34 f34 fail-clos github hmac-sha256
 - [DEV.md#Design decisions] --bit --spawn browser command console default dry-plan enqueue
 - [DEV.md#Design decisions] --soft action artifact auto-detect bundle download f31 failur
@@ -246,7 +247,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
 - [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
-- [DEV.md#Design de
+- [DEV.md#Design decisions]
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -292,14 +293,12 @@ assets/brand-options/three-artifacts.html
 ## Design decisions
 - The Modal entrypoint is a first-class host in the F31 Run Console contract: `review_pr` exports `LUFFY_HOST=modal` so `pack-run-for-ui.py` stamps the bundle's host label as `modal` instead of falling through the `GITHUB_ACTIONS`/else auto-detect to `local`.
 - `review_pr` also returns the `run_bundle` path in its result, so a Modal caller gets the console bundle handle back directly rather than having to download an Actions artifact (the GHA path's only option).
+- F34 deliberately reverses F33's behaviour rather than extending it: F33 allowed unauthenticated requests with a warning when no secret/token was configured; F34 makes that same state `auth=denied` so the production-safe posture is the default and misconfiguration is loud instead of silent.
+- The open-mode escape hatch is exposed on three surfaces that must stay in sync: env `LUFFY_WEBHOOK_ALLOW_OPEN=1`, the `allow_open=True` argument on the auth helper, and the `--allow-open` flag on `scripts/webhook_auth.py`. All three exist for dev/self-check only — none is a supported production configuration.
 
 ## Architecture
 - Bit 4 (F32) splits the enqueue path into four units in `modal_app/app.py`: `parse_enqueue_payload` (normalize an incoming request into repo/pr/model/post_comment), `plan_enqueue` (pure plan, no side effects), `enqueue_review` (the spawn call), and `review_webhook` (the HTTP entrypoint). Parsing/planning are separable from spawning so the parser can be self-checked without any OpenRouter spend.
-- `review_webhook` accepts two payload shapes: the simple API `{repo, pr, model, post_comment}`, and a raw GitHub `issue_comment` event whose comment body matches `@luffy … review` and whose issue is a PR. There is no third shape — non-PR issue comments and non-matching bodies are not enqueued.
-
-## Pitfalls
-- **F33/F34:** production must set `LUFFY_WEBHOOK_SECRET` and/or `LUFFY_WEBHOOK_TOKEN` on the Modal function (e.g. fold into `luffy-github`). **F34 fail-closed:** if neither is set, requests are **denied** unless `LUFFY_WEBHOOK_ALLOW_OPEN=1` (dev escape only).
-- HMAC verification needs the **raw** request body (not a re-serialized dict). The webhook reads `await request.body()` before
+- `review_webhook` accepts two payload shapes: the simple API `{repo, pr, model, post_comm
 … [truncated; do not restate] …
 
 ### pack/DEV.md
@@ -375,4 +374,5 @@ assets/brand-options/three-artifacts.html
 
 ## Debugging
 - If a live POST is rejected, reproduce locally first: `python3 scripts/webhook_auth.py sign` to mint an `X-Hub-Signature-256` over the exact raw body, then `python3 scripts/webhook_auth.py authorize` to see which branch fired, rather than guessing from the Modal response.
+- Modal cheap profile in use for these checks is version `0.5.1-cheap`; quote it when comparing behaviour across deployed revisions.
 

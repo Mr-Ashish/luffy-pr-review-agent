@@ -1,20 +1,11 @@
 [
   {
-    "path": "modal_app/DEV.md",
+    "path": "agent/DEV.md",
     "kind": "dev",
     "action": "merge",
     "section": "Design decisions",
-    "bytes": 2915,
+    "bytes": 3132,
     "applied": true,
-    "unit_path": "modal_app"
-  },
-  {
-    "path": "modal_app/USAGE.md",
-    "kind": "usage",
-    "action": "merge",
-    "section": "Debugging",
-    "bytes": 1522,
-    "applied": true,
-    "unit_path": "modal_app"
+    "unit_path": "agent"
   }
 ]
