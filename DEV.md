@@ -13,6 +13,8 @@
 
 ## Design decisions
 
+- **F59 incremental review:** opt-in `LUFFY_INCREMENTAL=1`. `scripts/incremental_review.py` reads prior Luffy comment markers for `head=SHA`, then rewrites `pr.diff` to `base...head` compare patch. Markers gain `head=` via normalize `--head-sha`. Default off (full PR diff).
+
 - **F58 PR description filler:** `scripts/pr_description_filler.py` builds a deterministic description (type, file walkthrough, test-plan checklist, linked #issues) from `pr.json` — no LLM. Modes: `fill-empty` (default, never clobber rich author prose), `markers` (refresh `<!-- luffy-description -->` block), `force`. Assemble writes `pr-description.md`; `gh pr edit` only when `LUFFY_PR_DESCRIPTION_APPLY=1`.
 
 - **F57 Mermaid architecture:** `scripts/mermaid_architecture.py` builds a flowchart from PR changed paths (grouped by package; adjacency edges only — not invented runtime deps). Assemble injects into prompt; post-normalize soft-injects if the model omitted `### Architecture diagram`. Toggle `LUFFY_MERMAID` / F55 keys `mermaid`, `mermaid_max_nodes`.

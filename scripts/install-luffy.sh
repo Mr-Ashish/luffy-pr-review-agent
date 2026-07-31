@@ -106,6 +106,7 @@ RUNTIME_SCRIPTS=(
   distill-memory.sh
   feature_toggles.py
   hermes-pin.sh
+  incremental_review.py
   linked_issue_context.py
   lens_recipes.py
   hub-ingest-run.py

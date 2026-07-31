@@ -884,11 +884,21 @@ _NORM_EXTRA=()
 case "${DIFF_TRUNCATED:-false}" in
   true|TRUE|1|yes|YES) _NORM_EXTRA+=(--diff-truncated) ;;
 esac
+# F59: stamp head SHA into review marker when known
+_HEAD_SHA="${HEAD_SHA:-}"
+if [[ -z "$_HEAD_SHA" && -f "${OUT_DIR:-}/meta.env" ]]; then
+  _HEAD_SHA="$(grep -E '^HEAD_SHA=' "$OUT_DIR/meta.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d "'\"" )" || true
+fi
+_NORM_HEAD=()
+if [[ -n "${_HEAD_SHA:-}" ]]; then
+  _NORM_HEAD+=(--head-sha "$_HEAD_SHA")
+fi
 python3 "$LUFFY_ROOT/scripts/normalize-review.py" \
   --input "$RAW_OUT" \
   --output "$FINAL_OUT" \
   --pr "$PR_NUMBER" \
   --run-id "${GITHUB_RUN_ID:-local}" \
+  "${_NORM_HEAD[@]+"${_NORM_HEAD[@]}"}" \
   "${_NORM_EXTRA[@]+"${_NORM_EXTRA[@]}"}"
 
 # F57: soft-inject Mermaid architecture if model omitted it (never fails review)
