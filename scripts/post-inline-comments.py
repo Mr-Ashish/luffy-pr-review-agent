@@ -7,6 +7,7 @@ Maps Key findings (+ Blocking bullets) onto lines in pr.diff:
         (else nearest changed line, else first)
   F9c — ### Code suggestions → GitHub ```suggestion``` apply blocks
         (multi-line when the suggestion's `-` lines match PR `+` lines)
+  F54 — per finding: copy-pasteable Fix-it agent prompt (Claude Code ready)
 
 Usage:
   python3 scripts/post-inline-comments.py plan \\
@@ -21,6 +22,7 @@ Env:
   LUFFY_INLINE_SEVERITY=critical,high   (comma list; empty = all)
   LUFFY_INLINE_SUGGESTIONS=1 (default) | 0/off to skip F9c
   LUFFY_SUGGESTION_MAX=3
+  LUFFY_FIXIT_PROMPTS=1 (default) | 0/off to skip F54 fix-it agent prompts
   GH_TOKEN / GITHUB_TOKEN for post
   LUFFY_INLINE_FIXTURE=path.json  — write planned payload instead of API (tests)
 
@@ -322,6 +324,18 @@ def plan_comments(
             body += f"\n\n_Trigger:_ {f['trigger']}"
         if hint is not None:
             body += f"\n\n_Anchor:_ L{hint} → L{line} ({anchor})"
+        fixit = ""
+        if fixit_prompts_enabled_from_env():
+            fixit = format_fixit_prompt(
+                path=path,
+                line=int(line),
+                severity=str(f["severity"]),
+                issue=str(f["issue"]),
+                trigger=str(f.get("trigger") or ""),
+                source=str(f.get("source") or "findings"),
+            )
+            if fixit:
+                body += "\n\n" + fixit
         body += "\n\n<!-- luffy-inline -->"
         planned.append(
             {
@@ -334,6 +348,7 @@ def plan_comments(
                 "line_hint": hint,
                 "anchor": anchor,
                 "kind": "finding",
+                "fixit": bool(fixit),
             }
         )
         if len(planned) >= max_n:
@@ -529,6 +544,102 @@ def find_contiguous_added_block(
     return None
 
 
+# ---------------------------------------------------------------------------
+# F54: Fix-it agent prompt per inline finding (Claude Code / coding-agent ready)
+# ---------------------------------------------------------------------------
+
+
+def fixit_prompts_enabled_from_env() -> bool:
+    """LUFFY_FIXIT_PROMPTS=1 (default) | 0/off."""
+    v = (os.environ.get("LUFFY_FIXIT_PROMPTS") or "1").strip().lower()
+    return v not in ("0", "false", "off", "no")
+
+
+def _slug_commit_subject(issue: str, path: str) -> str:
+    """Short conventional-commit subject from issue text."""
+    base = (issue or "").strip()
+    # drop trailing period and collapse whitespace
+    base = re.sub(r"\s+", " ", base).rstrip(".")
+    if len(base) > 72:
+        base = base[:69].rstrip() + "..."
+    area = Path(path).stem if path else "review"
+    area = re.sub(r"[^a-zA-Z0-9_-]+", "-", area).strip("-").lower() or "review"
+    if not base:
+        base = f"address review finding in {area}"
+    return f"fix({area}): {base[:60]}"
+
+
+def format_fixit_prompt(
+    *,
+    path: str,
+    line: int,
+    severity: str,
+    issue: str,
+    trigger: str = "",
+    source: str = "findings",
+) -> str:
+    """Return a collapsible, copy-pasteable agent prompt for this finding.
+
+    Designed for Claude Code / Cursor / coding agents: file+line+issue,
+    acceptance criteria, how-to-fix, verify checklist, commit message.
+    """
+    sev = (severity or "medium").upper()
+    issue_s = (issue or "").strip() or "(see review finding)"
+    trigger_s = (trigger or "").strip()
+    commit = _slug_commit_subject(issue_s, path)
+    trigger_block = (
+        f"- Trigger scenario: {trigger_s}\n" if trigger_s else ""
+    )
+    verify_trigger = (
+        f"- [ ] Reproduce the trigger: {trigger_s}\n" if trigger_s else ""
+    )
+    # Prompt body is fenced so authors can select-all copy without the summary chrome
+    agent_prompt = f"""You are implementing a fix for a Luffy PR-review finding on the current PR branch.
+
+## Finding
+- File: `{path}`
+- Line: {line}
+- Severity: {sev}
+- Source: {source}
+- Issue: {issue_s}
+{trigger_block}
+## Acceptance criteria
+1. The defect described above is fixed at `{path}` (around line {line}) or the nearest correct call site.
+2. Behavior under the trigger scenario no longer fails (if a trigger was given).
+3. Add or adjust a focused regression test when the finding implies a fail mode; do not weaken existing assertions.
+4. No unrelated refactors or drive-by cleanups.
+5. Diff stays reviewable (prefer the smallest correct change).
+
+## How to fix
+1. Open `{path}` near line {line} and read surrounding context + the PR diff for that file.
+2. Address: {issue_s}
+3. Prefer the concrete code suggestion in the full Luffy review when one maps to this file; otherwise implement the minimal correct fix.
+4. Keep public APIs stable unless the finding requires a contract change (document it in the commit body).
+
+## Verify
+{verify_trigger}- [ ] Run the most relevant unit/integration tests for this area
+- [ ] Confirm no new linter/type errors on touched files
+- [ ] Re-read the changed hunks against the acceptance criteria
+
+## Commit
+Suggested message:
+```
+{commit}
+```
+Push to the existing PR branch (do not force-push shared history).
+"""
+    # Collapse in GitHub UI so inline threads stay scannable
+    block = (
+        "<details>\n"
+        "<summary>🛠️ Fix-it prompt (copy for Claude Code / agent)</summary>\n\n"
+        "Paste into your coding agent on this PR branch:\n\n"
+        f"````markdown\n{agent_prompt.strip()}\n````\n\n"
+        "<!-- luffy-fixit -->\n"
+        "</details>"
+    )
+    return block
+
+
 def format_suggestion_body(title: str, plus_lines: list[str]) -> str:
     # GitHub apply block — no language tag extras inside
     inner = "\n".join(plus_lines)
@@ -646,16 +757,20 @@ def post_review(
 
     n_find = sum(1 for c in comments if c.get("kind") != "suggestion")
     n_sug = sum(1 for c in comments if c.get("kind") == "suggestion")
+    n_fixit = sum(1 for c in comments if c.get("fixit"))
     bits = []
     if n_find:
         bits.append(f"{n_find} finding note(s)")
     if n_sug:
         bits.append(f"{n_sug} apply-suggestion(s) (F9c)")
+    if n_fixit:
+        bits.append(f"{n_fixit} fix-it prompt(s) (F54)")
     body = (
-        "## 🏴‍☠️ Luffy inline findings (F9/F9c)\n\n"
+        "## 🏴‍☠️ Luffy inline findings (F9/F9c/F54)\n\n"
         + (", ".join(bits) if bits else f"{len(comments)} note(s)")
         + " — path-anchored on changed lines "
-        "(see full PR comment for context).\n\n"
+        "(see full PR comment for context). Expand **Fix-it prompt** on a "
+        "finding to copy a Claude Code / coding-agent task.\n\n"
         f"<!-- luffy-inline-review pr={pr} -->"
     )
     api_comments: list[dict[str, Any]] = []
@@ -775,6 +890,8 @@ def main(argv: list[str] | None = None) -> int:
                     "count": len(comments),
                     "findings": sum(1 for c in comments if c.get("kind") != "suggestion"),
                     "suggestions": sum(1 for c in comments if c.get("kind") == "suggestion"),
+                    "fixit": sum(1 for c in comments if c.get("fixit")),
+                    "fixit_enabled": fixit_prompts_enabled_from_env(),
                     "comments": comments,
                     "files_in_diff": len(first_added_lines(diff_text)),
                 },

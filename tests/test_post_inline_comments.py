@@ -324,6 +324,101 @@ None
         data = json.loads(r.stdout)
         self.assertEqual(data.get("suggestions") or 0, 0)
 
+    def test_f54_fixit_prompt_on_finding(self):
+        """F54: each finding inline body includes a copy-pasteable fix-it agent prompt."""
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            review = d / "review.md"
+            diff = d / "pr.diff"
+            review.write_text(
+                """### Key findings
+
+| Severity | File | Issue | Trigger scenario |
+|----------|------|-------|------------------|
+| high | `src/f54.py:11` | missing null check before deref | caller passes None for optional user |
+""",
+                encoding="utf-8",
+            )
+            diff.write_text(
+                """diff --git a/src/f54.py b/src/f54.py
+--- a/src/f54.py
++++ b/src/f54.py
+@@ -1,1 +10,2 @@
+ context
++user.name.upper()
++return user
+""",
+                encoding="utf-8",
+            )
+            r = _run(
+                ["plan", "--review", str(review), "--diff", str(diff), "--severity", "all"],
+                env={"LUFFY_FIXIT_PROMPTS": "1", "LUFFY_INLINE_SUGGESTIONS": "0"},
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            data = json.loads(r.stdout)
+            self.assertGreaterEqual(data.get("fixit") or 0, 1)
+            self.assertTrue(data.get("fixit_enabled"))
+            findings = [c for c in data["comments"] if c.get("kind") == "finding"]
+            self.assertEqual(len(findings), 1)
+            c = findings[0]
+            self.assertTrue(c.get("fixit"))
+            body = c["body"]
+            self.assertIn("luffy-fixit", body)
+            self.assertIn("Fix-it prompt", body)
+            self.assertIn("src/f54.py", body)
+            self.assertIn("Acceptance criteria", body)
+            self.assertIn("How to fix", body)
+            self.assertIn("Verify", body)
+            self.assertIn("fix(f54):", body)
+            self.assertIn("missing null check", body)
+            self.assertIn("caller passes None", body)
+
+    def test_f54_fixit_disabled(self):
+        r = _run(
+            [
+                "plan",
+                "--review",
+                str(SHOWCASE / "review.md"),
+                "--diff",
+                str(SHOWCASE / "pr.diff"),
+                "--severity",
+                "critical,high,blocking",
+                "--max",
+                "4",
+            ],
+            env={"LUFFY_FIXIT_PROMPTS": "0", "LUFFY_INLINE_SUGGESTIONS": "0"},
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        data = json.loads(r.stdout)
+        self.assertEqual(data.get("fixit") or 0, 0)
+        self.assertFalse(data.get("fixit_enabled"))
+        for c in data["comments"]:
+            if c.get("kind") == "finding":
+                self.assertFalse(c.get("fixit"))
+                self.assertNotIn("luffy-fixit", c["body"])
+
+    def test_f54_showcase_fixit_default_on(self):
+        r = _run(
+            [
+                "plan",
+                "--review",
+                str(SHOWCASE / "review.md"),
+                "--diff",
+                str(SHOWCASE / "pr.diff"),
+                "--severity",
+                "critical,high,blocking,medium",
+                "--max",
+                "6",
+            ],
+            env={"LUFFY_INLINE_SUGGESTIONS": "0"},  # fixit default on
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        data = json.loads(r.stdout)
+        self.assertGreaterEqual(data.get("fixit") or 0, 1)
+        findings = [c for c in data["comments"] if c.get("kind") == "finding"]
+        self.assertTrue(any("luffy-fixit" in c["body"] for c in findings))
+
+
 if __name__ == "__main__":
     unittest.main()
 
