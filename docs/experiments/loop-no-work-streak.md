@@ -6,5 +6,5 @@ Track consecutive scheduled fires that found **no P0/P1** Luffy product work
 | Field | Value |
 |-------|------:|
 | streak | **0** |
-| last_fire | 2026-07-31 (F39 Modal host parity shipped) |
-| note | P1 modal cost/trust work found and shipped → streak stays 0. |
+| last_fire | 2026-07-31 (F40 ops signals in run-bundle + console shipped) |
+| note | P1 UI ops work found and shipped → streak stays 0. |

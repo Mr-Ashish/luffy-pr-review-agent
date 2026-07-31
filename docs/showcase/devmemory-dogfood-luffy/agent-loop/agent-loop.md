@@ -1,31 +1,31 @@
-# Agent loop · `run-20260731T205618-16333b`
+# Agent loop · `run-20260731T210154-8bd0d0`
 
 - **model:** `anthropic/claude-opus-5`
 - **hermes_rc:** 0
-- **units:** 3
-- **at:** 2026-07-31T15:26:54Z
+- **units:** 2
+- **at:** 2026-07-31T15:32:22Z
 
 ## Summary
 
-The session documents F39 Modal host parity: modal_app.review_pr now runs the F38 path-skip preflight before sparse clone, passes the F36 timeout into the orchestrator, and calls report-verdict.sh after a paid review, with pure logic factored into scripts/modal_parity.py (which loads the hyphenated path-skip-check.py via importlib and is soft-imported so failures fail open).
+Session documents the F40 ops-signals contract: which artifact/text source each bundle signal flag is derived from in pack-run-for-ui.py's collect_signals, that path-skip steps must persist ops-signals.env for the signal to survive into the pack, and how the Run Console surfaces the flags. The USAGE-level F40 bullet already exists verbatim in USAGE.md, so no usage unit is emitted.
 
 ## Usage
 
 ```json
 {
-  "estimated_cost_usd": 0.300735,
+  "estimated_cost_usd": 0.2668725,
   "cost_status": "estimated",
   "cost_source": "provider_models_api",
   "input_tokens": 2,
-  "output_tokens": 2714,
+  "output_tokens": 1688,
   "cache_read_tokens": 0,
-  "cache_write_tokens": 37260,
-  "reasoning_tokens": 337,
-  "total_tokens": 39976,
+  "cache_write_tokens": 35946,
+  "reasoning_tokens": 192,
+  "total_tokens": 37636,
   "api_calls": 1,
   "model": "anthropic/claude-opus-5",
   "provider": "openrouter",
-  "session_id": "20260731_205619_192979",
+  "session_id": "20260731_210155_b9cb22",
   "completed": true,
   "failed": false,
   "service_tier": null
@@ -36,11 +36,11 @@ The session documents F39 Modal host parity: modal_app.review_pr now runs the F3
 
 ```json
 {
-  "assemble_s": 0.11,
-  "extract_s": 35.342,
+  "assemble_s": 0.14,
+  "extract_s": 26.234,
   "normalize_s": 0.002,
-  "apply_s": 0.171,
-  "total_s": 35.629
+  "apply_s": 1.597,
+  "total_s": 27.976
 }
 ```
 

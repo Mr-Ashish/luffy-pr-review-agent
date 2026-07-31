@@ -61,6 +61,8 @@
 - Anchoring is derived, not trusted: the suggestion's `-` lines must match a **contiguous run of `+` lines in the PR diff for the same file**; a match yields `start_line`/`line` on side RIGHT (multi-line comment), and no match means the suggestion is dropped rather than anchored to a guessed line.
 - Two independent kill switches by design: `LUFFY_INLINE_COMMENTS=0` disables *all* inline output (findings + suggestions), while `LUFFY_INLINE_SUGGESTIONS=0` disables only F9c and leaves F9/F9b finding notes running.
 
+- Because each flag has a **file source plus a review-text fallback**, a signal survives even when the env file is missing; conversely the F38 path-skip step had to start writing `ops-signals.env` so the skip is durable in the pack rather than only inferrable from the stub comment text.
+
 ## Pitfalls
 
 - `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403), so the hub publish default is `mode=direct` (clone hub → ingest → push `main`); the dispatch path needs a classic PAT on the target repo.

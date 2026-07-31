@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T15:26:18Z
+- **assembled_at:** 2026-07-31T15:31:54Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+903f6df feat(ui): F40 ops signals in run-bundle + Run Console
+81d2b63 docs(knowledge): dogfood F39 Modal parity + showcase
 19fbe7e feat(modal): F39 host parity — path-skip + report-verdict
 6f9a862 docs(knowledge): dogfood F9c suggestions + showcase
 b2d2f91 feat(product): F9c GitHub apply-suggestion blocks
-13ddcd0 docs(knowledge): dogfood F38 path-skip + showcase
-974ba39 feat(cost): F38 path-glob free skip for docs-only PRs
 ```
 
 ## tree (sample)
@@ -123,6 +123,7 @@ docs/experiments/2026-07-31-f36-review-timeout.md
 docs/experiments/2026-07-31-f37-verdict-labels.md
 docs/experiments/2026-07-31-f38-path-skip.md
 docs/experiments/2026-07-31-f39-modal-parity.md
+docs/experiments/2026-07-31-f40-ops-signals.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-f9c-suggestions.md
@@ -221,7 +222,6 @@ assets/brand-options/hero-A-baseline.svg
 assets/brand-options/hero-B-glass.svg
 assets/brand-options/hero-C-isometric.svg
 assets/brand-options/hero-D-mesh.svg
-assets/brand-options/hero-E-volumetric.svg
 ```
 
 ## git diff
@@ -341,9 +341,9 @@ assets/brand-options/hero-E-volumetric.svg
 
 ## Run console
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
+- **F40 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated + `flags[]`). Overview shows **Ops signals (F40)**; header chips when any flag is set. Path-skip writes `ops-signals.env` for durable pack.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
-- Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
 
 ## Trigger a review (F32)
 --review docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/review.md \
@@ -358,8 +358,7 @@ assets/brand-options/hero-E-volumetric.svg
 - Benchmark Hermes startup paths: `SKIP_COLD=1 ./scripts/benchmark-hermes-startup.sh` → `docs/benchmarks/`.
 
 ## Setup
-- Install on each target repo's **default branch** (workflow only runs from default branch):
-- **Pack:** `./scripts
+- 
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md

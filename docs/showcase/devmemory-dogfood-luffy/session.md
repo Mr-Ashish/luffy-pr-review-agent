@@ -7,77 +7,53 @@
 
 ## Transcript / notes
 
-# Luffy dogfood — F39 Modal host parity
+# Luffy dogfood — F40 ops signals
 
-## ARCHITECTURE Modal section
-## Modal host (F39)
+## OPERATIONS F40
+## Ops signals in Run Console (F40)
 
-`modal_app.review_pr` is a first-class kitchen (not comment-only):
+Every auto-pack (`run-bundle.json`) includes a `signals` object:
 
-1. List PR paths via API → optional F38 path-skip (no clone / no OpenRouter)
-2. Sparse checkout → `run-luffy-review.sh` (F36 timeout, F31 bundle)
-3. Post PR comment → `report-verdict.sh` (F22 status, F23 review, F9/F9c inline, F37 labels)
+| Flag | Source |
+|------|--------|
+| `timeout` | `hermes-timeout.env` / F36 review text |
+| `path_skip` | `ops-signals.env` / F38 stub text |
+| `over_budget` | review OVER BUDGET / F29 |
+| `diff_truncated` | `meta.env` DIFF_TRUNCATED / F27 |
 
-Shared pure helper: `scripts/modal_parity.py`.
+Console: header chips + Overview **Ops signals (F40)**.
 
-## Packaging (F10)
-
-## OPERATIONS F39
 ## Modal host parity (F39)
 
-`modal_app` `review_pr` (bit 3) now mirrors GHA cost/trust gates:
+## USAGE Run console
+## Run console
 
-| Gate | Behaviour on Modal |
-|------|--------------------|
-| F38 path-skip | Before clone; env `LUFFY_SKIP_PATH_GLOBS`; force `LUFFY_SKIP_PATHS_FORCE=1` |
-| F36 timeout | `LUFFY_REVIEW_TIMEOUT_SECONDS` (default 1500) |
-| F22–F37 / F9 | `report-verdict.sh` after review (status, PR review, inline, labels) |
+- **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
+- **F40 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated + `flags[]`). Overview shows **Ops signals (F40)**; header chips when any flag is set. Path-skip writes `ops-signals.env` for durable pack.
+- Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
+- UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
+- Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
+- Optional OpenUI Lang: `python3 scripts/review-to-openui.py --review review.md -o out.openui`
+- Design: Impeccable (`/tmp/impeccable`) · `ui/review-console/PRODUCT.md` + `DESIGN.md`
 
-Offline helper: `python3 scripts/modal_parity.py path-skip …`. App version `0.6.0-f39`.
+## Trigger a review (F32)
 
-## Apply-suggestion blocks (F9c)
+## OPENUI tracker
+## 9. Phase status tracker
 
-## MODAL F39
-### F39 host parity (bit 3)
-
-Modal is no longer comment-only:
-
-1. **F38 path-skip** — if `LUFFY_SKIP_PATH_GLOBS` is set and every changed path matches, skip clone + Hermes; post stub + labels (`skipped_paid: true`).
-2. **F36 timeout** — `LUFFY_REVIEW_TIMEOUT_SECONDS` (default 1500) passed into the orchestrator.
-3. **F22–F37 / F9** — after a paid review, `report-verdict.sh` posts commit status, formal PR review, inline notes/suggestions, and verdict labels.
-
-```bash
-# Self-check path-skip offline
-python3 scripts/modal_parity.py path-skip --path README.md --globs docs   # exit 2
-# Modal secret/app env: LUFFY_SKIP_PATH_GLOBS=docs
-```
-
-## Commands
-
-```bash
-# Bit 1
-modal run modal_app/app.py
-
-# Bit 2 (clone Mr-Ashish/odoo + list PRs)
-modal run modal_app/app.py --bit 2
-
-# Bit 3 — cheap review worker (OpenRouter spend)
-modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini
-
-# Bit 4 — dry enqueue plan (no Hermes spend; parser self-check)
-modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3
-# Bit 4 — actually spawn worker
-modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3 --spawn
-
-# Unified CLI (also print|local)
-./scripts/trigger-review.sh print Mr-Ashish/odoo 3
-./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post
-
-# Deploy — public webhook URL for review_webhook
-modal deploy modal_app/app.py
-```
-
-### Webhook (bit 4 + F33 auth)
+| Phase | Status |
+|-------|--------|
+| 0 Research & plan | **done** |
+| 1 Converter + tests + fixture | **done** (`scripts/review-to-openui.py`, showcase fixture) |
+| 2 Review console shell | **superseded** by full **Run Console** (Impeccable Operate / kinpaku) |
+| 2b Full run UI | **done** — PR · result · findings · diff · trace · loop · cost · memory · artifacts |
+| 3 Real artifacts | **done** (`pack-run-for-ui.py` → `run-bundle.json`, Load bundle) |
+| 3b Auto-pack every run (F31) | **done** — orchestrator soft-writes `.luffy-out/run-bundle.json` (+ trace copy); Modal returns `run_bundle` |
+| 4 Trigger from console (F32) | **done** — Run tab + `trigger-review.sh` + Modal bit4 webhook/spawn (no in-browser Hermes) |
+| 4b Deep-link from PR comment (F35) | **done** — `ops_footer.py` Actions run + run-bundle tip (+ optional `LUFFY_CONSOLE_URL`) |
+| 4c Stream progress | pending (live status stream while review runs) |
+| 4d Ops signals in console (F40) | **done** — pack `signals` + Overview chips (timeout/path-skip/budget/truncation) |
+| 5 Docs complete | **done** for Phases 0–4b + F31/F32/F35/F40 |
 
 ## SOUL
 # Luffy — PR Review Agent
@@ -120,24 +96,8 @@ You are **Luffy**, a staff-level code reviewer running inside CI. You review **t
 3. Data loss / concurrency / race conditions  
 4. API / contract / payload shape breaks  
 5. Missing tests for risky paths  
-6. Performance regressions that are concrete  
-7. Maintainability  
-8. Style nits last (or omit)
 
-## Structured judgment (required in every review)
-- **Score** 0–100: production readiness of *this* diff (100 = merge-ready at scale).
-- **Review effort** 1–5: cost for an experienced human to re-review (1 easy … 5 hard).
-- **Security audit:** `No` if clean; otherwise a short labeled concern (e.g. `XSS: …`).
-- **Relevant tests:** yes/no — were tests added/updated for the risk?
-- **Key findings:** 0–N high-signal issues with file + trigger scenario (not vague vibes).
-- **Code suggestions (optional):** only when you can show a concrete better snippet for new code.
-
-## Output contract
-Respond with **only** a single Markdown document suitable for a GitHub PR comment.
-No preamble (“Sure!”), no tool chatter, no wrapping the entire review in a code fence.
-Follow the template in the user prompt exactly.
-
-## Scripts inventory
+## Scripts
 __pycache__
 apply-verdict-labels.py
 assemble-context.sh
@@ -177,79 +137,15 @@ usage-summary.py
 webhook_auth.py
 write-failure-review.sh
 
-## ROI Sprint 31
-### Sprint 31 (shipped)
+## ROI Sprint 32
+### Sprint 32 (shipped)
 
-**F39** Modal host parity: `review_pr` runs F38 path-skip **before** sparse clone (env `LUFFY_SKIP_PATH_GLOBS`); on skip posts stub COMMENT + report-verdict labels (no OpenRouter). After a paid run, calls `report-verdict.sh` for commit status / PR review / inline / labels. Sets `LUFFY_REVIEW_TIMEOUT_SECONDS` (F36). Helper `scripts/modal_parity.py`. App version `0.6.0-f39`.
+**F40** ops signals in Run Console: `pack-run-for-ui.py` emits `signals` (timeout F36, path-skip F38, over-budget F29, diff-truncated F27 + `flags[]`). Path-skip steps write `ops-signals.env`. Console header chips + Overview **Ops signals (F40)** panel so operators answer “why free-skip / kill / overspend / incomplete?” without grepping artifacts.
 
 ### readme-kit (shipped)
 
-## modal_parity header
-#!/usr/bin/env python3
-"""F39: Modal host parity helpers (path-skip preflight + verdict signals).
-
-Pure functions used by modal_app/review_pr so Modal runs the same cost/trust
-gates as GHA (F38 path skip before clone, F22–F37/F9 after review).
-
-Usage (offline):
-  python3 scripts/modal_parity.py path-skip --path README.md --globs docs
-  python3 scripts/modal_parity.py path-skip --paths-file pr-paths.txt
-"""
-
-from __future__ import annotations
-
-import argparse
-import json
-import os
-import sys
-from pathlib import Path
-from typing import Any
-
-# Import path-skip pure API (hyphenated filename)
-_SCRIPTS = Path(__file__).resolve().parent
-import importlib.util
-
-_ps_spec = importlib.util.spec_from_file_location(
-    "path_skip_check",
-    _SCRIPTS / "path-skip-check.py",
-)
-assert _ps_spec and _ps_spec.loader
-_ps = importlib.util.module_from_spec(_ps_spec)
-_ps_spec.loader.exec_module(_ps)
-decide = _ps.decide
-load_paths = _ps.load_paths
-parse_globs = _ps.parse_globs
-
-
-def path_skip_preflight(
-    paths: list[str],
-    *,
-    globs_raw: str | None = None,
-
-## modal_app version
-32:LUFFY_MODAL_VERSION = "0.6.0-f39"
-89:        path_skip_preflight,
-90:        path_skip_stub_summary,
-94:    path_skip_preflight = None  # type: ignore
-95:    path_skip_stub_summary = None  # type: ignore
-123:        "version": LUFFY_MODAL_VERSION,
-165:        "version": LUFFY_MODAL_VERSION,
-352:    # F39: path-skip preflight (F38) BEFORE clone / OpenRouter spend
-354:    path_skip_info: dict[str, Any] | None = None
-359:        path_skip_info = {"skip": False, "reason": f"list_paths_error:{e}"}
-366:    if path_skip_preflight is not None and pr_paths is not None:
-367:        path_skip_info = path_skip_preflight(
-373:    if path_skip_info and path_skip_info.get("skip"):
-375:            path_skip_stub_summary(
-376:                str(path_skip_info.get("sample") or ""),
-377:                str(path_skip_info.get("globs") or ""),
-379:            if path_skip_stub_summary
-381:                "Path-skip: all paths matched globs (F39 Modal).",
-418:            # F39: labels/status even on free skip (COMMENT)
-419:            if (pack / "scripts" / "report-verdict.sh").is_file():
-423:                        str(pack / "scripts" / "report-verdict.sh"),
-438:            "version": LUFFY_MODAL_VERSION,
-442:            "path_skip": path_skip_info,
-449:            "note": "F39 path-skip: no OpenRouter / no clone",
-488:    # F39: GHA-parity signals — commit status, PR review, inline, labels
+## collect_signals
+124:def collect_signals(
+131:    """F40: ops signals for Run Console overview (timeout, path-skip, budget, truncation).
+422:        "signals": signals,  # F40: timeout / path-skip / budget / truncation
 

@@ -1,47 +1,33 @@
 ```json
 {
-  "summary": "The session documents F39 Modal host parity: modal_app.review_pr now runs the F38 path-skip preflight before sparse clone, passes the F36 timeout into the orchestrator, and calls report-verdict.sh after a paid review, with pure logic factored into scripts/modal_parity.py (which loads the hyphenated path-skip-check.py via importlib and is soft-imported so failures fail open).",
+  "summary": "Session documents the F40 ops-signals contract: which artifact/text source each bundle signal flag is derived from in pack-run-for-ui.py's collect_signals, that path-skip steps must persist ops-signals.env for the signal to survive into the pack, and how the Run Console surfaces the flags. The USAGE-level F40 bullet already exists verbatim in USAGE.md, so no usage unit is emitted.",
   "session_ids": ["dogfood-luffy-session"],
   "units": [
     {
       "kind": "dev",
-      "path": "modal_app",
+      "path": ".",
       "action": "merge",
-      "section": "Architecture",
-      "content": "- F39 makes `review_pr` (bit 3) a full three-stage host rather than comment-only: (1) list PR paths via the GitHub API and run the F38 path-skip preflight, (2) sparse checkout + `run-luffy-review.sh` (F36 timeout, F31 bundle), (3) `report-verdict.sh` for commit status, formal PR review, F9/F9c inline notes, and F37 verdict labels.\n- The cost gate is ordered deliberately: path-skip runs **before** clone and before any OpenRouter call, so a docs-only PR costs neither a checkout nor tokens (result payload notes `\"F39 path-skip: no OpenRouter / no clone\"`).\n- On a free skip the run is not silent — it still posts a stub COMMENT built by `path_skip_stub_summary()` and still invokes `report-verdict.sh` so labels/status appear (`skipped_paid: true`).\n- Shared logic lives in the pure helper `scripts/modal_parity.py` (`path_skip_preflight`, `path_skip_stub_summary`), which re-exports `decide`/`load_paths`/`parse_globs` from the hyphenated `scripts/path-skip-check.py` via `importlib.util.spec_from_file_location` — Modal and GHA therefore share one decision function instead of two copies.\n- Host contract knobs: `LUFFY_SKIP_PATH_GLOBS` (globs), `LUFFY_SKIP_PATHS_FORCE=1` (force skip), `LUFFY_REVIEW_TIMEOUT_SECONDS` (default 1500). App profile stamp `LUFFY_MODAL_VERSION = \"0.6.0-f39\"` is returned in every result payload.",
+      "section": "Design decisions",
+      "content": "- **F40 ops signals** are *derived*, not newly emitted by the reviewer: `collect_signals()` in `pack-run-for-ui.py` reconstructs four booleans from existing run artifacts — `timeout` ← `hermes-timeout.env` / F36 review text, `path_skip` ← `ops-signals.env` / F38 stub text, `over_budget` ← the `OVER BUDGET` marker in the normalized review (F29), `diff_truncated` ← `DIFF_TRUNCATED` in `meta.env` (F27) — and attaches them as `bundle[\"signals\"]` alongside a flat `flags[]` list.\n- Because each flag has a **file source plus a review-text fallback**, a signal survives even when the env file is missing; conversely the F38 path-skip step had to start writing `ops-signals.env` so the skip is durable in the pack rather than only inferrable from the stub comment text.\n- Purpose is operator triage, not new data: the goal is answering \"why free-skip / kill / overspend / incomplete run?\" from the bundle alone instead of grepping Actions artifacts.",
       "evidence": [
-        "F39: path-skip preflight (F38) BEFORE clone / OpenRouter spend",
-        "Shared pure helper: `scripts/modal_parity.py`.",
-        "F39: labels/status even on free skip (COMMENT)",
-        "LUFFY_MODAL_VERSION = \"0.6.0-f39\""
+        "`timeout` | `hermes-timeout.env` / F36 review text",
+        "Path-skip steps write `ops-signals.env`",
+        "def collect_signals( ... \"signals\": signals,  # F40: timeout / path-skip / budget / truncation"
       ],
       "confidence": "high"
     },
     {
       "kind": "dev",
-      "path": "modal_app",
+      "path": "ui/review-console",
       "action": "merge",
-      "section": "Pitfalls",
-      "content": "- The parity helpers are **soft-imported**: on ImportError `path_skip_preflight` / `path_skip_stub_summary` are set to `None` and the skip gate is simply bypassed, so a packaging regression that drops `scripts/modal_parity.py` (or breaks the importlib load of `scripts/path-skip-check.py`) degrades into paying for every review instead of erroring. Verify skip behaviour by asserting the result payload carries a non-null `path_skip` field, not just that the run succeeded.\n- The path listing step fails open too: an API error records `path_skip_info = {\"skip\": False, \"reason\": \"list_paths_error:…\"}` and continues to the paid path — check that `reason` when a docs-only PR unexpectedly costs OpenRouter spend.\n- Because the helper is imported by file path from the `scripts/` directory inside the packaged app, the F10 pack must ship both `scripts/modal_parity.py` and `scripts/path-skip-check.py`; shipping only one silently disables the gate.",
+      "section": "Architecture",
+      "content": "- The console renders `bundle.signals` in two places: header **chips** (shown only when at least one flag is set) and an **Ops signals (F40)** panel in the Overview tab — so a clean run stays visually quiet and any degraded run is visible without opening a tab.\n- Phase tracker state: Phase 2 (standalone review console shell) is **superseded** by the full Run Console; F40 (\"ops signals in console\", phase 4d) is done, while **4c live progress streaming remains pending** — treat streaming as the next console workstream, not signals.",
       "evidence": [
-        "path_skip_preflight = None  # type: ignore",
-        "path_skip_info = {\"skip\": False, \"reason\": f\"list_paths_error:{e}\"}",
-        "_ps_spec = importlib.util.spec_from_file_location(\"path_skip_check\", _SCRIPTS / \"path-skip-check.py\")"
+        "Console: header chips + Overview **Ops signals (F40)**.",
+        "| 4c Stream progress | pending (live status stream while review runs) |",
+        "| 2 Review console shell | **superseded** by full **Run Console**"
       ],
       "confidence": "medium"
-    },
-    {
-      "kind": "usage",
-      "path": "modal_app",
-      "action": "merge",
-      "section": "Common commands",
-      "content": "- Bit 3 cheap paid review worker (spends OpenRouter): `modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini`.\n- Bit 1 = smoke, bit 2 = clone target repo + list PRs: `modal run modal_app/app.py [--bit 2]`.\n- Unified host-agnostic entrypoint: `./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post` (also accepts `print` and `local` hosts).\n- Enable the F39 free skip on Modal by setting `LUFFY_SKIP_PATH_GLOBS=docs` in the Modal app env/secret; add `LUFFY_SKIP_PATHS_FORCE=1` to force a skip, and `LUFFY_REVIEW_TIMEOUT_SECONDS` to override the 1500s review timeout.",
-      "evidence": [
-        "modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini",
-        "./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post",
-        "# Modal secret/app env: LUFFY_SKIP_PATH_GLOBS=docs"
-      ],
-      "confidence": "high"
     }
   ]
 }
