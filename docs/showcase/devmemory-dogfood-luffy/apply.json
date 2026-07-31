@@ -1,28 +1,28 @@
 [
   {
-    "path": "agent/DEV.md",
+    "path": "DEV.md",
     "kind": "dev",
     "action": "merge",
     "section": "Pitfalls",
-    "bytes": 1588,
+    "bytes": 15001,
     "applied": true,
-    "unit_path": "agent"
+    "unit_path": "."
   },
   {
-    "path": "agent/DEV.md",
+    "path": "memory/DEV.md",
     "kind": "dev",
     "action": "merge",
-    "section": "Design decisions",
-    "bytes": 2170,
+    "section": "Pitfalls",
+    "bytes": 1442,
     "applied": true,
-    "unit_path": "agent"
+    "unit_path": "memory"
   },
   {
     "path": "USAGE.md",
     "kind": "usage",
     "action": "merge",
-    "section": "Troubleshooting",
-    "bytes": 6761,
+    "section": "Common commands",
+    "bytes": 7515,
     "applied": true,
     "unit_path": "."
   }

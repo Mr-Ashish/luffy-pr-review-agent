@@ -13,7 +13,6 @@
 
 ## Design decisions
 
-- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a job timeout. **F21** makes spend visible on the PR comment + job summary without blocking runs.
 - **F8 prebaked runner:** `ensure_hermes` short-circuits when `LUFFY_HERMES_PREBAKED=1` or `/root/.hermes-pin`/`$HOME/.hermes-pin` exists and `hermes` is on PATH (image from `docker/luffy-runner/`). Workflow optional `container: vars.LUFFY_RUNNER_IMAGE`; Hermes Actions cache is skipped when prebaked is detected.
 - Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (default known-good SHA; `latest`/`main`/`floating`/empty = float), emits `install.sh` args (`--skip-setup --commit … --force-commit`), and supplies the Actions cache key suffix (`v4-<12-char-pin>`). Pin mismatch on a warm cache triggers reinstall.
 - Re-runs replace prior Luffy comments by deleting bodies matching the `<!-- luffy-review pr=N` marker before posting; set `LUFFY_REPLACE_PREVIOUS=0` to stack instead.
@@ -23,21 +22,15 @@
 - Observability is forced on at the env level (`HERMES_TUI_TOOL_PROGRESS=verbose`, `PYTHONUNBUFFERED=1`) so agent/tool activity is recoverable from logs even for a run that later fails.
 - `HERMES_HOME` is seeded per run but `MEMORY.md` is explicitly preserved through seeding — the home directory is disposable, the memory file is not.
 
-- `install-luffy.sh` picks the pack in two different ways on purpose: runtime scripts come from a hardcoded `RUNTIME_SCRIPTS` array (image-build/bench tooling excluded unless `--with-runner-build`), while `agent/` is enumerated dynamically (`find "$SRC/agent" -maxdepth 1 -type f`), so adding an agent file propagates automatically but adding a script does not.
 - The installer copies **itself** into the target pack (`install-luffy.sh` is in `RUNTIME_SCRIPTS`), so an installed repo can re-run the install/update from its own tree; executable bits are preserved per-file (`[[ -x "$from" ]] && chmod +x`).
-- Source root defaults to the parent of `scripts/` (`--source` overrides) and is validated by three presence checks — `agent/`, `scripts/`, `.github/workflows/luffy-pr-review.yml` — before any copy, so a wrong `--source` fails fast instead of half-installing.
 - Installing the pack into the Luffy source tree itself (`SRC == DEST`) is refused unless `--force`, explicitly to avoid half-copies over the canonical tree.
-- Exit contract: `0` ok, `1` usage/error (including refuse install into source tree without `--force`); existing target files are **skipped** (not exit 2) unless `--force`. All human output goes to **stderr** via `log()`.
-- Provenance is a plain-text stamp, not a version string: `.luffy-install-stamp` records `installed_at`, `source_sha`, `source_path`, `mode=pack|caller`, and pack description.
 
 - **F22/F23 verdict signal** is a post-post decoration: `scripts/parse-verdict.py` reads `**Verdict:**` from the posted review and maps APPROVE→`+1`/`success`/`APPROVE`, REQUEST CHANGES→`-1`/`failure`/`REQUEST_CHANGES`, COMMENT→`eyes`/`success`/`COMMENT`; pipeline_rc≠0 forces `-1`/`error`/`COMMENT` (infra fail must not look like product REQUEST CHANGES). `scripts/report-verdict.sh` applies soft reaction + commit status `luffy/review` + short formal PR Review (F23) and writes a job-summary section. Opt-outs: `LUFFY_COMMIT_STATUS=0`, `LUFFY_PR_REVIEW=0`. Required checks can require context `luffy/review`.
-- **F21 cost visibility** is a post-normalize decoration, not a pipeline stage: `scripts/usage-summary.py` reads `hermes-usage.json` and exposes `footer` / `append` / `step-summary`.
 - Telemetry is explicitly non-load-bearing: missing, empty, non-dict, or unparseable usage files are soft no-ops that exit 0, and `run-hermes-review.sh` calls the `append` step guarded by `[[ -f … ]]` with `|| notice "usage-summary append soft-failed"` — cost reporting can never fail a review.
 - Both the PR-comment footer and the job summary are fed from the same usage file so cost is visible without downloading an artifact; number formatting is deliberately lossy/human (tokens as `1.5k`/`10k`/`1.0M`, `n/a` when a field is absent or non-numeric, booleans rejected as numbers).
 
 - The reusable workflow declares **no `permissions:` block** — "Permissions come from the caller workflow/job", so every caller must grant `contents`/`pull-requests`/`issues`/`actions` write itself; a caller that forgets one fails at post/cache time, not at call time.
 - Both reusable secrets (`OPENROUTER_API_KEY`, `LUFFY_HUB_TOKEN`) are declared `required: false` and callers are expected to use `secrets: inherit`; this keeps forks/unfunded repos from failing the `workflow_call` contract up front, with `LUFFY_HUB_TOKEN` falling back to `GITHUB_TOKEN`.
-- Reusable inputs default to the hub (`luffy_repository: Mr-Ashish/luffy-pr-review-agent`, `luffy_ref: main`), so an under-specified caller still resolves to a working runtime instead of erroring.
 - `install-luffy.sh` preflights **both** F10 files (`.github/workflows/luffy-review-reusable.yml` and `pack/luffy-pr-review-caller.yml`) before copying anything, so a source tree missing the reusable pair dies before producing a half-install.
 
 ## Pitfalls
@@ -58,7 +51,6 @@
 
 - Re-running `install-luffy.sh` without `--force` is a silent no-op per file: `copy_file` logs `exists (skip, use --force)` and returns 0, so an *upgrade* over an already-installed repo leaves the old pack in place while the command still exits successfully. Upgrades require `--force`.
 - A missing source file only warns (`WARN missing in source: $rel/$f`) and continues, so a drifted/incomplete source tree can produce a partially installed pack with exit code 0 — read the stderr log, don't trust the exit status alone.
-- `RUNTIME_SCRIPTS` is a hand-maintained allowlist: any new runtime script added to `scripts/` must be appended there or target repos silently never receive it (the workflow then fails at run time, not install time).
 - `agent/` is copied with `-maxdepth 1 -type f`, so nested files under `agent/` are never installed — keep agent assets flat.
 - `usage()` renders help by slicing the file header (`sed -n '2,25p' "$0"`); editing or growing the top comment block silently truncates or corrupts `--help` output.
 
@@ -69,9 +61,11 @@
 - The `@luffy review` gate `if:` expression is duplicated in *both* the thin caller job and the reusable job. Changing the trigger phrase or association logic in one place silently no-ops (caller filters everything out) or double-gates; keep the two conditions in sync.
 - Hub-managed callers point at `…/luffy-review-reusable.yml@main`, i.e. unpinned by design — a broken hub `main` breaks every `--caller` target repo at once, and there is no per-target rollback short of editing that `uses:` ref.
 
-- F23 formal PR reviews are **additive** to the issue comment, not a replace for F12: cooldown still keys off the issue-comment marker `<!-- luffy-review pr=N`, and re-runs do not dismiss prior PR reviews (they stack in the Reviews panel). If review noise becomes a problem, add dismiss-previous or set `LUFFY_PR_REVIEW=0`.
-- GitHub often rejects `APPROVE` when the actor is the PR author or org policy forbids bot approves — `report-verdict.sh` soft-falls back to `COMMENT` so the Reviews panel still gets a row; do not treat missing green check as a pipeline failure.
 - Pipeline failures map to `review_event=COMMENT` on purpose: an OpenRouter outage must not show as "Changes requested" on the product.
+
+- Sparse-checkout path counting is fragile (F13): `grep -c ... || echo 0` emitted `0\n0` for an empty PR path list, which the workflow read as non-zero and fell back to a **full monorepo clone** (observed ~3.5 min on Odoo with `fetch-depth: 0`). Any change to `scripts/sparse-pr-paths.sh` must keep the count a single integer.
+- The Hermes Actions cache must be saved **only on miss** with a stable key (F14); an earlier key including `run_id` thrashed the cache (never a hit, burned GH cache quota). Symptom to watch for: `cache write denied` even with `actions: write`.
+- Config errors must exit non-zero (F15): a missing-secret path returned `pipeline_rc=0`, so the trigger comment got a false ✅ reaction while no review happened. Reaction/status honesty depends on the pipeline exit code, not on whether a comment was posted.
 
 ## Patterns
 

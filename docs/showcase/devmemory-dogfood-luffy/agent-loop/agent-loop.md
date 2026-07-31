@@ -1,31 +1,31 @@
-# Agent loop · `run-20260731T182053-639eef`
+# Agent loop · `run-20260731T182819-96ccc0`
 
 - **model:** `anthropic/claude-opus-5`
 - **hermes_rc:** 0
-- **units:** 4
-- **at:** 2026-07-31T12:51:36Z
+- **units:** 3
+- **at:** 2026-07-31T12:59:02Z
 
 ## Summary
 
-Session shipped F22 (verdict-aware done signal). Beyond the already-recorded verdict→reaction/status mapping, new durable detail: the exact textual contract parse-verdict.py requires from the review body (bold `**Verdict:**` line, alias/prefix normalization, UNKNOWN fallback), the `statuses: write` grant callers must carry, and the operator knobs for the `luffy/review` commit-status context.
+Most of the session restates already-indexed architecture/install/verdict claims. Genuinely new durable items: the concrete correctness pitfalls behind F13/F14/F15 (sparse-path count bug, cache save-on-miss, config-error exit code), MEMORY.md rotation cap, the GITHUB_TOKEN/repository_dispatch 403 constraint that makes direct push the default hub mode, and the manual workflow_dispatch trigger path.
 
 ## Usage
 
 ```json
 {
-  "estimated_cost_usd": 0.32966625,
+  "estimated_cost_usd": 0.33251,
   "cost_status": "estimated",
   "cost_source": "provider_models_api",
   "input_tokens": 2,
-  "output_tokens": 3048,
+  "output_tokens": 3086,
   "cache_read_tokens": 0,
-  "cache_write_tokens": 40553,
-  "reasoning_tokens": 270,
-  "total_tokens": 43603,
+  "cache_write_tokens": 40856,
+  "reasoning_tokens": 256,
+  "total_tokens": 43944,
   "api_calls": 1,
   "model": "anthropic/claude-opus-5",
   "provider": "openrouter",
-  "session_id": "20260731_182054_45c526",
+  "session_id": "20260731_182820_d12fd4",
   "completed": true,
   "failed": false,
   "service_tier": null
@@ -36,11 +36,11 @@ Session shipped F22 (verdict-aware done signal). Beyond the already-recorded ver
 
 ```json
 {
-  "assemble_s": 0.099,
-  "extract_s": 42.442,
+  "assemble_s": 0.097,
+  "extract_s": 42.223,
   "normalize_s": 0.002,
-  "apply_s": 0.216,
-  "total_s": 42.764
+  "apply_s": 0.99,
+  "total_s": 43.318
 }
 ```
 
