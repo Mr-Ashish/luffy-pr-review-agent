@@ -44,7 +44,7 @@ Respond with **only** the JSON object (fence optional).
 
 ### Transcript
 
-# Luffy dogfood session — F24
+# Luffy dogfood — F25 pin SoT
 
 ## OPERATIONS
 # Luffy operations
@@ -62,7 +62,7 @@ Respond with **only** the JSON object (fence optional).
    ```
 2. Repository secret: `OPENROUTER_API_KEY`
 3. Optional variable: `LUFFY_MODEL` (default in scripts: `openai/gpt-5-mini`)
-4. Optional variable: `LUFFY_HERMES_COMMIT` — pin Hermes to a git SHA (default baked into workflow + `scripts/hermes-pin.sh`); set `latest` or `main` to float on install.sh tip
+4. Optional variable: `LUFFY_HERMES_COMMIT` — pin Hermes to a git SHA (default from `scripts/hermes-pin.sh` only — F25); set `latest` or `main` to float on install.sh tip
 5. On a PR, comment: `@luffy review this pr`
 
 ## High-ROI fixes
@@ -82,6 +82,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 11 (F22):** verdict-aware reaction + commit status `luffy/review` + job-summary verdict section
 - **Sprint 12 (F23):** formal GitHub PR Review event from verdict (Reviews panel); opt-out `vars.LUFFY_PR_REVIEW=0`
 - **Sprint 13 (F24):** dismiss prior Luffy PR reviews on re-run (APPROVED/CHANGES_REQUESTED); shares `LUFFY_REPLACE_PREVIOUS`
+- **Sprint 14 (F25):** Hermes pin single source of truth — bump only `scripts/hermes-pin.sh`; workflows resolve empty var via `default`
 
 ## Central hub memory (cross-repo)
 
@@ -243,7 +244,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 21 | **F22** | Verdict-aware done signal (reaction + commit status + job summary) | XS | 🔥 Trust UX — REQUEST CHANGES no longer looks like ✅ | **Shipped** (`parse-verdict.py`, `report-verdict.sh`) |
 | 22 | **F23** | Formal GitHub PR Review event from verdict (Reviews panel) | XS | 🔥 Trust UX — APPROVE/REQUEST_CHANGES/COMMENT as real PR reviews | **Shipped** (`review_event` + `report-verdict.sh`) |
 | 23 | **F24** | Dismiss prior Luffy PR reviews on re-run (Reviews hygiene) | XS | 🔥 Trust UX — re-@luffy no longer stacks APPROVE/REQUEST_CHANGES | **Shipped** (`dismiss-prior-pr-reviews.sh`) |
-| 24 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 24 | **F25** | Hermes pin single source of truth (no workflow hardcoded SHA) | XS | 🔥 Ops/repro — bump pin in one place | **Shipped** (workflows call `hermes-pin.sh default`) |
+| 25 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -297,6 +299,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 
 **F24** dismiss prior Luffy PR reviews: before posting a new F23 review, `dismiss-prior-pr-reviews.sh` finds bodies with `<!-- luffy-pr-review pr=N` and dismisses `APPROVED` / `CHANGES_REQUESTED` (GitHub cannot dismiss `COMMENTED`). Shares `LUFFY_REPLACE_PREVIOUS` with F12 (0 = leave history). Soft-fail; fixture-testable via `LUFFY_PR_REVIEWS_FIXTURE`.
 
+### Sprint 14 (shipped)
+
+**F25** Hermes pin single source of truth: remove hardcoded `DEFAULT_HERMES_COMMIT` from workflow `env:` fallbacks. Empty/unset `vars.LUFFY_HERMES_COMMIT` → after pack checkout, write pin from `scripts/hermes-pin.sh default` into `$GITHUB_ENV`. Explicit `latest`/`main`/`floating` still float. Same for `build-luffy-runner.yml`. Bump pin only in `hermes-pin.sh` (Dockerfile ARG may lag for standalone builds).
+
 ### readme-kit (shipped)
 
 YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser removed.
@@ -318,7 +324,7 @@ YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser r
 ## Design decisions
 
 - **F8 prebaked runner:** `ensure_hermes` short-circuits when `LUFFY_HERMES_PREBAKED=1` or `/root/.hermes-pin`/`$HOME/.hermes-pin` exists and `hermes` is on PATH (image from `docker/luffy-runner/`). Workflow optional `container: vars.LUFFY_RUNNER_IMAGE`; Hermes Actions cache is skipped when prebaked is detected.
-- Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (default known-good SHA; `latest`/`main`/`floating`/empty = float), emits `install.sh` args (`--skip-setup --commit … --force-commit`), and supplies the Actions cache key suffix (`v4-<12-char-pin>`). Pin mismatch on a warm cache triggers reinstall.
+- Hermes install is pinned for repro (F7/F25): `scripts/hermes-pin.sh` is the **single source of truth** for `DEFAULT_HERMES_COMMIT`. Workflows pass through `vars.LUFFY_HERMES_COMMIT` only; when empty, **Resolve Hermes pin (F25)** writes `hermes-pin.sh default` into `$GITHUB_ENV` (empty GHA var must not float). Explicit `latest`/`main`/`floating` still float. `install.sh` args via `install-args`; cache key suffix `v4-<12-char-pin>`.
 - Re-runs replace prior Luffy comments by deleting bodies matching the `<!-- luffy-review pr=N` marker before posting; set `LUFFY_REPLACE_PREVIOUS=0` to stack instead.
 - Failure UX is always-publish: missing OpenRouter secret, Hermes/model failure, and job crash before the review file each still produce a PR comment (failure stub / low-confidence COMMENT verdict) rather than a silent red X.
 
@@ -329,7 +335,7 @@ YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser r
 - The installer copies **itself** into the target pack (`install-luffy.sh` is in `RUNTIME_SCRIPTS`), so an installed repo can re-run the install/update from its own tree; executable bits are preserved per-file (`[[ -x "$from" ]] && chmod +x`).
 - Installing the pack into the Luffy source tree itself (`SRC == DEST`) is refused unless `--force`, explicitly to avoid half-copies over the canonical tree.
 
-- **F22/F23/F24 verdict signal** is a post-post decoration: `scripts/parse-verdict.py` reads `**Verdict:**` from the posted review and maps APPROVE→`+1`/`success`/`APPROVE`, REQUEST CHANGES→`-1`/`failure`/`REQUEST_CHANGES`, COMMENT→`eyes`/`success`/`COMMENT`; pipeline_rc≠0 forces `-1`/`error`/`COMMENT` (infra fail must not look like product REQUEST CHANGES). `scripts/report-verdict.sh` applies soft reaction + commit status `luffy/review` + **F24 dismiss prior** Luffy PR reviews + short formal PR Review (F23) and writes a job-summary section. Opt-outs: `LUFFY_COMMIT_STATUS=0`, `LUFFY_PR_REVIEW=0`; replace/dismiss share `LUFFY_REPLACE_PREVIOUS`. Required checks can require context `luffy/review`.
+- **F22/F23/F24 verdict signal** is a post-post decoration: `scripts/parse-verdict.py` reads `**Verdict:**` and maps APPROVE→`+1`/`success`/`APPROVE`, REQUEST CHANGES→`-1`/`failure`/`REQUEST_CHANGES`, COMMENT→`eyes`/`success`/`COMMENT`; pipeline_rc≠0 forces `-1`/`error`/`COMMENT`. `report-verdict.sh` applies soft reaction + commit status + **F24 dismiss prior** Luffy PR reviews + short formal PR Review (F23). Opt-outs: `LUFFY_COMMIT_STATUS=0`, `LUFFY_PR_REVIEW=0`; replace/dismiss share `LUFFY_REPLACE_PREVIOUS`.
 - Telemetry is explicitly non-load-bearing: missing, empty, non-dict, or unparseable usage files are soft no-ops that exit 0, and `run-hermes-review.sh` calls the `append` step guarded by `[[ -f … ]]` with `|| notice "usage-summary append soft-failed"` — cost reporting can never fail a review.
 - Both the PR-comment footer and the job summary are fed from the same usage file so cost is visible without downloading an artifact; number formatting is deliberately lossy/human (tokens as `1.5k`/`10k`/`1.0M`, `n/a` when a field is absent or non-numeric, booleans rejected as numbers).
 
@@ -347,11 +353,7 @@ YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser r
 
 - Default model diverges by layer: `scripts/run-hermes-review.sh` falls back to `anthropic/claude-opus-5` while the ops docs advertise `openai/gpt-5-mini` as the default. Anyone reasoning about cost from the docs alone will be wrong for local/dry runs — set `LUFFY_MODEL` explicitly instead of relying on either default.
 - Pin verification degrades to a substring check: when the install tree has no `.git`, `ensure_hermes` accepts the binary if `hermes --version` merely contains the pin's first 8 chars. A cached install without git metadata can therefore pass the pin gate on weak evidence — check `hermes-pin.txt` in the trace when a run's behaviour looks off for the pinned SHA.
-- `DEFAULT_HERMES_COMMIT` is hardcoded in `scripts/hermes-pin.sh` and duplicated as the workflow env fallback (`vars.LUFFY_HERMES_COMMIT || <sha>`); bumping the pin means editing both or the workflow will keep overriding the script default.
-
-- `gh api --paginate` can emit **several concatenated JSON arrays** (one per page), so a plain `json.loads` on its output fails; `cooldown-check.sh` walks the buffer with `json.JSONDecoder().raw_decode` and extends a single list. Reuse that loop for any new paginated `gh api --jq` consumer instead of assuming one array.
-- A non-integer `LUFFY_COOLDOWN_SECONDS` is treated as **disabled** (`reason=disabled_invalid`, warning only) rather than an error — a typo in the repo variable silently removes the spend guard.
-- Clock skew is clamped, not trusted: a comment timestamp newe
+- F25 fixed pin duplication: workflows must **not** embed `|| '<sha>'` fallbacks. Bump only `DEFAULT_HERMES_COMMIT` in `scripts/hermes-pin.sh`. Caveat: `docker/luffy-runner/
 
 … [session truncated] …
 
@@ -395,11 +397,11 @@ agent
 
 ### recent log
 ```
+274f807 feat(ops): F25 Hermes pin single source of truth
+de82d05 docs(knowledge): dogfood F24 dismiss-prior + showcase
 22544d3 feat(trust): F24 dismiss prior Luffy PR reviews on re-run
 f514272 docs(knowledge): dogfood F23 formal PR review + showcase
 fdfad00 feat(trust): F23 formal PR Review event from verdict
-e57b96e docs(knowledge): dogfood F22 verdict signals + showcase
-caea511 feat(trust): F22 verdict-aware reaction + commit status
 ```
 
 ### tree (sample)
@@ -563,7 +565,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
 - [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
-- [DEV.md#Design decisions] --commit --force-commit --skip-setup action cache default float install
+- [DEV.md#Design decisions] $githubenv cache default defaulthermescommit empty explicit f25 f7f25
 - [DEV.md#Design decisions] comment delet luffy luffy-review luffyreplaceprevious=0 marker match prior
 - [DEV.md#Design decisions] always-publish comment crash failure hermesmodel low-confidence openrouter produce
 - [DEV.md#Design decisions] agentic assembl beyond capture-hermes-looppy completion default inspect luffytoolset
@@ -571,14 +573,14 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] directory disposable explicitly hermeshome memory memorymd preserv through
 - [DEV.md#Design decisions] $from chmod executable install install-luffysh installer installupdate itself
 - [DEV.md#Design decisions] --force avoid canonical explicitly half-cop install itself luffy
-- [DEV.md#Design decisions] -1errorcomment approve→+1successapprove chang changes→-1failurerequestchang check comment→eyessuccesscomment commit context
+- [DEV.md#Design decisions] -1errorcomment approve→+1successapprove changes→-1failurerequestchang comment→eyessuccesscomment commit decor dismis f22f23f24
 - [DEV.md#Design decisions] append empty explicitly guard never no-op non-dict non-load-bear
 - [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
 - [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
 - [DEV.md#Design decisions] anyth f10 githubworkflowsluffy-review-reusableyml half-install install-luffysh packluffy-pr-review-calleryml preflight produc
 - [DEV.md#Pitfalls] 403 cannot classic clone default dispatch githubtoken ingest
-- [DEV.md#Pit
+- [DEV.md#Pi
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts

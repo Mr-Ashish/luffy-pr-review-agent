@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T13:03:51Z
+- **assembled_at:** 2026-07-31T13:08:34Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+274f807 feat(ops): F25 Hermes pin single source of truth
+de82d05 docs(knowledge): dogfood F24 dismiss-prior + showcase
 22544d3 feat(trust): F24 dismiss prior Luffy PR reviews on re-run
 f514272 docs(knowledge): dogfood F23 formal PR review + showcase
 fdfad00 feat(trust): F23 formal PR Review event from verdict
-e57b96e docs(knowledge): dogfood F22 verdict signals + showcase
-caea511 feat(trust): F22 verdict-aware reaction + commit status
 ```
 
 ## tree (sample)
@@ -183,7 +183,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
 - [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
-- [DEV.md#Design decisions] --commit --force-commit --skip-setup action cache default float install
+- [DEV.md#Design decisions] $githubenv cache default defaulthermescommit empty explicit f25 f7f25
 - [DEV.md#Design decisions] comment delet luffy luffy-review luffyreplaceprevious=0 marker match prior
 - [DEV.md#Design decisions] always-publish comment crash failure hermesmodel low-confidence openrouter produce
 - [DEV.md#Design decisions] agentic assembl beyond capture-hermes-looppy completion default inspect luffytoolset
@@ -191,14 +191,14 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] directory disposable explicitly hermeshome memory memorymd preserv through
 - [DEV.md#Design decisions] $from chmod executable install install-luffysh installer installupdate itself
 - [DEV.md#Design decisions] --force avoid canonical explicitly half-cop install itself luffy
-- [DEV.md#Design decisions] -1errorcomment approve→+1successapprove chang changes→-1failurerequestchang check comment→eyessuccesscomment commit context
+- [DEV.md#Design decisions] -1errorcomment approve→+1successapprove changes→-1failurerequestchang comment→eyessuccesscomment commit decor dismis f22f23f24
 - [DEV.md#Design decisions] append empty explicitly guard never no-op non-dict non-load-bear
 - [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
 - [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
 - [DEV.md#Design decisions] anyth f10 githubworkflowsluffy-review-reusableyml half-install install-luffysh packluffy-pr-review-calleryml preflight produc
 - [DEV.md#Pitfalls] 403 cannot classic clone default dispatch githubtoken ingest
-- [DEV.md#Pit
+- [DEV.md#Pi
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
