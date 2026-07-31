@@ -1,23 +1,34 @@
 {
   "units": [
     {
-      "kind": "usage",
-      "path": ".",
+      "kind": "dev",
+      "path": "modal_app",
       "action": "merge",
-      "section": "Debugging",
-      "content": "- Inline comments (F9) can be exercised with zero GitHub API calls: set `LUFFY_INLINE_FIXTURE=<path>` and `post-inline-comments.py` writes the review payload JSON to that path instead of calling `gh api` — this is the hook the tests use, and the same trick works for inspecting a real run's intended anchors.\n- `LUFFY_INLINE_DIFF` overrides which diff file the anchor resolution reads, so you can replay anchoring against a saved `pr.diff` (e.g. from a showcase trace) without re-assembling context.\n- Identify Luffy's inline output by its markers when auditing a PR: each comment body carries `<!-- luffy-inline -->` and the enclosing review body carries `<!-- luffy-inline-review pr=N -->`.",
+      "section": "Design decisions",
+      "content": "- F34 deliberately reverses F33's behaviour rather than extending it: F33 allowed unauthenticated requests with a warning when no secret/token was configured; F34 makes that same state `auth=denied` so the production-safe posture is the default and misconfiguration is loud instead of silent.\n- The open-mode escape hatch is exposed on three surfaces that must stay in sync: env `LUFFY_WEBHOOK_ALLOW_OPEN=1`, the `allow_open=True` argument on the auth helper, and the `--allow-open` flag on `scripts/webhook_auth.py`. All three exist for dev/self-check only — none is a supported production configuration.",
       "evidence": [
-        "LUFFY_INLINE_FIXTURE writes payload JSON without API (tests)",
-        "vars: LUFFY_INLINE_COMMENTS (default 1), LUFFY_INLINE_SEVERITY, LUFFY_INLINE_MAX, LUFFY_INLINE_DIFF",
-        "Body marker <!-- luffy-inline -->; review body <!-- luffy-inline-review pr=N -->"
+        "F33 left open+warn; F34 flips production-safe default",
+        "Escape hatch: LUFFY_WEBHOOK_ALLOW_OPEN=1, allow_open=True, CLI --allow-open"
       ],
       "confidence": "medium"
+    },
+    {
+      "kind": "usage",
+      "path": "modal_app",
+      "action": "merge",
+      "section": "Debugging",
+      "content": "- The bit 4 dry plan is also the auth regression check: it asserts `auth_fail_closed_ok` (no secret/token → denied) and `auth_open_ok` (same state with `allow_open=True` → permitted). Run `modal run modal_app/app.py --bit 4 --repo <owner/name> --pr <n>` to confirm both branches before deploying, with no LLM/OpenRouter spend.\n- Modal cheap profile in use for these checks is version `0.5.1-cheap`; quote it when comparing behaviour across deployed revisions.",
+      "evidence": [
+        "Bit 4 dry plan checks auth_fail_closed_ok + auth_open_ok (with allow_open=True)",
+        "Modal version 0.5.1-cheap"
+      ],
+      "confidence": "high"
     }
   ],
-  "summary": "The session is almost entirely a restatement of already-indexed F9 claims (path anchoring to first added line, severity/max filtering, no model-provided line numbers until F9b, re-run stacking, report-verdict.sh integration). The only durable detail not covered by existing knowledge is the offline/test escape hatch env vars for post-inline-comments.py.",
+  "summary": "The session adds two details not present in existing knowledge: the F34 fail-closed default is reachable through three distinct escape surfaces (env var, function kwarg, CLI flag) as a deliberate flip of F33's open+warn behaviour, and the bit-4 dry plan now doubles as an auth self-check asserting both auth_fail_closed_ok and auth_open_ok. Everything else in the transcript restates existing DEV/USAGE claims.",
   "session_ids": [
     "dogfood-luffy-session"
   ],
   "model": "anthropic/claude-opus-5",
-  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T201419-898ea4/extract.raw.md"
+  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T201945-39f2db/extract.raw.md"
 }

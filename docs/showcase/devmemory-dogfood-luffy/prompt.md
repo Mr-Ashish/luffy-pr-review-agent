@@ -44,18 +44,14 @@ Respond with **only** the JSON object (fence optional).
 
 ### Transcript
 
-# Luffy dogfood session — F9 path-anchored inline comments
+# Luffy dogfood session — F34 webhook fail-closed
 
-## F9 knowledge
-- scripts/post-inline-comments.py plan|post — pure offline plan; post via gh api PR reviews with comments[]
-- Maps Key findings table + Blocking bullets to first added (+) line per file in pr.diff
-- Does NOT use model-provided line numbers (F9b later)
-- Default severity critical,high,blocking; max 6; one comment per file
-- Body marker <!-- luffy-inline -->; review body <!-- luffy-inline-review pr=N -->
-- report-verdict.sh runs F9 after F23; soft-fail; job summary Luffy inline comments (F9)
-- vars: LUFFY_INLINE_COMMENTS (default 1), LUFFY_INLINE_SEVERITY, LUFFY_INLINE_MAX, LUFFY_INLINE_DIFF
-- LUFFY_INLINE_FIXTURE writes payload JSON without API (tests)
-- Re-runs can stack inline notes (GitHub cannot bulk-delete review comments easily)
+## F34 knowledge
+- authorize_webhook fail-closed by default when neither LUFFY_WEBHOOK_SECRET nor LUFFY_WEBHOOK_TOKEN
+- Escape hatch: LUFFY_WEBHOOK_ALLOW_OPEN=1, allow_open=True, CLI --allow-open
+- F33 left open+warn; F34 flips production-safe default
+- Bit 4 dry plan checks auth_fail_closed_ok + auth_open_ok (with allow_open=True)
+- Modal version 0.5.1-cheap
 
 ## Architecture excerpt
 # Luffy architecture
@@ -138,26 +134,115 @@ Vars: `LUFFY_MEMORY_MODE` (`local` default | `hub` | `both`), `LUFFY_MEMORY_PATH
 ## Packaging (F10)
 
 | Mode | What lives on the target | Runtime source |
-|------|--------------------------|----------------|
-| **Caller** (`install-luffy.sh --caller`) | Thin `.github/workflows/luffy-pr-review.yml` only | Hub `agent/`+`scripts/` via `luffy-review-reusable.yml@main` |
-| **Pack** (default install) | `agent/`, runtime `scripts/`, thin caller + local copy of reusable | Target default branch |
 
-Hub implementation file: `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`, inputs `luffy_repository` + `luffy_ref`).
+## Modal excerpt
+# Luffy on Modal
 
-## Run console (ops UI)
+GitHub Actions is the legacy doorbell + kitchen. Modal is the new kitchen (and webhook doorbell).
 
-Luffy’s PR comment remains Markdown. The **Run Console** (`ui/review-console/`) is the full-run ops surface (Impeccable Operate / Neo kinpaku):
+## Setup (once)
 
-```text
-review pipeline (GHA / Modal / local)
-    → F31 soft stage pack_ui_bundle
-    → .luffy-out/run-bundle.json (+ traces/<id>/run-bundle.json)
-    → Vite app Load bundle → tabs: PR · result · findings · diff · trace · loop · cost · memory · artifacts
+```bash
+pip install modal
+python3 -m modal token new   # browser auth → ~/.modal.toml
 ```
 
-Host label: auto (`GITHUB_ACTIONS` → `gha`, Modal env → `modal`, else `local`) or `LUFFY_HOST`. Manual: `scripts/pack-run-for-ui.py`. Optional OpenUI Lang export: `scripts/review-to-openui.py`. See [OPENUI-INTEGRATION.md](OPENUI-INTEGRATION.md).
+## Bit status
 
-**F32 trigger:** `scripts/trigger-review.sh` (`print|local|modal`) + console **Run** tab. Modal bit 4 webhook/`enqueue_review` only **spawns** `review_pr` (never Hermes in the doorbell).
+| Bit | What | Verify |
+|-----|------|--------|
+| **1** | Skeleton app + health | `modal run modal_app/app.py` → `BIT1_OK` |
+| **2** | Image git/gh + secrets + clone | `modal run modal_app/app.py --bit 2` → `BIT2_OK` |
+| **3** | Manual review worker | `modal run … --bit 3 --repo … --pr …` → `BIT3_OK` |
+| **4** | Enqueue + webhook (F32) | `modal run … --bit 4` dry plan → `BIT4_OK`; deploy POST `review_webhook` |
+| 5 | E2E on Mr-Ashish/odoo | real PR (paid) |
+
+## Commands
+
+```bash
+# Bit 1
+modal run modal_app/app.py
+
+# Bit 2 (clone Mr-Ashish/odoo + list PRs)
+modal run modal_app/app.py --bit 2
+
+# Bit 3 — cheap review worker (OpenRouter spend)
+modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini
+
+# Bit 4 — dry enqueue plan (no Hermes spend; parser self-check)
+modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3
+# Bit 4 — actually spawn worker
+modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3 --spawn
+
+# Unified CLI (also print|local)
+./scripts/trigger-review.sh print Mr-Ashish/odoo 3
+./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post
+
+# Deploy — public webhook URL for review_webhook
+modal deploy modal_app/app.py
+```
+
+### Webhook (bit 4 + F33 auth)
+
+POST JSON (simple API):
+
+```json
+{"repo": "Mr-Ashish/odoo", "pr": 3, "model": "openai/gpt-4.1-mini", "post_comment": true}
+```
+
+Headers when `LUFFY_WEBHOOK_TOKEN` is set:
+
+```bash
+curl -sS -X POST "$WEBHOOK_URL" \
+  -H "Authorization: Bearer $LUFFY_WEBHOOK_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"repo":"Mr-Ashish/odoo","pr":3,"model":"openai/gpt-4.1-mini"}'
+```
+
+GitHub webhook: set the same value as **Webhook secret** in GitHub and as Modal env `LUFFY_WEBHOOK_SECRET` (HMAC `X-Hub-Signature-256`). Accepts `issue_comment` on a PR whose body matches `@luffy … review`.
+
+| Env | Role |
+|-----|------|
+| `LUFFY_WEBHOOK_SECRET` | GitHub HMAC secret |
+| `LUFFY_WEBHOOK_TOKEN` | Bearer / `X-Luffy-Token` for simple API |
+| `LUFFY_WEBHOOK_ALLOW_OPEN=1` | **Dev only** — permit unauthenticated when neither secret/token set |
+| `LUFFY_WEBHOOK_DRY_RUN=1` | Plan only (no spawn) |
+
+**F34 fail-closed:** neither secret nor token → `auth=denied` unless `LUFFY_WEBHOOK_ALLOW_OPEN=1`. Production **must** set at least one (fold into Modal secret `luffy-github` or app env). Pure helper: `python3 scripts/webhook_auth.py sign|authorize [--allow-open]`. Handler **only spawns** `review_pr`.## Secrets
+
+```bash
+# OpenRouter (from Luffy .env)
+modal secret create luffy-openrouter [REDACTED]
+
+# GitHub (PAT or `gh auth token`)
+modal secret create luffy-github GITHUB_TOKEN=… GH_TOKEN=…
+```
+
+## Cheap profile (default)
+
+Modal bills **max(request, usage)** for CPU/memory. We:
+
+| Lever | Choice |
+|-------|--------|
+| CPU / memory | **No reservation** (Modal min ~0.125 core) — never `cpu=2` / `memory=4096` |
+| GPU | None |
+| Checkout | Sparse + `--depth 1` PR head (no full Odoo clone) |
+| Diff | `MAX_DIFF_BYTES=200000` |
+| LLM | `openai/gpt-4.1-mini` default (not Opus) |
+| Memory publish | off in Modal path (`LUFFY_LOCAL_PUBLISH=0`) |
+| Timeout | 25 min hard kill |
+
+```bash
+# cheapest e2e
+modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini
+```
+
+## Notes
+
+- Pipeline scripts under `scripts/` stay the product SoT.
+- Do not run Hermes inside the webhook HTTP handler — always `spawn`.
+- Fat traces → Modal Volume / object storage (not Actions artifacts).
+- **F31:** `review_pr` sets `LUFFY_HOST=modal`; orchestrator writes `run-bundle.json` under `.luffy-out` (and the volume copy). Return dict includes `run_bundle` path when present.
 
 ## Operations excerpt
 # Luffy operations
@@ -205,21 +290,11 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 21 (F32):** `trigger-review.sh` + Modal bit4 enqueue/webhook + Run Console Run tab (spawn-only doorbell)
 - **Sprint 22 (F33):** webhook HMAC + [REDACTED] on Modal doorbell (`webhook_auth.py`)
 - **Sprint 23 (F9):** path-anchored inline PR comments on first changed line (`post-inline-comments.py`)
+- **Sprint 24 (F34):** Modal webhook fail-closed by default (`LUFFY_WEBHOOK_ALLOW_OPEN=1` for dev)
 
 ## Inline comments (F9)
 
 After the formal F23 review, Luffy may post a second COMMENT review with **inline** notes on the first *added* line of each finding’s file (from `pr.diff`).
-
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `LUFFY_INLINE_COMMENTS` | `1` | `0`/`off` disables |
-| `LUFFY_INLINE_SEVERITY` | `critical,high,blocking` | Comma list; `all` = no filter |
-| `LUFFY_INLINE_MAX` | `6` | Cap per run |
-
-Offline plan: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff`.
-
-## Repo-local memory (F28 default)
-
 
 ## SOUL excerpt
 # Luffy — PR Review Agent
@@ -247,11 +322,6 @@ You are **Luffy**, a staff-level code reviewer running inside CI. You review **t
 ## Finding discipline (quality bar)
 1. **Bugs & security:** be thorough. Do not skip a genuine defect just because the trigger is narrow — name the scenario.
 2. **Lower severity:** high bar. If you cannot explain a concrete trigger, do not flag it.
-3. Each finding must be **discrete and actionable** (file + symbol + why + realistic input/path).
-4. Do not speculate about breakage elsewhere unless you can name the affected path from the diff/workspace.
-5. Do not flag intentional design or pure style unless it causes a clear defect.
-6. Limited confidence + high impact (data loss, security, money): report with an explicit uncertainty note.
-7. Otherwise **prefer silence over guesses**. Empty “Blocking” is fine when the PR is solid.
 
 ## Scripts
 __pycache__
@@ -337,11 +407,11 @@ agent
 
 ### recent log
 ```
+b263892 feat(trust): F34 webhook fail-closed by default
+39d7bbb docs(knowledge): dogfood F9 inline comments + showcase
 be6aa9a feat(trust): F9 path-anchored inline PR review comments
 30f1b11 docs(knowledge): dogfood F33 webhook auth + showcase
 ceb25d4 feat(trust): F33 webhook HMAC + [REDACTED] on Modal doorbell
-9994ec6 docs(knowledge): dogfood F32 trigger + Modal bit4 enqueue
-3c3f85c feat(ops): F32 unified trigger + Modal bit4 enqueue webhook
 ```
 
 ### tree (sample)
@@ -436,6 +506,7 @@ docs/ROI-FIXES.md
 docs/experiments/2026-07-31-f31-run-bundle.md
 docs/experiments/2026-07-31-f32-trigger.md
 docs/experiments/2026-07-31-f33-webhook-auth.md
+docs/experiments/2026-07-31-f34-webhook-fail-closed.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/experiments/f28-repo-local-memory.md
@@ -551,7 +622,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
 - [DEV.md#Design decisions] anchor bulk-delete cannot comment f9b filter findingsblock first
-- [DEV.md#Design decisions] auth=open authoriz bearerx-luffy-token configur f33 github hmac-sha256 luffywebhooksecret
+- [DEV.md#Design decisions] authoriz bearerx-luffy-token escape f33f34 f34 fail-clos github hmac-sha256
 - [DEV.md#Design decisions] --bit --spawn browser command console default dry-plan enqueue
 - [DEV.md#Design decisions] --soft action artifact auto-detect bundle download f31 failur
 - [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
@@ -567,7 +638,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
 - [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
-- [DE
+- [DEV.md#Design de
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -619,8 +690,8 @@ assets/brand-options/three-artifacts.html
 - `review_webhook` accepts two payload shapes: the simple API `{repo, pr, model, post_comment}`, and a raw GitHub `issue_comment` event whose comment body matches `@luffy … review` and whose issue is a PR. There is no third shape — non-PR issue comments and non-matching bodies are not enqueued.
 
 ## Pitfalls
-- **F33:** production must set `LUFFY_WEBHOOK_SECRET` and/or `LUFFY_WEBHOOK_TOKEN` on the Modal function (e.g. fold into `luffy-github`). If neither is set, `review_webhook` still accepts traffic with `auth=open` + warning — fine for local smoke, unsafe once the URL is public.
-- HMAC verification needs the **raw** request body (not a re-serialized dict). The webhook reads `await reque
+- **F33/F34:** production must set `LUFFY_WEBHOOK_SECRET` and/or `LUFFY_WEBHOOK_TOKEN` on the Modal function (e.g. fold into `luffy-github`). **F34 fail-closed:** if neither is set, requests are **denied** unless `LUFFY_WEBHOOK_ALLOW_OPEN=1` (dev escape only).
+- HMAC verification needs the **raw** request body (not a re-serialized dict). The webhook reads `await request.body()` before
 … [truncated; do not restate] …
 
 ### pack/DEV.md
@@ -692,7 +763,7 @@ assets/brand-options/three-artifacts.html
 - Bit 4 dry enqueue plan (no LLM spend, self-checks the payload parser): `modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3` → `BIT4_OK`.
 - Actually enqueue the worker: append `--spawn` to the same command.
 - Publish the webhook: `modal deploy modal_app/app.py`, then POST `{"repo":"Mr-Ashish/odoo","pr":3,"model":"openai/gpt-4.1-mini","post_comment":true}` to the `review_webhook` URL (or forward a GitHub `issue_comment` payload).
-- F33 auth: set `LUFFY_WEBHOOK_TOKEN` (`Authorization: Bearer …`) and/or `LUFFY_WEBHOOK_SECRET` (GitHub `X-Hub-Signature-256`). Helper: `python3 scripts/webhook_auth.py sign|authorize`.
+- F33/F34 auth: set `LUFFY_WEBHOOK_TOKEN` (`Authorization: Bearer …`) and/or `LUFFY_WEBHOOK_SECRET` (GitHub `X-Hub-Signature-256`). Fail-closed without either unless `LUFFY_WEBHOOK_ALLOW_OPEN=1`. Helper: `python3 scripts/webhook_auth.py sign|authorize [--allow-open]`.
 
 ## Debugging
 - If a live POST is rejected, reproduce locally first: `python3 scripts/webhook_auth.py sign` to mint an `X-Hub-Signature-256` over the exact raw body, then `python3 scripts/webhook_auth.py authorize` to see which branch fired, rather than guessing from the Modal response.

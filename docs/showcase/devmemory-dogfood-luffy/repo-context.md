@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T14:44:20Z
+- **assembled_at:** 2026-07-31T14:49:45Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+b263892 feat(trust): F34 webhook fail-closed by default
+39d7bbb docs(knowledge): dogfood F9 inline comments + showcase
 be6aa9a feat(trust): F9 path-anchored inline PR review comments
 30f1b11 docs(knowledge): dogfood F33 webhook auth + showcase
 ceb25d4 feat(trust): F33 webhook HMAC + [REDACTED] on Modal doorbell
-9994ec6 docs(knowledge): dogfood F32 trigger + Modal bit4 enqueue
-3c3f85c feat(ops): F32 unified trigger + Modal bit4 enqueue webhook
 ```
 
 ## tree (sample)
@@ -112,6 +112,7 @@ docs/ROI-FIXES.md
 docs/experiments/2026-07-31-f31-run-bundle.md
 docs/experiments/2026-07-31-f32-trigger.md
 docs/experiments/2026-07-31-f33-webhook-auth.md
+docs/experiments/2026-07-31-f34-webhook-fail-closed.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/experiments/f28-repo-local-memory.md
@@ -229,7 +230,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
 - [DEV.md#Design decisions] anchor bulk-delete cannot comment f9b filter findingsblock first
-- [DEV.md#Design decisions] auth=open authoriz bearerx-luffy-token configur f33 github hmac-sha256 luffywebhooksecret
+- [DEV.md#Design decisions] authoriz bearerx-luffy-token escape f33f34 f34 fail-clos github hmac-sha256
 - [DEV.md#Design decisions] --bit --spawn browser command console default dry-plan enqueue
 - [DEV.md#Design decisions] --soft action artifact auto-detect bundle download f31 failur
 - [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
@@ -245,7 +246,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
 - [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
-- [DE
+- [DEV.md#Design de
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -297,8 +298,8 @@ assets/brand-options/three-artifacts.html
 - `review_webhook` accepts two payload shapes: the simple API `{repo, pr, model, post_comment}`, and a raw GitHub `issue_comment` event whose comment body matches `@luffy … review` and whose issue is a PR. There is no third shape — non-PR issue comments and non-matching bodies are not enqueued.
 
 ## Pitfalls
-- **F33:** production must set `LUFFY_WEBHOOK_SECRET` and/or `LUFFY_WEBHOOK_TOKEN` on the Modal function (e.g. fold into `luffy-github`). If neither is set, `review_webhook` still accepts traffic with `auth=open` + warning — fine for local smoke, unsafe once the URL is public.
-- HMAC verification needs the **raw** request body (not a re-serialized dict). The webhook reads `await reque
+- **F33/F34:** production must set `LUFFY_WEBHOOK_SECRET` and/or `LUFFY_WEBHOOK_TOKEN` on the Modal function (e.g. fold into `luffy-github`). **F34 fail-closed:** if neither is set, requests are **denied** unless `LUFFY_WEBHOOK_ALLOW_OPEN=1` (dev escape only).
+- HMAC verification needs the **raw** request body (not a re-serialized dict). The webhook reads `await request.body()` before
 … [truncated; do not restate] …
 
 ### pack/DEV.md
@@ -370,7 +371,7 @@ assets/brand-options/three-artifacts.html
 - Bit 4 dry enqueue plan (no LLM spend, self-checks the payload parser): `modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3` → `BIT4_OK`.
 - Actually enqueue the worker: append `--spawn` to the same command.
 - Publish the webhook: `modal deploy modal_app/app.py`, then POST `{"repo":"Mr-Ashish/odoo","pr":3,"model":"openai/gpt-4.1-mini","post_comment":true}` to the `review_webhook` URL (or forward a GitHub `issue_comment` payload).
-- F33 auth: set `LUFFY_WEBHOOK_TOKEN` (`Authorization: Bearer …`) and/or `LUFFY_WEBHOOK_SECRET` (GitHub `X-Hub-Signature-256`). Helper: `python3 scripts/webhook_auth.py sign|authorize`.
+- F33/F34 auth: set `LUFFY_WEBHOOK_TOKEN` (`Authorization: Bearer …`) and/or `LUFFY_WEBHOOK_SECRET` (GitHub `X-Hub-Signature-256`). Fail-closed without either unless `LUFFY_WEBHOOK_ALLOW_OPEN=1`. Helper: `python3 scripts/webhook_auth.py sign|authorize [--allow-open]`.
 
 ## Debugging
 - If a live POST is rejected, reproduce locally first: `python3 scripts/webhook_auth.py sign` to mint an `X-Hub-Signature-256` over the exact raw body, then `python3 scripts/webhook_auth.py authorize` to see which branch fired, rather than guessing from the Modal response.

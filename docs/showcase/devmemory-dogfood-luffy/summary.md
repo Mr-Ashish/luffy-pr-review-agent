@@ -1,9 +1,9 @@
-# Run run-20260731T201419-898ea4
+# Run run-20260731T201945-39f2db
 
 - session: `dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
-- units: 1
-- summary: The session is almost entirely a restatement of already-indexed F9 claims (path anchoring to first added line, severity/max filtering, no model-provided line numbers until F9b, re-run stacking, report-verdict.sh integration). The only durable detail not covered by existing knowledge is the offline/test escape hatch env vars for post-inline-comments.py.
-- at: 2026-07-31T14:44:42Z
-- timings: {"assemble_s": 0.135, "extract_s": 22.628, "normalize_s": 0.001}
+- units: 2
+- summary: The session adds two details not present in existing knowledge: the F34 fail-closed default is reachable through three distinct escape surfaces (env var, function kwarg, CLI flag) as a deliberate flip of F33's open+warn behaviour, and the bit-4 dry plan now doubles as an auth self-check asserting both auth_fail_closed_ok and auth_open_ok. Everything else in the transcript restates existing DEV/USAGE claims.
+- at: 2026-07-31T14:50:08Z
+- timings: {"assemble_s": 0.136, "extract_s": 22.954, "normalize_s": 0.001}

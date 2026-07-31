@@ -13,3 +13,5 @@
 ## Debugging
 
 - If a live POST is rejected, reproduce locally first: `python3 scripts/webhook_auth.py sign` to mint an `X-Hub-Signature-256` over the exact raw body, then `python3 scripts/webhook_auth.py authorize` to see which branch fired, rather than guessing from the Modal response.
+
+- Modal cheap profile in use for these checks is version `0.5.1-cheap`; quote it when comparing behaviour across deployed revisions.
