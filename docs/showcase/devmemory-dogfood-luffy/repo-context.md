@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T14:26:56Z
+- **assembled_at:** 2026-07-31T14:33:15Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+3c3f85c feat(ops): F32 unified trigger + Modal bit4 enqueue webhook
+653dcd9 docs(knowledge): dogfood F31 run-bundle + Modal host label
 aa11576 feat(ui): F31 auto-emit run-bundle.json for Run Console
 6acd3df feat(ui): Impeccable run console for full Luffy runs
 877d047 docs(showcase): OpenUI fixture from Modal e2e odoo PR #3
-19683ec docs: mark OpenUI phases 0-3 status
-9fa32aa feat(ui): OpenUI review console + Modal skeleton (cheap)
 ```
 
 ## tree (sample)
@@ -43,6 +43,7 @@ ui/review-console/src/parse.ts
 ui/review-console/src/styles.css
 ui/review-console/src/types.ts
 ui/review-console/src/vite-env.d.ts
+readme-kit/DEV.md
 readme-kit/README.md
 readme-kit/package-lock.json
 readme-kit/package.json
@@ -72,6 +73,7 @@ memory/repos/Mr-Ashish--odoo/MEMORY.md
 memory/repos/Mr-Ashish--odoo/latest.json
 memory/repos/Mr-Ashish--luffy-pr-review-agent/MEMORY.md
 memory/repos/Mr-Ashish--luffy-pr-review-agent/latest.json
+modal_app/DEV.md
 modal_app/__init__.py
 modal_app/app.py
 tests/test_cooldown_check.py
@@ -87,6 +89,7 @@ tests/test_normalize_review.py
 tests/test_pack_run_for_ui.py
 tests/test_parse_verdict.py
 tests/test_review_to_openui.py
+tests/test_trigger_review.py
 tests/test_usage_summary.py
 pack/DEV.md
 pack/README.md
@@ -104,6 +107,7 @@ docs/README-BRANDING-ECOSYSTEM.md
 docs/README-KIT-MVP.md
 docs/ROI-FIXES.md
 docs/experiments/2026-07-31-f31-run-bundle.md
+docs/experiments/2026-07-31-f32-trigger.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/experiments/f28-repo-local-memory.md
 docs/experiments/loop-no-work-streak.md
@@ -171,6 +175,7 @@ scripts/run-hermes-review.sh
 scripts/run-luffy-review.sh
 scripts/save-trace.sh
 scripts/sparse-pr-paths.sh
+scripts/trigger-review.sh
 scripts/usage-summary.py
 scripts/write-failure-review.sh
 assets/README.md
@@ -216,6 +221,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] --caller --with-hub-ingest --with-runner-build adoption agent agentscript default entrypoint
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
+- [DEV.md#Design decisions] --bit --spawn browser command console default dry-plan enqueue
 - [DEV.md#Design decisions] --soft action artifact auto-detect bundle download f31 failur
 - [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
 - [DEV.md#Design decisions] comment delet luffy luffy-review luffyreplaceprevious=0 marker match prior
@@ -231,8 +237,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
 - [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
 - [DEV.md#Design decisions] anyth f10 githubworkflowsluffy-review-reusableyml half-install install-luffysh packluffy-pr-review-calleryml preflight produc
-- [DEV.md#Design decisions] actually append budget chang cheapest comment confirm direc
-- [DEV.md#Design decisions] absent budgetstatu compar c
+- [DEV.md#Design decisions] actually append budget c
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -246,6 +251,12 @@ assets/brand-options/three-artifacts.html
 
 ## Design decisi
 … [truncated; do not restate] …
+
+### readme-kit/DEV.md
+
+## Design decisions
+- Config format: YAML is the preferred input with JSON kept at parity (`examples/luffy/` ships both `readme.config.yaml` and `readme.config.json`), so either file shape drives the same build.
+- YAML parsing uses the `yaml` npm dependency; the previously hand-rolled parser was deleted rather than kept as a fallback — do not reintroduce a bespoke parser for "zero-dep" reasons.
 
 ### docker/luffy-runner/DEV.md
 
@@ -268,6 +279,12 @@ assets/brand-options/three-artifacts.html
 - Original failure mode this layer exists to fix: hub memory was written after a run but **not loaded into** the next review — the preload step is the load half of the contract, and without it the `memory/` tree is write-only.
 - `preload-hub-memory.sh` fetches `.luffy/MEMORY.md` through the **default-branch contents API** (`api.github.com/repos/$REPO/contents/...`), not from the checked-out workspace: the PR checkout is sparse/PR-head, so reading it from disk would
 … [truncated; do not restate] …
+
+### modal_app/DEV.md
+
+## Design decisions
+- The Modal entrypoint is a first-class host in the F31 Run Console contract: `review_pr` exports `LUFFY_HOST=modal` so `pack-run-for-ui.py` stamps the bundle's host label as `modal` instead of falling through the `GITHUB_ACTIONS`/else auto-detect to `local`.
+- `review_pr` also returns the `run_bundle` path in its result, so a Modal caller gets the console bundle handle back directly rather than having to download an Actions artifact (the GHA path's only option).
 
 ### pack/DEV.md
 
@@ -302,7 +319,7 @@ assets/brand-options/three-artifacts.html
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
-- Tabs: Overview, PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
+- Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
 
 ## Common commands
 - Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).
@@ -314,7 +331,7 @@ assets/brand-options/three-artifacts.html
 - Install on each target repo's **default branch** (workflow only runs from default branch):
 - **Pack:** `./scripts/install-luffy.sh /path/to/target-repo` — `agent/`, runtime `scripts/`, thin caller + local reusable.
 - Required secret: `OPENROUTER_API_KEY`.
-- **Memory (F28):** each target repo owns review memory under **`.luffy/`** (committed slim pack: `MEMORY.md` + `runs/{trace}/`). Install seeds `.luffy/MEMO
+- **Memory (F28):** each target repo owns review memory under **`.luffy/`** (committed slim pack: `MEMORY.md` + `runs/{trace}/`). Ins
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md

@@ -1,27 +1,44 @@
 diff --git a/modal_app/DEV.md b/modal_app/DEV.md
-new file mode 100644
---- /dev/null
+--- a/modal_app/DEV.md
 +++ b/modal_app/DEV.md
-@@ -0,0 +1,8 @@
-+# DEV — engineering knowledge
+@@ -6,3 +6,14 @@
+ 
+ - The Modal entrypoint is a first-class host in the F31 Run Console contract: `review_pr` exports `LUFFY_HOST=modal` so `pack-run-for-ui.py` stamps the bundle's host label as `modal` instead of falling through the `GITHUB_ACTIONS`/else auto-detect to `local`.
+ - `review_pr` also returns the `run_bundle` path in its result, so a Modal caller gets the console bundle handle back directly rather than having to download an Actions artifact (the GHA path's only option).
 +
-+> How this part of the system is built.
++## Architecture
 +
-+## Design decisions
++- Bit 4 (F32) splits the enqueue path into four units in `modal_app/app.py`: `parse_enqueue_payload` (normalize an incoming request into repo/pr/model/post_comment), `plan_enqueue` (pure plan, no side effects), `enqueue_review` (the spawn call), and `review_webhook` (the HTTP entrypoint). Parsing/planning are separable from spawning so the parser can be self-checked without any OpenRouter spend.
++- `review_webhook` accepts two payload shapes: the simple API `{repo, pr, model, post_comment}`, and a raw GitHub `issue_comment` event whose comment body matches `@luffy … review` and whose issue is a PR. There is no third shape — non-PR issue comments and non-matching bodies are not enqueued.
 +
-+- The Modal entrypoint is a first-class host in the F31 Run Console contract: `review_pr` exports `LUFFY_HOST=modal` so `pack-run-for-ui.py` stamps the bundle's host label as `modal` instead of falling through the `GITHUB_ACTIONS`/else auto-detect to `local`.
-+- `review_pr` also returns the `run_bundle` path in its result, so a Modal caller gets the console bundle handle back directly rather than having to download an Actions artifact (the GHA path's only option).
++## Pitfalls
++
++- The webhook is unauthenticated: signature verification of GitHub deliveries is explicitly deferred hardening, so a deployed `review_webhook` URL is a spend-capable open endpoint. Treat the URL itself as the only secret until verification lands.
++- Two independent dry switches exist and they are easy to confuse: `LUFFY_WEBHOOK_DRY_RUN=1` makes the *deployed HTTP handler* plan-only, while the CLI `--bit 4` is dry by default and needs `--spawn` to actually enqueue. Setting one does not affect the other — a "dry" CLI run says nothing about the deployed webhook's behaviour.
++- Do not add work (Hermes, cloning, review assembly) to the HTTP handler even for convenience; the spawn-only rule is what keeps the request short-lived and the billed work inside `review_pr`.
 
-diff --git a/readme-kit/DEV.md b/readme-kit/DEV.md
+diff --git a/modal_app/USAGE.md b/modal_app/USAGE.md
 new file mode 100644
 --- /dev/null
-+++ b/readme-kit/DEV.md
-@@ -0,0 +1,8 @@
-+# DEV — engineering knowledge
++++ b/modal_app/USAGE.md
+@@ -0,0 +1,10 @@
++# USAGE — operational knowledge
 +
-+> How this part of the system is built.
++> How to work with this part of the system.
 +
-+## Design decisions
++## Common commands
 +
-+- Config format: YAML is the preferred input with JSON kept at parity (`examples/luffy/` ships both `readme.config.yaml` and `readme.config.json`), so either file shape drives the same build.
-+- YAML parsing uses the `yaml` npm dependency; the previously hand-rolled parser was deleted rather than kept as a fallback — do not reintroduce a bespoke parser for "zero-dep" reasons.
++- Bit 4 dry enqueue plan (no LLM spend, self-checks the payload parser): `modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3` → `BIT4_OK`.
++- Actually enqueue the worker: append `--spawn` to the same command.
++- Publish the webhook: `modal deploy modal_app/app.py`, then POST `{"repo":"Mr-Ashish/odoo","pr":3,"model":"openai/gpt-4.1-mini","post_comment":true}` to the `review_webhook` URL (or forward a GitHub `issue_comment` payload).
++- Unified trigger CLI wraps all hosts: `./scripts/trigger-review.sh print <repo> <pr>` (no spend, just prints the commands), `local` (delegates to `scripts/review-local.sh`), `modal` (bit-3 worker) — e.g. `./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post`.
+
+diff --git a/pack/DEV.md b/pack/DEV.md
+--- a/pack/DEV.md
++++ b/pack/DEV.md
+@@ -13,3 +13,5 @@
+ - Pack-mode install now seeds the target's `.luffy/MEMORY.md` (`seed_local_memory()` in `install-luffy.sh`), copying `agent/MEMORY.seed.md` when present and falling back to an inline stub. It honours `--force` (skips an existing file otherwise) and `--dry-run`, and runs before `write_stamp "pack"`.
+ - `--caller` (hub-managed thin) installs **do not** seed `.luffy/` because no agent/scripts are copied — the installer instead prints a tip to seed `.luffy/MEMORY.md` manually on the default branch (or run pack mode once). A caller repo with no seed simply starts from `MEMORY_SOURCE=seed`.
+ - Regression coverage lives in `tests/test_install_luffy.py`: pack install asserts both `scripts/publish-run-local.sh` and `.luffy/MEMORY.md` exist.
++
++- The install pack now ships `scripts/trigger-review.sh`, so an installed target repo can drive reviews from any host (print/local/modal) without cloning the hub. Adding a new top-level trigger script therefore requires updating the pack's copied-scripts list, not just the hub repo.

@@ -13,3 +13,5 @@
 - Pack-mode install now seeds the target's `.luffy/MEMORY.md` (`seed_local_memory()` in `install-luffy.sh`), copying `agent/MEMORY.seed.md` when present and falling back to an inline stub. It honours `--force` (skips an existing file otherwise) and `--dry-run`, and runs before `write_stamp "pack"`.
 - `--caller` (hub-managed thin) installs **do not** seed `.luffy/` because no agent/scripts are copied — the installer instead prints a tip to seed `.luffy/MEMORY.md` manually on the default branch (or run pack mode once). A caller repo with no seed simply starts from `MEMORY_SOURCE=seed`.
 - Regression coverage lives in `tests/test_install_luffy.py`: pack install asserts both `scripts/publish-run-local.sh` and `.luffy/MEMORY.md` exist.
+
+- The install pack now ships `scripts/trigger-review.sh`, so an installed target repo can drive reviews from any host (print/local/modal) without cloning the hub. Adding a new top-level trigger script therefore requires updating the pack's copied-scripts list, not just the hub repo.

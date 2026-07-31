@@ -1,31 +1,31 @@
-# Agent loop · `run-20260731T195656-7bf1e1`
+# Agent loop · `run-20260731T200314-c4311b`
 
 - **model:** `anthropic/claude-opus-5`
 - **hermes_rc:** 0
-- **units:** 2
-- **at:** 2026-07-31T14:27:18Z
+- **units:** 4
+- **at:** 2026-07-31T14:33:55Z
 
 ## Summary
 
-Most of the session restates already-indexed claims (F31 bundle, F28 memory layers, install modes, SOUL contract). Two items are not covered by existing knowledge: how the Modal entrypoint participates in the F31 Run Console contract, and the readme-kit config-format decision (YAML preferred with JSON parity, hand-rolled parser removed).
+The F32 session adds durable detail about the Modal bit-4 enqueue/webhook layer: its function chain, the two accepted webhook payload shapes, the spawn-only doorbell rule with its dry-run switch and missing signature verification, plus the concrete bit-4 / deploy / unified-trigger commands and the fact that pack installs now ship trigger-review.sh.
 
 ## Usage
 
 ```json
 {
-  "estimated_cost_usd": 0.27289125,
+  "estimated_cost_usd": 0.31811625,
   "cost_status": "estimated",
   "cost_source": "provider_models_api",
   "input_tokens": 2,
-  "output_tokens": 1490,
+  "output_tokens": 3097,
   "cache_read_tokens": 0,
-  "cache_write_tokens": 37701,
-  "reasoning_tokens": 229,
-  "total_tokens": 39193,
+  "cache_write_tokens": 38509,
+  "reasoning_tokens": 275,
+  "total_tokens": 41608,
   "api_calls": 1,
   "model": "anthropic/claude-opus-5",
   "provider": "openrouter",
-  "session_id": "20260731_195657_accde5",
+  "session_id": "20260731_200315_12a8ca",
   "completed": true,
   "failed": false,
   "service_tier": null
@@ -36,11 +36,11 @@ Most of the session restates already-indexed claims (F31 bundle, F28 memory laye
 
 ```json
 {
-  "assemble_s": 0.135,
-  "extract_s": 21.975,
-  "normalize_s": 0.001,
-  "apply_s": 0.007,
-  "total_s": 22.121
+  "assemble_s": 0.106,
+  "extract_s": 40.645,
+  "normalize_s": 0.003,
+  "apply_s": 0.046,
+  "total_s": 40.804
 }
 ```
 

@@ -44,42 +44,19 @@ Respond with **only** the JSON object (fence optional).
 
 ### Transcript
 
-# Luffy dogfood session — F31 auto run-bundle
+# Luffy dogfood session — F32 unified trigger
 
 ## Product
-Luffy is a gated PR review control plane (GHA + Modal + local) that runs Hermes+OpenRouter, posts Markdown reviews, and keeps repo-local .luffy/ memory.
+Luffy is a gated PR review control plane (GHA + Modal + local).
 
-## Scripts inventory
-__pycache__
-assemble-context.sh
-association-allowed.sh
-benchmark-hermes-startup.sh
-build-hub-payload.py
-build-luffy-runner-image.sh
-capture-hermes-loop.py
-cooldown-check.sh
-dismiss-prior-pr-reviews.sh
-distill-memory.sh
-hermes-pin.sh
-hub-ingest-run.py
-install-luffy.sh
-memory-health.sh
-normalize-review.py
-pack-run-for-ui.py
-parse-verdict.py
-post-review-comment.sh
-preload-hub-memory.sh
-publish-run-local.sh
-publish-run-to-hub.sh
-report-verdict.sh
-review-local.sh
-review-to-openui.py
-run-hermes-review.sh
-run-luffy-review.sh
-save-trace.sh
-sparse-pr-paths.sh
-usage-summary.py
-write-failure-review.sh
+## F32 knowledge
+- scripts/trigger-review.sh modes: print (no spend), local (review-local.sh), modal (bit 3 worker)
+- Modal bit 4: parse_enqueue_payload, plan_enqueue, enqueue_review, review_webhook
+- Webhook accepts simple API {repo,pr,model,post_comment} or GitHub issue_comment with @luffy review on a PR
+- HTTP path only spawns review_pr — Hermes never runs in the doorbell
+- LUFFY_WEBHOOK_DRY_RUN=1 plans only; CLI modal run --bit 4 dry by default, --spawn to enqueue
+- Run Console Run tab + empty-state TriggerPanel copies commands; browser is not a kitchen
+- install pack includes trigger-review.sh
 
 ## Architecture (excerpt)
 # Luffy architecture
@@ -180,6 +157,8 @@ review pipeline (GHA / Modal / local)
 
 Host label: auto (`GITHUB_ACTIONS` → `gha`, Modal env → `modal`, else `local`) or `LUFFY_HOST`. Manual: `scripts/pack-run-for-ui.py`. Optional OpenUI Lang export: `scripts/review-to-openui.py`. See [OPENUI-INTEGRATION.md](OPENUI-INTEGRATION.md).
 
+**F32 trigger:** `scripts/trigger-review.sh` (`print|local|modal`) + console **Run** tab. Modal bit 4 webhook/`enqueue_review` only **spawns** `review_pr` (never Hermes in the doorbell).
+
 ## Operations (excerpt)
 # Luffy operations
 
@@ -223,6 +202,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 18 (F29):** soft max cost budget via `vars.LUFFY_MAX_COST_USD` (footer + job summary + warning; never fails the run)
 - **Sprint 19 (F30):** memory health job summary + loud local-publish failure; README local-first
 - **Sprint 20 (F31):** every run auto-writes `run-bundle.json` for the Run Console (artifact + job summary); soft-fail
+- **Sprint 21 (F32):** `trigger-review.sh` + Modal bit4 enqueue/webhook + Run Console Run tab (spawn-only doorbell)
 
 ## Repo-local memory (F28 default)
 
@@ -230,46 +210,131 @@ Each target repo owns review memory under **`.luffy/`** on its default branch:
 
 ```text
 .luffy/
-  MEMORY.md
-  runs/{trace_id}/meta.json|review.md|summary.md
+
+## Modal (excerpt)
+# Luffy on Modal
+
+GitHub Actions is the legacy doorbell + kitchen. Modal is the new kitchen (and webhook doorbell).
+
+## Setup (once)
+
+```bash
+pip install modal
+python3 -m modal token new   # browser auth → ~/.modal.toml
 ```
 
-- Preload: `preload-hub-memory.sh` loads `.luffy/MEMORY.md` via contents API first (sparse PR workspace is not enough).
-- Publish: `publish-run-local.sh` clones default branch → ingest layout=local → commit+push (`contents: write`).
-- Fat traces stay Actions artifacts only.
-- Vars: `LUFFY_MEMORY_MODE=local|hub|both` (default `local`), `LUFFY_MEMORY_PATH` (default `.luffy`), `LUFFY_HUB_PUBLISH=1` to force hub.
+## Bit status
 
-## Central hub memory (opt-in cross-repo)
+| Bit | What | Verify |
+|-----|------|--------|
+| **1** | Skeleton app + health | `modal run modal_app/app.py` → `BIT1_OK` |
+| **2** | Image git/gh + secrets + clone | `modal run modal_app/app.py --bit 2` → `BIT2_OK` |
+| **3** | Manual review worker | `modal run … --bit 3 --repo … --pr …` → `BIT3_OK` |
+| **4** | Enqueue + webhook (F32) | `modal run … --bit 4` dry plan → `BIT4_OK`; deploy POST `review_webhook` |
+| 5 | E2E on Mr-Ashish/odoo | real PR (paid) |
 
-Hub publish runs only when `LUFFY_MEMORY_MODE=hub|both` or `LUFFY_HUB_PUBLISH=1`.
+## Commands
 
-**Hub:** `Mr-Ashish/luffy-pr-review-agent`  
-**Path:** `memory/repos/{owner}--{repo}/`
+```bash
+# Bit 1
+modal run modal_app/app.py
 
-### Flow
+# Bit 2 (clone Mr-Ashish/odoo + list PRs)
+modal run modal_app/app.py --bit 2
 
-```text
-Target Luffy run finishes
-  → build-hub-payload.py (redacted, size-capped)
-  → publish-run-local.sh  (default: commit target .luffy/)
-  → publish-run-to-hub.sh (opt-in)
-       mode=direct when enabled:
-         clone hub → hub-ingest-run.py → commit memory/ → push main
-       optional mode=dispatch:
-         repository_dispatch luffy-run → Ingest Luffy Run workflow
+# Bit 3 — cheap review worker (OpenRouter spend)
+modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini
+
+# Bit 4 — dry enqueue plan (no Hermes spend; parser self-check)
+modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3
+# Bit 4 — actually spawn worker
+modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3 --spawn
+
+# Unified CLI (also print|local)
+./scripts/trigger-review.sh print Mr-Ashish/odoo 3
+./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post
+
+# Deploy — public webhook URL for review_webhook
+modal deploy modal_app/app.py
 ```
 
-> **Note:** `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403).  
-> Default **direct** push works with `contents: write` on the hub (self-review) or a PAT on target repos.
+### Webhook (bit 4)
 
-## ROI F31
-### Sprint 20 (shipped)
+POST JSON (simple API):
 
-**F31** auto Run Console bundle: after each review the orchestrator soft-runs `scripts/pack-run-for-ui.py` → `.luffy-out/run-bundle.json` (+ copy under the trace dir). Host label auto-detects `gha` / `modal` / `local` (`LUFFY_HOST` override). Included in existing `luffy-out` + trace artifacts; job summary **Luffy Run Console bundle (F31)**. Modal `review_pr` sets `LUFFY_HOST=modal` and returns `run_bundle`. Soft-fail only — never fails the review. Load via `ui/review-console` **Load bundle**.
+```json
+{"repo": "Mr-Ashish/odoo", "pr": 3, "model": "openai/gpt-4.1-mini", "post_comment": true}
+```
 
-### readme-kit (shipped)
+Or a GitHub `issue_comment` event on a PR whose body matches `@luffy … review`.  
+Handler **only spawns** `review_pr` (set `LUFFY_WEBHOOK_DRY_RUN=1` to plan-only). Signature verification = later hardening.
 
-YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser removed.
+## Secrets
+
+```bash
+# OpenRouter (from Luffy .env)
+modal secret create luffy-openrouter [REDACTED]
+
+# GitHub (PAT or `gh auth token`)
+modal secret create luffy-github GITHUB_TOKEN=… GH_TOKEN=…
+```
+
+## Cheap profile (default)
+
+Modal bills **max(request, usage)** for CPU/memory. We:
+
+| Lever | Choice |
+|-------|--------|
+| CPU / memory | **No reservation** (Modal min ~0.125 core) — never `cpu=2` / `memory=4096` |
+| GPU | None |
+| Checkout | Sparse + `--depth 1` PR head (no full Odoo clone) |
+| Diff | `MAX_DIFF_BYTES=200000` |
+| LLM | `openai/gpt-4.1-mini` default (not Opus) |
+| Memory publish | off in Modal path (`LUFFY_LOCAL_PUBLISH=0`) |
+| Timeout | 25 min hard kill |
+
+```bash
+# cheapest e2e
+modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini
+```
+
+## Notes
+
+- Pipeline scripts under `scripts/` stay the product SoT.
+- Do not run Hermes inside the webhook HTTP handler — always `spawn`.
+
+## Scripts
+__pycache__
+assemble-context.sh
+association-allowed.sh
+benchmark-hermes-startup.sh
+build-hub-payload.py
+build-luffy-runner-image.sh
+capture-hermes-loop.py
+cooldown-check.sh
+dismiss-prior-pr-reviews.sh
+distill-memory.sh
+hermes-pin.sh
+hub-ingest-run.py
+install-luffy.sh
+memory-health.sh
+normalize-review.py
+pack-run-for-ui.py
+parse-verdict.py
+post-review-comment.sh
+preload-hub-memory.sh
+publish-run-local.sh
+publish-run-to-hub.sh
+report-verdict.sh
+review-local.sh
+review-to-openui.py
+run-hermes-review.sh
+run-luffy-review.sh
+save-trace.sh
+sparse-pr-paths.sh
+trigger-review.sh
+usage-summary.py
+write-failure-review.sh
 
 ## SOUL (excerpt)
 # Luffy — PR Review Agent
@@ -312,30 +377,6 @@ You are **Luffy**, a staff-level code reviewer running inside CI. You review **t
 4. API / contract / payload shape breaks  
 5. Missing tests for risky paths  
 6. Performance regressions that are concrete  
-7. Maintainability  
-8. Style nits last (or omit)
-
-## Structured judgment (required in every review)
-- **Score** 0–100: production readiness of *this* diff (100 = merge-ready at scale).
-- **Review effort** 1–5: cost for an experienced human to re-review (1 easy … 5 hard).
-- **Security audit:** `No` if clean; otherwise a short labeled concern (e.g. `XSS: …`).
-- **Relevant tests:** yes/no — were tests added/updated for the risk?
-- **Key findings:** 0–N high-signal issues with file + trigger scenario (not vague vibes).
-- **Code suggestions (optional):** only when you can show a concrete better snippet for new code.
-
-## Output contract
-Respond with **only** a single Markdown document suitable for a GitHub PR comment.
-No preamble (“Sure!”), no tool chatter, no wrapping the entire review in a code fence.
-Follow the template in the user prompt exactly.
-
-## F31 knowledge
-- Orchestrator soft stage pack_ui_bundle after memory-health writes .luffy-out/run-bundle.json
-- Also copies to TRACE_DIR/run-bundle.json when present
-- Host auto-detect gha/modal/local via LUFFY_HOST / GITHUB_ACTIONS / MODAL_*
-- pack-run-for-ui.py: --soft --also --memory-health; install pack includes it
-- Modal review_pr sets LUFFY_HOST=modal and returns run_bundle path
-- Operators download luffy-out artifact and Load bundle in ui/review-console
-- Soft-fail only — never fails the review
 
 
 ## Existing directories (allowed `path` values)
@@ -386,11 +427,11 @@ agent
 
 ### recent log
 ```
+3c3f85c feat(ops): F32 unified trigger + Modal bit4 enqueue webhook
+653dcd9 docs(knowledge): dogfood F31 run-bundle + Modal host label
 aa11576 feat(ui): F31 auto-emit run-bundle.json for Run Console
 6acd3df feat(ui): Impeccable run console for full Luffy runs
 877d047 docs(showcase): OpenUI fixture from Modal e2e odoo PR #3
-19683ec docs: mark OpenUI phases 0-3 status
-9fa32aa feat(ui): OpenUI review console + Modal skeleton (cheap)
 ```
 
 ### tree (sample)
@@ -416,6 +457,7 @@ ui/review-console/src/parse.ts
 ui/review-console/src/styles.css
 ui/review-console/src/types.ts
 ui/review-console/src/vite-env.d.ts
+readme-kit/DEV.md
 readme-kit/README.md
 readme-kit/package-lock.json
 readme-kit/package.json
@@ -445,6 +487,7 @@ memory/repos/Mr-Ashish--odoo/MEMORY.md
 memory/repos/Mr-Ashish--odoo/latest.json
 memory/repos/Mr-Ashish--luffy-pr-review-agent/MEMORY.md
 memory/repos/Mr-Ashish--luffy-pr-review-agent/latest.json
+modal_app/DEV.md
 modal_app/__init__.py
 modal_app/app.py
 tests/test_cooldown_check.py
@@ -460,6 +503,7 @@ tests/test_normalize_review.py
 tests/test_pack_run_for_ui.py
 tests/test_parse_verdict.py
 tests/test_review_to_openui.py
+tests/test_trigger_review.py
 tests/test_usage_summary.py
 pack/DEV.md
 pack/README.md
@@ -477,6 +521,7 @@ docs/README-BRANDING-ECOSYSTEM.md
 docs/README-KIT-MVP.md
 docs/ROI-FIXES.md
 docs/experiments/2026-07-31-f31-run-bundle.md
+docs/experiments/2026-07-31-f32-trigger.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/experiments/f28-repo-local-memory.md
 docs/experiments/loop-no-work-streak.md
@@ -544,6 +589,7 @@ scripts/run-hermes-review.sh
 scripts/run-luffy-review.sh
 scripts/save-trace.sh
 scripts/sparse-pr-paths.sh
+scripts/trigger-review.sh
 scripts/usage-summary.py
 scripts/write-failure-review.sh
 assets/README.md
@@ -587,6 +633,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] --caller --with-hub-ingest --with-runner-build adoption agent agentscript default entrypoint
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
+- [DEV.md#Design decisions] --bit --spawn browser command console default dry-plan enqueue
 - [DEV.md#Design decisions] --soft action artifact auto-detect bundle download f31 failur
 - [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
 - [DEV.md#Design decisions] comment delet luffy luffy-review luffyreplaceprevious=0 marker match prior
@@ -602,8 +649,7 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
 - [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
 - [DEV.md#Design decisions] anyth f10 githubworkflowsluffy-review-reusableyml half-install install-luffysh packluffy-pr-review-calleryml preflight produc
-- [DEV.md#Design decisions] actually append budget chang cheapest comment confirm direc
-- [DEV.md#Design decisions] absent budgetstatu compar c
+- [DEV.md#Design decisions] actually append budget c
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -617,6 +663,12 @@ assets/brand-options/three-artifacts.html
 
 ## Design decisi
 … [truncated; do not restate] …
+
+### readme-kit/DEV.md
+
+## Design decisions
+- Config format: YAML is the preferred input with JSON kept at parity (`examples/luffy/` ships both `readme.config.yaml` and `readme.config.json`), so either file shape drives the same build.
+- YAML parsing uses the `yaml` npm dependency; the previously hand-rolled parser was deleted rather than kept as a fallback — do not reintroduce a bespoke parser for "zero-dep" reasons.
 
 ### docker/luffy-runner/DEV.md
 
@@ -639,6 +691,12 @@ assets/brand-options/three-artifacts.html
 - Original failure mode this layer exists to fix: hub memory was written after a run but **not loaded into** the next review — the preload step is the load half of the contract, and without it the `memory/` tree is write-only.
 - `preload-hub-memory.sh` fetches `.luffy/MEMORY.md` through the **default-branch contents API** (`api.github.com/repos/$REPO/contents/...`), not from the checked-out workspace: the PR checkout is sparse/PR-head, so reading it from disk would
 … [truncated; do not restate] …
+
+### modal_app/DEV.md
+
+## Design decisions
+- The Modal entrypoint is a first-class host in the F31 Run Console contract: `review_pr` exports `LUFFY_HOST=modal` so `pack-run-for-ui.py` stamps the bundle's host label as `modal` instead of falling through the `GITHUB_ACTIONS`/else auto-detect to `local`.
+- `review_pr` also returns the `run_bundle` path in its result, so a Modal caller gets the console bundle handle back directly rather than having to download an Actions artifact (the GHA path's only option).
 
 ### pack/DEV.md
 
@@ -673,7 +731,7 @@ assets/brand-options/three-artifacts.html
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
-- Tabs: Overview, PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
+- Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
 
 ## Common commands
 - Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).
@@ -685,7 +743,7 @@ assets/brand-options/three-artifacts.html
 - Install on each target repo's **default branch** (workflow only runs from default branch):
 - **Pack:** `./scripts/install-luffy.sh /path/to/target-repo` — `agent/`, runtime `scripts/`, thin caller + local reusable.
 - Required secret: `OPENROUTER_API_KEY`.
-- **Memory (F28):** each target repo owns review memory under **`.luffy/`** (committed slim pack: `MEMORY.md` + `runs/{trace}/`). Install seeds `.luffy/MEMO
+- **Memory (F28):** each target repo owns review memory under **`.luffy/`** (committed slim pack: `MEMORY.md` + `runs/{trace}/`). Ins
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md

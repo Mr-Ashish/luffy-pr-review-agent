@@ -3,18 +3,36 @@
     "path": "modal_app/DEV.md",
     "kind": "dev",
     "action": "merge",
-    "section": "Design decisions",
-    "bytes": 563,
+    "section": "Architecture",
+    "bytes": 1280,
     "applied": true,
     "unit_path": "modal_app"
   },
   {
-    "path": "readme-kit/DEV.md",
+    "path": "modal_app/DEV.md",
+    "kind": "dev",
+    "action": "merge",
+    "section": "Pitfalls",
+    "bytes": 2066,
+    "applied": true,
+    "unit_path": "modal_app"
+  },
+  {
+    "path": "modal_app/USAGE.md",
+    "kind": "usage",
+    "action": "merge",
+    "section": "Common commands",
+    "bytes": 828,
+    "applied": true,
+    "unit_path": "modal_app"
+  },
+  {
+    "path": "pack/DEV.md",
     "kind": "dev",
     "action": "merge",
     "section": "Design decisions",
-    "bytes": 475,
+    "bytes": 1985,
     "applied": true,
-    "unit_path": "readme-kit"
+    "unit_path": "pack"
   }
 ]
