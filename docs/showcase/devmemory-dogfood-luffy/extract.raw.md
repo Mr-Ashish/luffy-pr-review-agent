@@ -1,6 +1,6 @@
 ```json
 {
-  "summary": "Session covers the F20 install-luffy.sh implementation in detail. New durable knowledge beyond the existing F20 one-liner: the pack-selection strategy (hardcoded runtime allowlist + dynamic single-level agent/ enumeration + self-inclusion), the self-install guard and exit-code contract, and the silent-skip/WARN failure modes that make re-installs and partial packs look successful.",
+  "summary": "The session's genuinely new durable content is the F21 cost/usage telemetry layer: the `scripts/usage-summary.py` contract (footer/append/step-summary subcommands, soft no-op on missing telemetry), its regex coupling to the brand footer that `normalize-review.py` appends, the soft-failing hook in `run-hermes-review.sh`, and its inclusion in the install pack's runtime-script allowlist. Existing knowledge already covered F1–F20, architecture, hub memory, agent SOUL, and the prebaked runner, so those are omitted.",
   "session_ids": ["dogfood-luffy-session"],
   "units": [
     {
@@ -8,11 +8,11 @@
       "path": ".",
       "action": "merge",
       "section": "Design decisions",
-      "content": "- `install-luffy.sh` picks the pack in two different ways on purpose: runtime scripts come from a hardcoded `RUNTIME_SCRIPTS` array (image-build/bench tooling excluded unless `--with-runner-build`), while `agent/` is enumerated dynamically (`find \"$SRC/agent\" -maxdepth 1 -type f`), so adding an agent file propagates automatically but adding a script does not.\n- The installer copies **itself** into the target pack (`install-luffy.sh` is in `RUNTIME_SCRIPTS`), so an installed repo can re-run the install/update from its own tree; executable bits are preserved per-file (`[[ -x \"$from\" ]] && chmod +x`).\n- Source root defaults to the parent of `scripts/` (`--source` overrides) and is validated by three presence checks — `agent/`, `scripts/`, `.github/workflows/luffy-pr-review.yml` — before any copy, so a wrong `--source` fails fast instead of half-installing.\n- Installing the pack into the Luffy source tree itself (`SRC == DEST`) is refused unless `--force`, explicitly to avoid half-copies over the canonical tree.\n- Documented exit contract: `0` ok, `1` usage/error, `2` refused (target exists without `--force`); all human output goes to **stderr** via `log()`, keeping stdout clean.\n- Provenance is a plain-text stamp, not a version string: `.luffy-install-stamp` records `installed_at`, `source_sha` (`git rev-parse --short HEAD` of the source, `unknown` outside git), `source_path`, and the pack contents.",
+      "content": "- **F21 cost visibility** is a post-normalize decoration, not a pipeline stage: `scripts/usage-summary.py` reads the `hermes --usage-file` JSON (`hermes-usage.json`) written by `run-hermes-review.sh` and exposes three subcommands — `footer` (emit one italic Markdown line), `append` (inject/update that line on an existing `review.md`), `step-summary` (a **Luffy cost / usage** section for `$GITHUB_STEP_SUMMARY` with model, estimated USD, tokens, API calls, stage timings).\n- Telemetry is explicitly non-load-bearing: missing, empty, non-dict, or unparseable usage files are soft no-ops that exit 0, and `run-hermes-review.sh` calls the `append` step guarded by `[[ -f … ]]` with `|| notice \"usage-summary append soft-failed\"` — cost reporting can never fail a review.\n- Both the PR-comment footer and the job summary are fed from the same usage file so cost is visible without downloading an artifact; number formatting is deliberately lossy/human (tokens as `1.5k`/`10k`/`1.0M`, `n/a` when a field is absent or non-numeric, booleans rejected as numbers).\n- `usage-summary.py` is part of the F20 install pack's `RUNTIME_SCRIPTS` allowlist in `scripts/install-luffy.sh`, so target repos get cost visibility on install; image-build/benchmark scripts (`build-luffy-runner-image.sh`, `benchmark-hermes-startup.sh`) remain excluded.",
       "evidence": [
-        "# Runtime script allowlist — exclude image build / bench from target packs by default",
-        "die \"refusing to install into the Luffy source tree itself (use --force if intentional)\"",
-        "# Exit: 0 ok, 1 usage/error, 2 refused (exists without --force)"
+        "Cost UX | `scripts/usage-summary.py` | Append cost/tokens footer + job-summary from `hermes-usage.json` (F21)",
+        "Missing or empty usage files are soft no-ops (exit 0) so the pipeline never fails because cost telemetry was absent.",
+        "python3 \"$LUFFY_ROOT/scripts/usage-summary.py\" append --usage \"$USAGE_FILE\" --review \"$FINAL_OUT\" || notice \"usage-summary append soft-failed\""
       ],
       "confidence": "high"
     },
@@ -21,24 +21,11 @@
       "path": ".",
       "action": "merge",
       "section": "Pitfalls",
-      "content": "- Re-running `install-luffy.sh` without `--force` is a silent no-op per file: `copy_file` logs `exists (skip, use --force)` and returns 0, so an *upgrade* over an already-installed repo leaves the old pack in place while the command still exits successfully. Upgrades require `--force`.\n- A missing source file only warns (`WARN missing in source: $rel/$f`) and continues, so a drifted/incomplete source tree can produce a partially installed pack with exit code 0 — read the stderr log, don't trust the exit status alone.\n- `RUNTIME_SCRIPTS` is a hand-maintained allowlist: any new runtime script added to `scripts/` must be appended there or target repos silently never receive it (the workflow then fails at run time, not install time).\n- `agent/` is copied with `-maxdepth 1 -type f`, so nested files under `agent/` are never installed — keep agent assets flat.\n- `usage()` renders help by slicing the file header (`sed -n '2,25p' \"$0\"`); editing or growing the top comment block silently truncates or corrupts `--help` output.",
+      "content": "- `usage-summary.py` is textually coupled to `normalize-review.py`: `_FOOTER_RX` matches the exact brand footer line (`*Luffy · Hermes Agent · OpenRouter · memory-backed review…*`) to anchor where the cost line goes. Editing that footer string in `normalize-review.py` silently misplaces (or drops) the F21 cost line — change both together.\n- Re-appending is idempotent by design via `_COST_LINE_RX` (`^\\*Cost / usage:.*\\*$`): an existing cost line is replaced, not stacked. Rewriting that line's shape in one place breaks dedup and produces duplicated footers on re-runs.\n- A missing `*Cost / usage: …*` line on a posted review is not necessarily a bug — it is the documented soft no-op when `hermes-usage.json` is absent/empty/malformed. Check the usage file before suspecting the review path.",
       "evidence": [
-        "log \"exists (skip, use --force): $to\"",
-        "log \"WARN missing in source: $rel/$f\"",
-        "sed -n '2,25p' \"$0\" | sed 's/^# \\{0,1\\}//'"
-      ],
-      "confidence": "high"
-    },
-    {
-      "kind": "usage",
-      "path": ".",
-      "action": "merge",
-      "section": "Troubleshooting",
-      "content": "- Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` in the target and compare `source_sha` with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`.\n- Installer output is entirely on stderr; capture it with `./scripts/install-luffy.sh /path/to/repo 2>&1 | tee install.log` and grep for `exists (skip` / `WARN missing` before committing the pack.\n- Preview exactly what would be written (including the stamp) with `--dry-run`; lines are prefixed `DRY  <from> → <to>`.\n- Interpret exit codes: `2` means the target already has the pack (or you aimed at the Luffy source tree) and the run was refused — re-invoke with `--force`; `1` is a usage/validation error such as a bad `--source` missing `agent/`, `scripts/`, or `luffy-pr-review.yml`.",
-      "evidence": [
-        "log \"DRY  would write $STAMP (source_sha=$VERSION)\"",
-        "echo \"source_sha=$VERSION\"",
-        "log() { printf '%s\\n' \"$*\" >&2; }"
+        "# Matches the brand footer normalize-review.py appends.\n_FOOTER_RX = re.compile(r\"^\\*Luffy · Hermes Agent · OpenRouter · memory-backed review[^*]*\\*\\s*$\", re.M)",
+        "_COST_LINE_RX = re.compile(r\"^\\*Cost / usage:.*\\*\\s*$\", re.M)",
+        "append — inject/update that line on an existing review.md"
       ],
       "confidence": "high"
     },
@@ -47,13 +34,25 @@
       "path": ".",
       "action": "merge",
       "section": "Common commands",
-      "content": "- Explicit-flag form of the installer (equivalent to the positional target): `./scripts/install-luffy.sh --dest /path/to/target-repo [--source /path/to/luffy] [--dry-run|--force]`.\n- Hub-only extra: `--with-hub-ingest` additionally copies `.github/workflows/ingest-luffy-run.yml` (install this on the hub repo, not on app repos).\n- Image-building extra: `--with-runner-build` copies `build-luffy-runner.yml`, `docker/luffy-runner/{Dockerfile,README.md}`, plus `scripts/build-luffy-runner-image.sh` and `scripts/benchmark-hermes-startup.sh`, which are otherwise excluded from target packs.\n- Post-install checklist printed by the script: commit the pack to the **default branch**, add secret `OPENROUTER_API_KEY`, optionally set `LUFFY_HUB_TOKEN` / `LUFFY_MODEL` / `LUFFY_HERMES_COMMIT` / `LUFFY_COOLDOWN_SECONDS` / `LUFFY_RUNNER_IMAGE`, then comment `@luffy review this pr` on a PR.",
+      "content": "- Render the F21 cost line standalone: `python3 scripts/usage-summary.py footer --usage <hermes-usage.json>`.\n- Inject/refresh the cost line on a normalized review body: `python3 scripts/usage-summary.py append --usage <hermes-usage.json> --review <review.md>` (idempotent; safe to re-run).\n- Produce the Actions job-summary section: `python3 scripts/usage-summary.py step-summary --usage <hermes-usage.json>` (accepts a timings JSON for stage durations).\n- All three exit 0 with no output when the usage file is missing or empty, so they are safe to wire into scripts unguarded.",
       "evidence": [
-        "--with-hub-ingest   Also copy ingest-luffy-run.yml (hub repo only)",
-        "for extra in build-luffy-runner-image.sh benchmark-hermes-startup.sh; do",
-        "log \"  1. Commit the installed pack and push to the default branch.\""
+        "footer        — one Markdown italic line for the posted review\n  append        — inject/update that line on an existing review.md\n  step-summary  — Markdown section for $GITHUB_STEP_SUMMARY",
+        "Reads hermes --usage-file JSON (see run-hermes-review.sh)"
       ],
       "confidence": "high"
+    },
+    {
+      "kind": "usage",
+      "path": ".",
+      "action": "merge",
+      "section": "Debugging",
+      "content": "- To audit what a review cost, read the **Luffy cost / usage** section in the Actions job summary first — no artifact download needed; the same numbers appear as the `*Cost / usage: …*` footer on the PR comment.\n- For deeper digging, `hermes-usage.json` travels with the run package (see `docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/hermes-usage.json` for a captured example alongside `timings.json`).\n- If cost/token values render as `n/a`, the usage JSON parsed but the specific field was absent or non-numeric; if the whole line is missing, the usage file itself was missing/empty and every subcommand no-opped.",
+      "evidence": [
+        "the Actions job summary has a matching **Luffy cost / usage** section (no artifact download required)",
+        "docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/hermes-usage.json",
+        "def format_tokens(n: float | int | None) -> str:\n    if n is None:\n        return \"n/a\""
+      ],
+      "confidence": "medium"
     }
   ]
 }

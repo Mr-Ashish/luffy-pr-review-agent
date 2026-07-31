@@ -1,31 +1,31 @@
-# Agent loop · `run-20260731T180011-05e5d0`
+# Agent loop · `run-20260731T180622-971ca1`
 
 - **model:** `anthropic/claude-opus-5`
 - **hermes_rc:** 0
 - **units:** 4
-- **at:** 2026-07-31T12:30:58Z
+- **at:** 2026-07-31T12:37:04Z
 
 ## Summary
 
-Session covers the F20 install-luffy.sh implementation in detail. New durable knowledge beyond the existing F20 one-liner: the pack-selection strategy (hardcoded runtime allowlist + dynamic single-level agent/ enumeration + self-inclusion), the self-install guard and exit-code contract, and the silent-skip/WARN failure modes that make re-installs and partial packs look successful.
+The session's genuinely new durable content is the F21 cost/usage telemetry layer: the `scripts/usage-summary.py` contract (footer/append/step-summary subcommands, soft no-op on missing telemetry), its regex coupling to the brand footer that `normalize-review.py` appends, the soft-failing hook in `run-hermes-review.sh`, and its inclusion in the install pack's runtime-script allowlist. Existing knowledge already covered F1–F20, architecture, hub memory, agent SOUL, and the prebaked runner, so those are omitted.
 
 ## Usage
 
 ```json
 {
-  "estimated_cost_usd": 0.228143,
+  "estimated_cost_usd": 0.330135,
   "cost_status": "estimated",
   "cost_source": "provider_models_api",
   "input_tokens": 2,
-  "output_tokens": 3607,
-  "cache_read_tokens": 20016,
-  "cache_write_tokens": 20472,
-  "reasoning_tokens": 364,
-  "total_tokens": 44097,
+  "output_tokens": 3184,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 40084,
+  "reasoning_tokens": 217,
+  "total_tokens": 43270,
   "api_calls": 1,
   "model": "anthropic/claude-opus-5",
   "provider": "openrouter",
-  "session_id": "20260731_180012_72d9d8",
+  "session_id": "20260731_180623_c37544",
   "completed": true,
   "failed": false,
   "service_tier": null
@@ -36,11 +36,11 @@ Session covers the F20 install-luffy.sh implementation in detail. New durable kn
 
 ```json
 {
-  "assemble_s": 0.095,
-  "extract_s": 46.308,
+  "assemble_s": 0.087,
+  "extract_s": 40.624,
   "normalize_s": 0.002,
-  "apply_s": 1.0,
-  "total_s": 47.41
+  "apply_s": 1.249,
+  "total_s": 41.967
 }
 ```
 

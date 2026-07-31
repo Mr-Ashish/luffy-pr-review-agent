@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T12:30:11Z
+- **assembled_at:** 2026-07-31T12:36:22Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+91262f5 feat(cost): surface usage on PR comments + job summary (F21)
+b20f7c3 feat(ops): prebaked Hermes runner image + startup benchmark (F8)
+7f5dc5b docs(knowledge): dogfood F20 install-luffy pack semantics + showcase
 bd8e3f6 feat(install): one-command Luffy pack install into target repos (F20)
 28e7d6e docs(knowledge): dogfood F8 prebaked runner into docker/ + showcase
-ff1096a feat(ops): prebaked Hermes runner image + optional container (F8)
-3c7d39b docs(knowledge): dogfood F19 cooldown patterns into DEV/USAGE + showcase
-e015fd2 feat(cost): per-PR re-trigger cooldown after successful review (F19)
 ```
 
 ## tree (sample)
@@ -63,6 +63,7 @@ tests/test_hermes_pin.py
 tests/test_hub_ingest.py
 tests/test_install_luffy.py
 tests/test_normalize_review.py
+tests/test_usage_summary.py
 agent/DEV.md
 agent/MEMORY.seed.md
 agent/SOUL.md
@@ -127,6 +128,7 @@ scripts/run-hermes-review.sh
 scripts/run-luffy-review.sh
 scripts/save-trace.sh
 scripts/sparse-pr-paths.sh
+scripts/usage-summary.py
 scripts/write-failure-review.sh
 assets/README.md
 assets/favicon-32.png
@@ -178,17 +180,17 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] agentic assembl beyond capture-hermes-looppy completion default inspect luffytoolset
 - [DEV.md#Design decisions] activity agenttool hermestuitoolprogress=verbose later level observability pythonunbuffered=1 recoverable
 - [DEV.md#Design decisions] directory disposable explicitly hermeshome memory memorymd preserv through
+- [DEV.md#Design decisions] $srcagent --with-runner-build -maxdepth -type adding agent array automatically
+- [DEV.md#Design decisions] $from chmod executable install install-luffysh installer installupdate itself
+- [DEV.md#Design decisions] --source agent check default githubworkflowsluffy-pr-reviewyml half-install overrid parent
+- [DEV.md#Design decisions] --force avoid canonical explicitly half-cop install itself luffy
+- [DEV.md#Design decisions] --force contract exist human includ install output refuse
+- [DEV.md#Design decisions] --short content installedat luffy-install-stamp outside plain-text provenance record
 - [DEV.md#Pitfalls] 403 cannot classic clone default dispatch githubtoken ingest
 - [DEV.md#Pitfalls] content cross-repo githubtoken itself luffy luffyhubtoken publish requir
 - [DEV.md#Pitfalls] again agent comment common embedd f18 github honour
 - [DEV.md#Pitfalls] 100000 budget default exceed growth maxmemorybyt memorymd otherwise
-- [DEV.md#Pitfalls] backlog broken cache class count dishonest historical sparse-checkout
-- [DEV.md#Pitfalls] advertise alone anthropicclaude-opus-5 anyone default diverg either explicitly
-- [DEV.md#Pitfalls] --version accept behaviour binary check contain degrad ensureherm
-- [DEV.md#Pitfalls] <sha> default defaulthermescommit duplicat fallback hardcod overrid script
-- [DEV.md#Pitfalls] --paginate array assum buffer concatenat consumer cooldown-checksh extend
-- [DEV.md#Pitfalls] disabl error guard luffycooldownsecond non-integer reason=disabledinvalid remov silently
-- [DEV.md#Pitfalls] age=0 bypass clamp clock comment cooldown maximis newer
+- [DEV.md#Pitfalls] back
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts

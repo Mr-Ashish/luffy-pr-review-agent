@@ -4,7 +4,7 @@
     "kind": "dev",
     "action": "merge",
     "section": "Design decisions",
-    "bytes": 10452,
+    "bytes": 12383,
     "applied": true,
     "unit_path": "."
   },
@@ -13,16 +13,7 @@
     "kind": "dev",
     "action": "merge",
     "section": "Pitfalls",
-    "bytes": 11489,
-    "applied": true,
-    "unit_path": "."
-  },
-  {
-    "path": "USAGE.md",
-    "kind": "usage",
-    "action": "merge",
-    "section": "Troubleshooting",
-    "bytes": 4396,
+    "bytes": 13191,
     "applied": true,
     "unit_path": "."
   },
@@ -31,7 +22,16 @@
     "kind": "usage",
     "action": "merge",
     "section": "Common commands",
-    "bytes": 4986,
+    "bytes": 4948,
+    "applied": true,
+    "unit_path": "."
+  },
+  {
+    "path": "USAGE.md",
+    "kind": "usage",
+    "action": "merge",
+    "section": "Debugging",
+    "bytes": 5570,
     "applied": true,
     "unit_path": "."
   }

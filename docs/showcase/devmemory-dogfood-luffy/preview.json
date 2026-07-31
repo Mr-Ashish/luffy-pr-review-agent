@@ -1,22 +1,22 @@
 {
   "stats": {
     "files": 2,
-    "lines_added": 24,
-    "lines_removed": 2,
+    "lines_added": 15,
+    "lines_removed": 4,
     "changes": 4
   },
   "files": [
     {
       "path": "DEV.md",
       "is_new": false,
-      "lines_added": 13,
-      "lines_removed": 1
+      "lines_added": 8,
+      "lines_removed": 2
     },
     {
       "path": "USAGE.md",
       "is_new": false,
-      "lines_added": 11,
-      "lines_removed": 1
+      "lines_added": 7,
+      "lines_removed": 2
     }
   ]
 }

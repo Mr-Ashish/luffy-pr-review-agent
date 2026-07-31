@@ -44,8 +44,44 @@ Respond with **only** the JSON object (fence optional).
 
 ### Transcript
 
-# Luffy dogfood — F20 install-luffy.sh
+# Luffy dogfood session — product snapshot for knowledge extract
 
+Generated for scheduled fire dogfood after F21 cost/usage visibility.
+
+## Scripts inventory
+assemble-context.sh
+association-allowed.sh
+benchmark-hermes-startup.sh
+build-hub-payload.py
+build-luffy-runner-image.sh
+capture-hermes-loop.py
+cooldown-check.sh
+distill-memory.sh
+hermes-pin.sh
+hub-ingest-run.py
+install-luffy.sh
+normalize-review.py
+post-review-comment.sh
+preload-hub-memory.sh
+publish-run-to-hub.sh
+review-local.sh
+run-hermes-review.sh
+run-luffy-review.sh
+save-trace.sh
+sparse-pr-paths.sh
+usage-summary.py
+write-failure-review.sh
+
+## agent/ inventory
+DEV.md
+MEMORY.seed.md
+SOUL.md
+config.yaml
+review-prompt.md
+
+---
+
+# ARCHITECTURE
 # Luffy architecture
 
 ## One sentence
@@ -69,7 +105,8 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 |-------|--------|----------------|
 | Assemble | `scripts/assemble-context.sh` | `gh pr` meta + diff + prompt (no LLM) |
 | Review | `scripts/run-hermes-review.sh` | Hermes one-shot on `WORKSPACE_ROOT` |
-| Normalize | `scripts/normalize-review.py` | Contract, fences, size, HTML marker |
+| Normalize | `scripts/normalize-review.py` | Contract, fences, size, HTML marker, secret redact |
+| Cost UX | `scripts/usage-summary.py` | Append cost/tokens footer + job-summary from `hermes-usage.json` (F21) |
 | Distill | `scripts/distill-memory.sh` | Append structured memory block |
 | Post | `scripts/post-review-comment.sh` | Delete prior `<!-- luffy-review pr=N` comments, then `gh pr comment` |
 | Orchestrate | `scripts/run-luffy-review.sh` | Compose stages + timings |
@@ -103,6 +140,9 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 
 Reusable `workflow_call` so app repos only need a thin caller.
 
+---
+
+# OPERATIONS
 # Luffy operations
 
 ## Required setup
@@ -130,6 +170,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 6 (F19):** per-PR re-trigger cooldown after successful review
 - **Sprint 7 (F8):** prebaked Hermes runner image (`docker/luffy-runner/`, `vars.LUFFY_RUNNER_IMAGE`)
 - **Sprint 8 (F20):** `scripts/install-luffy.sh` one-command pack install into target repos
+- **Sprint 9 (F21):** cost/usage line on PR comments + job summary from `hermes-usage.json`
 
 ## Central hub memory (cross-repo)
 
@@ -202,6 +243,7 @@ Requires: `gh` authenticated, network for Hermes install + OpenRouter.
 - Job timeout 45 minutes
 - Re-runs **replace** prior Luffy comments on the same PR (marker `<!-- luffy-review pr=N`); set `LUFFY_REPLACE_PREVIOUS=0` to stack
 - **Per-PR cooldown (F19):** default 900s after a *successful* Luffy comment — skip paid run (rocket reaction). Override `vars.LUFFY_COOLDOWN_SECONDS` (`0`/`off` disables). Bypass: `@luffy review force` or workflow_dispatch
+- **Cost visibility (F21):** each successful review footer includes estimated OpenRouter cost + token/API counts from `hermes-usage.json`; the Actions job summary has a matching **Luffy cost / usage** section (no artifact download required)
 
 ## Memory
 
@@ -239,6 +281,18 @@ Secrets (`sk-or-…`, `[REDACTED] common `ghp_`/`github_pat_` tokens) are redact
 gh run download <run-id> -R owner/repo -n luffy-trace-pr1-run<run-id>
 ```
 
+## F8 Prebaked Hermes runner (faster CI startup)
+
+Cold Hermes install is the expensive part of job startup (~2 minutes locally). Mitigation:
+
+1. **Actions cache** (default): pin-keyed restore of `~/.local` + `~/.hermes` (F2/F14/F7).
+2. **Prebaked image** (optional): build with workflow **Build Luffy Hermes runner** or `./scripts/build-luffy-runner-image.sh`. Image sets `LUFFY_HERMES_PREBAKED=1`. On runners that already have Hermes, export the same env so install is skipped.
+3. **Benchmark:** `./scripts/benchmark-hermes-startup.sh` → `docs/benchmarks/hermes-startup-latest.md`.
+
+
+---
+
+# ROI-FIXES (head)
 # High-ROI minimal fixes (triage)
 
 Evidence from live e2e (Odoo monorepo + hub memory):
@@ -273,8 +327,9 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 16 | **F19** | Per-PR re-trigger cooldown (`scripts/cooldown-check.sh`, default 900s) | S | 🔥 Cost/abuse | **Shipped** |
 | 17 | **F20** | `scripts/install-luffy.sh` copy pack to target repo | S | 🔥 Adoption | **Shipped** |
 | 18 | **F8** | Prebaked Hermes runner image + startup benchmark | M | 🔥 Fast CI startup | **Shipped** (docker/ + build workflow + benchmark script) |
-| 19 | F9 | Inline GitHub review comments | L | Product | Later |
-| 20 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
+| 19 | **F21** | Surface OpenRouter cost/tokens on PR comment + job summary | XS | 🔥 Cost visibility | **Shipped** (`usage-summary.py`) |
+| 20 | F9 | Inline GitHub review comments | L | Product | Later |
+| 21 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
 
 ### Sprint 1 (shipped)
 
@@ -308,10 +363,17 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 
 **F20** one-command install: `scripts/install-luffy.sh /path/to/target-repo` copies `agent/`, runtime `scripts/`, and `luffy-pr-review.yml`; optional `--with-hub-ingest` / `--with-runner-build`; stamp `.luffy-install-stamp`.
 
+### Sprint 9 (shipped)
+
+**F21** cost/usage visibility: `scripts/usage-summary.py` appends a `*Cost / usage: …*` line to the posted review from `hermes-usage.json` and writes a job-summary section (model, estimated USD, tokens, API calls, stage timings). Soft no-op when usage is missing.
+
 ### readme-kit (shipped)
 
 YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser removed.
 
+---
+
+# SOUL
 # Luffy — PR Review Agent
 
 You are **Luffy**, a staff-level code reviewer running inside CI. You review **this PR’s changes**, not the whole product history.
@@ -368,243 +430,134 @@ Respond with **only** a single Markdown document suitable for a GitHub PR commen
 No preamble (“Sure!”), no tool chatter, no wrapping the entire review in a code fence.
 Follow the template in the user prompt exactly.
 
-## Scripts
-assemble-context.sh
-association-allowed.sh
-benchmark-hermes-startup.sh
-build-hub-payload.py
-build-luffy-runner-image.sh
-capture-hermes-loop.py
-cooldown-check.sh
-distill-memory.sh
-hermes-pin.sh
-hub-ingest-run.py
-install-luffy.sh
-normalize-review.py
-post-review-comment.sh
-preload-hub-memory.sh
-publish-run-to-hub.sh
-review-local.sh
-run-hermes-review.sh
-run-luffy-review.sh
-save-trace.sh
-sparse-pr-paths.sh
-write-failure-review.sh
+---
 
-## install-luffy.sh
-#!/usr/bin/env bash
-# F20: copy the Luffy runtime pack into a target repository.
-#
-# Pack (what target repos need on their *default* branch):
-#   agent/                              SOUL, prompts, config, memory seed
-#   scripts/                            orchestration (runtime helpers)
-#   .github/workflows/luffy-pr-review.yml
-#
-# Usage:
-#   ./scripts/install-luffy.sh /path/to/target-repo
-#   ./scripts/install-luffy.sh --dest /path/to/target-repo --dry-run
-#   ./scripts/install-luffy.sh --dest . --force   # re-install over existing
-#
-# Options:
-#   --dest DIR          Target repo root (required unless positional DIR)
-#   --dry-run           Print actions; do not write
-#   --force             Overwrite existing files without prompting
-#   --with-hub-ingest   Also copy ingest-luffy-run.yml (hub repo only)
-#   --with-runner-build Also copy build-luffy-runner.yml + docker/luffy-runner/
-#   --source DIR        Luffy source root (default: parent of scripts/)
-#   -h | --help
-#
-# Exit: 0 ok, 1 usage/error, 2 refused (exists without --force)
-set -euo pipefail
+# F21 usage-summary.py (header + CLI contract)
+#!/usr/bin/env python3
+"""F21: surface Hermes/OpenRouter cost + tokens on PR comments and job summaries.
 
-SRC=""
-DEST=""
-DRY_RUN=0
-FORCE=0
-WITH_INGEST=0
-WITH_RUNNER=0
+Reads hermes --usage-file JSON (see run-hermes-review.sh) and emits:
+  footer        — one Markdown italic line for the posted review
+  append        — inject/update that line on an existing review.md
+  step-summary  — Markdown section for $GITHUB_STEP_SUMMARY
 
-log() { printf '%s\n' "$*" >&2; }
-die() { log "ERROR: $*"; exit 1; }
+Missing or empty usage files are soft no-ops (exit 0) so the pipeline never
+fails because cost telemetry was absent.
+"""
 
-usage() {
-  sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
-  exit "${1:-0}"
-}
+from __future__ import annotations
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --dest)
-      DEST="${2:-}"
-      shift 2
-      ;;
-    --source)
-      SRC="${2:-}"
-      shift 2
-      ;;
-    --dry-run) DRY_RUN=1; shift ;;
-    --force) FORCE=1; shift ;;
-    --with-hub-ingest) WITH_INGEST=1; shift ;;
-    --with-runner-build) WITH_RUNNER=1; shift ;;
-    -h | --help) usage 0 ;;
-    --)
-      shift
-      break
-      ;;
-    -*)
-      die "unknown option: $1 (try --help)"
-      ;;
-    *)
-      if [[ -z "$DEST" ]]; then
-        DEST="$1"
-        shift
-      else
-        die "unexpected argument: $1"
-      fi
-      ;;
-  esac
-done
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Any
 
-SRC="${SRC:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-[[ -n "$DEST" ]] || die "target directory required (positional or --dest)"
-DEST="$(cd "$DEST" 2>/dev/null && pwd)" || die "target not found: $DEST"
-SRC="$(cd "$SRC" && pwd)"
-
-[[ -d "$SRC/agent" ]] || die "source missing agent/: $SRC"
-[[ -d "$SRC/scripts" ]] || die "source missing scripts/: $SRC"
-[[ -f "$SRC/.github/workflows/luffy-pr-review.yml" ]] || die "source missing luffy-pr-review.yml"
-
-# Refuse installing pack into itself unless forced (avoids half-copies)
-if [[ "$SRC" == "$DEST" && "$FORCE" != "1" ]]; then
-  die "refusing to install into the Luffy source tree itself (use --force if intentional)"
-fi
-
-# Runtime script allowlist — exclude image build / bench from target packs by default
-# (still available when --with-runner-build copies docker tooling separately).
-RUNTIME_SCRIPTS=(
-  assemble-context.sh
-  association-allowed.sh
-  build-hub-payload.py
-  capture-hermes-loop.py
-  cooldown-check.sh
-  distill-memory.sh
-  hermes-pin.sh
-  hub-ingest-run.py
-  install-luffy.sh
-  normalize-review.py
-  post-review-comment.sh
-  preload-hub-memory.sh
-  publish-run-to-hub.sh
-  review-local.sh
-  run-hermes-review.sh
-  run-luffy-review.sh
-  save-trace.sh
-  sparse-pr-paths.sh
-  write-failure-review.sh
+# Matches the brand footer normalize-review.py appends.
+_FOOTER_RX = re.compile(
+    r"^\*Luffy · Hermes Agent · OpenRouter · memory-backed review[^*]*\*\s*$",
+    re.M,
 )
+_COST_LINE_RX = re.compile(r"^\*Cost / usage:.*\*\s*$", re.M)
 
-copy_file() {
-  local from="$1" to="$2"
-  if [[ -e "$to" && "$FORCE" != "1" ]]; then
-    log "exists (skip, use --force): $to"
-    return 0
-  fi
-  if [[ "$DRY_RUN" == "1" ]]; then
-    log "DRY  $from → $to"
-    return 0
-  fi
-  mkdir -p "$(dirname "$to")"
-  cp -f "$from" "$to"
-  # Preserve executable bit for scripts
-  if [[ -x "$from" ]]; then
-    chmod +x "$to"
-  fi
-  log "OK   $to"
-}
 
-copy_tree_files() {
-  # copy selected files under a subdir (not full recursive junk)
-  local rel="$1"
-  shift
-  local f
-  for f in "$@"; do
-    local from="$SRC/$rel/$f"
-    local to="$DEST/$rel/$f"
-    [[ -f "$from" ]] || {
-      log "WARN missing in source: $rel/$f"
-      continue
-    }
-    copy_file "$from" "$to"
-  done
-}
+def load_usage(path: Path | None) -> dict[str, Any] | None:
+    if path is None or not path.is_file():
+        return None
+    try:
+        raw = path.read_text(encoding="utf-8", errors="replace").strip()
+        if not raw:
+            return None
+        data = json.loads(raw)
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict) or not data:
+        return None
+    return data
 
-log "Luffy install · source=$SRC"
-log "               dest=$DEST dry_run=$DRY_RUN force=$FORCE"
 
-# agent/*
-AGENT_FILES=()
-while IFS= read -r -d '' f; do
-  AGENT_FILES+=("$(basename "$f")")
-done < <(find "$SRC/agent" -maxdepth 1 -type f -print0 | sort -z)
+def load_timings(path: Path | None) -> dict[str, Any] | None:
+    if path is None or not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
 
-copy_tree_files "agent" "${AGENT_FILES[@]}"
 
-# runtime scripts
-copy_tree_files "scripts" "${RUNTIME_SCRIPTS[@]}"
+def _num(v: Any) -> float | int | None:
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return v
+    return None
 
-# main workflow
-copy_file \
-  "$SRC/.github/workflows/luffy-pr-review.yml" \
-  "$DEST/.github/workflows/luffy-pr-review.yml"
 
-if [[ "$WITH_INGEST" == "1" ]]; then
-  copy_file \
-    "$SRC/.github/workflows/ingest-luffy-run.yml" \
-    "$DEST/.github/workflows/ingest-luffy-run.yml"
-fi
+def format_tokens(n: float | int | None) -> str:
+    if n is None:
+        return "n/a"
+    n = int(n)
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 10_000:
+        return f"{n / 1_000:.0f}k"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}k"
+    return str(n)
 
-if [[ "$WITH_RUNNER" == "1" ]]; then
-  copy_file \
-    "$SRC/.github/workflows/build-luffy-runner.yml" \
-    "$DEST/.github/workflows/build-luffy-runner.yml"
-  if [[ -f "$SRC/docker/luffy-runner/Dockerfile" ]]; then
-    copy_file \
-      "$SRC/docker/luffy-runner/Dockerfile" \
-      "$DEST/docker/luffy-runner/Dockerfile"
-  fi
-  if [[ -f "$SRC/docker/luffy-runner/README.md" ]]; then
-    copy_file \
-      "$SRC/docker/luffy-runner/README.md" \
-      "$DEST/docker/luffy-runner/README.md"
-  fi
-  for extra in build-luffy-runner-image.sh benchmark-hermes-startup.sh; do
-    [[ -f "$SRC/scripts/$extra" ]] && copy_file "$SRC/scripts/$extra" "$DEST/scripts/$extra"
-  done
-fi
 
-# Stamp for operators (not secret)
-STAMP="$DEST/.luffy-install-stamp"
-VERSION="$(git -C "$SRC" rev-parse --short HEAD 2>/dev/null || echo unknown)"
-if [[ "$DRY_RUN" == "1" ]]; then
-  log "DRY  would write $STAMP (source_sha=$VERSION)"
-else
-  {
-    echo "installed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "source_sha=$VERSION"
-    echo "source_path=$SRC"
-    echo "pack=agent,scripts(runtime),luffy-pr-review.yml"
-  } >"$STAMP"
-  log "OK   $STAMP"
-fi
+def format_cost_usd(v: float | int | None) -> str:
+    if v is None:
+        return "n/a"
+    x = float(v)
+    if x >= 1:
 
-log ""
-log "Next steps on the target repo (default branch):"
-log "  1. Commit the installed pack and push to the default branch."
-log "  2. Add secret OPENROUTER_API_KEY."
-log "  3. Optional: LUFFY_HUB_TOKEN, vars LUFFY_MODEL / LUFFY_HERMES_COMMIT / LUFFY_COOLDOWN_SECONDS / LUFFY_RUNNER_IMAGE."
-log "  4. On a PR, comment: @luffy review this pr"
-log "Done."
+---
 
+# run-hermes-review F21 hook (context)
+267:# F21: surface cost/tokens on the posted comment (soft-fail if no usage file)
+268-if [[ -f "$LUFFY_ROOT/scripts/usage-summary.py" ]]; then
+269-  python3 "$LUFFY_ROOT/scripts/usage-summary.py" append \
+270-    --usage "$USAGE_FILE" \
+271-    --review "$FINAL_OUT" || notice "usage-summary append soft-failed"
+272-fi
+273-
+
+---
+
+# install-luffy RUNTIME_SCRIPTS
+90:RUNTIME_SCRIPTS=(
+91-  assemble-context.sh
+92-  association-allowed.sh
+93-  build-hub-payload.py
+94-  capture-hermes-loop.py
+95-  cooldown-check.sh
+96-  distill-memory.sh
+97-  hermes-pin.sh
+98-  hub-ingest-run.py
+99-  install-luffy.sh
+100-  normalize-review.py
+101-  post-review-comment.sh
+102-  preload-hub-memory.sh
+103-  publish-run-to-hub.sh
+104-  review-local.sh
+105-  run-hermes-review.sh
+106-  run-luffy-review.sh
+107-  save-trace.sh
+108-  sparse-pr-paths.sh
+109-  usage-summary.py
+110-  write-failure-review.sh
+111-)
+112-
+113-copy_file() {
+114-  local from="$1" to="$2"
+115-  if [[ -e "$to" && "$FORCE" != "1" ]]; then
+
+---
+
+# DEV.md excerpt (existing knowledge)
 # DEV — engineering knowledge
 
 > How this repository is built.
@@ -619,7 +572,10 @@ log "Done."
 
 ## Design decisions
 
-- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORAT
+- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout.
+- **F8 prebaked runner:** `ensure_hermes` short-circuits when `LUFFY_HERMES_PREBAKED=1` or `/root/.hermes-pin`/`$HOME/.hermes-pin` exists and `hermes` is on PATH (image from `docker/luffy-runner/`). Workflow optional `container: vars.LUFFY_RUNNER_IMAGE`; Hermes Actions cache is skipped when prebaked is detected.
+- Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (default known-good SHA; `latest`/`main`/`floating`/empty = float), emits `install.sh` args (`--skip-setup --commit … --force-commit`), and supplies the Actions cache key suffix (`v4-<12-char-pin>`). Pin mismatch on a warm cache triggers reinstall.
+- Re-runs replace prior Luffy comments by deleting bodies matching the `<!-- l
 
 … [session truncated] …
 
@@ -662,11 +618,11 @@ agent
 
 ### recent log
 ```
+91262f5 feat(cost): surface usage on PR comments + job summary (F21)
+b20f7c3 feat(ops): prebaked Hermes runner image + startup benchmark (F8)
+7f5dc5b docs(knowledge): dogfood F20 install-luffy pack semantics + showcase
 bd8e3f6 feat(install): one-command Luffy pack install into target repos (F20)
 28e7d6e docs(knowledge): dogfood F8 prebaked runner into docker/ + showcase
-ff1096a feat(ops): prebaked Hermes runner image + optional container (F8)
-3c7d39b docs(knowledge): dogfood F19 cooldown patterns into DEV/USAGE + showcase
-e015fd2 feat(cost): per-PR re-trigger cooldown after successful review (F19)
 ```
 
 ### tree (sample)
@@ -712,6 +668,7 @@ tests/test_hermes_pin.py
 tests/test_hub_ingest.py
 tests/test_install_luffy.py
 tests/test_normalize_review.py
+tests/test_usage_summary.py
 agent/DEV.md
 agent/MEMORY.seed.md
 agent/SOUL.md
@@ -776,6 +733,7 @@ scripts/run-hermes-review.sh
 scripts/run-luffy-review.sh
 scripts/save-trace.sh
 scripts/sparse-pr-paths.sh
+scripts/usage-summary.py
 scripts/write-failure-review.sh
 assets/README.md
 assets/favicon-32.png
@@ -825,17 +783,17 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] agentic assembl beyond capture-hermes-looppy completion default inspect luffytoolset
 - [DEV.md#Design decisions] activity agenttool hermestuitoolprogress=verbose later level observability pythonunbuffered=1 recoverable
 - [DEV.md#Design decisions] directory disposable explicitly hermeshome memory memorymd preserv through
+- [DEV.md#Design decisions] $srcagent --with-runner-build -maxdepth -type adding agent array automatically
+- [DEV.md#Design decisions] $from chmod executable install install-luffysh installer installupdate itself
+- [DEV.md#Design decisions] --source agent check default githubworkflowsluffy-pr-reviewyml half-install overrid parent
+- [DEV.md#Design decisions] --force avoid canonical explicitly half-cop install itself luffy
+- [DEV.md#Design decisions] --force contract exist human includ install output refuse
+- [DEV.md#Design decisions] --short content installedat luffy-install-stamp outside plain-text provenance record
 - [DEV.md#Pitfalls] 403 cannot classic clone default dispatch githubtoken ingest
 - [DEV.md#Pitfalls] content cross-repo githubtoken itself luffy luffyhubtoken publish requir
 - [DEV.md#Pitfalls] again agent comment common embedd f18 github honour
 - [DEV.md#Pitfalls] 100000 budget default exceed growth maxmemorybyt memorymd otherwise
-- [DEV.md#Pitfalls] backlog broken cache class count dishonest historical sparse-checkout
-- [DEV.md#Pitfalls] advertise alone anthropicclaude-opus-5 anyone default diverg either explicitly
-- [DEV.md#Pitfalls] --version accept behaviour binary check contain degrad ensureherm
-- [DEV.md#Pitfalls] <sha> default defaulthermescommit duplicat fallback hardcod overrid script
-- [DEV.md#Pitfalls] --paginate array assum buffer concatenat consumer cooldown-checksh extend
-- [DEV.md#Pitfalls] disabl error guard luffycooldownsecond non-integer reason=disabledinvalid remov silently
-- [DEV.md#Pitfalls] age=0 bypass clamp clock comment cooldown maximis newer
+- [DEV.md#Pitfalls] back
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
