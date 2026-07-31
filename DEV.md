@@ -47,7 +47,7 @@
 - The helper never rewrites the child's exit code except timeout→124 (`125` is reserved for invalid usage / empty command), so normal Hermes failures still surface unchanged upstream.
 - F36 and F29 are complementary, not overlapping: F29's soft `LUFFY_MAX_COST_USD` annotates a run that already *finished*, while F36 is the only mechanism that stops a run that never finishes.
 - Timeout evidence lands in the trace as `hermes-timeout.env` and `hermes-timeout-seconds.txt`, so a 124 can be distinguished from a model/contract failure after the fact.
-- **F41 max turns:** Hermes-inspired iteration budget (`agent.max_turns` / `--max-turns` / `HERMES_MAX_ITERATIONS`). Default **40** (Hermes product default is 500 — unsafe for CI cost). Resolver `scripts/max_turns.py`; `run-hermes-review.sh` passes `--max-turns`, rewrites `HERMES_HOME/config.yaml`, writes `hermes-max-turns.env`, detects "Iteration budget exhausted" in logs. Complements F36 (time) and F29 (post-hoc $): F41 stops *tool-call thrash* that still finishes under the wall-clock. Pack exposes `signals.max_turns_hit` + `loop.{tool_call_turns,message_count,max_turns}` for the Run Console.
+- **F41 max turns:** Hermes-inspired iteration budget (`agent.max_turns` / `--max-turns` / `HERMES_MAX_ITERATIONS`). Default **40** (Hermes product default is 500 — unsafe for CI cost). Resolver `scripts/max_turns.py`; `run-hermes-review.sh` passes `--max-turns`, rewrites `HERMES_HOME/config.yaml`, writes `hermes-max-turns.env`, detects budget exhaustion via log strings. Complements F36 (time) and F29 (post-hoc $): F41 stops *tool-call thrash* that still finishes under the wall-clock. Pack exposes `signals.max_turns_hit` + `loop.{tool_call_turns,message_count,max_turns}` for the Run Console.
 
 - Exactly **one** managed label is applied per run and the other three managed labels from a prior run are removed, so a PR never carries two contradictory Luffy verdicts: `APPROVE→{prefix}:approve`, `REQUEST_CHANGES→{prefix}:request-changes`, `COMMENT→{prefix}:comment`, `UNKNOWN`/pipeline failure→`{prefix}:error`.
 - Pipeline failure always wins over the parsed verdict (`--pipeline-ok false` ⇒ `error`) — the label channel is deliberately not allowed to green-wash a broken run.
@@ -63,6 +63,10 @@
 - Two independent kill switches by design: `LUFFY_INLINE_COMMENTS=0` disables *all* inline output (findings + suggestions), while `LUFFY_INLINE_SUGGESTIONS=0` disables only F9c and leaves F9/F9b finding notes running.
 
 - Because each flag has a **file source plus a review-text fallback**, a signal survives even when the env file is missing; conversely the F38 path-skip step had to start writing `ops-signals.env` so the skip is durable in the pack rather than only inferrable from the stub comment text.
+
+- `0` / `off` is a supported value meaning "no cap" — treat unset and disabled as different states when reading a run's config.
+- Knob surfaces are per-host: GitHub Actions uses `vars.LUFFY_MAX_TURNS`, Modal uses env `LUFFY_MAX_TURNS`; `scripts/max_turns.py` is included in the install pack so adopted repos get the same resolver.
+- Design was lifted from Hermes' own conversation loop (`agent.max_turns` / `--max-turns` / `HERMES_MAX_ITERATIONS` in NousResearch/hermes-agent); the running list of such borrowings lives in `docs/experiments/hermes-inspired-roi.md`.
 
 ## Pitfalls
 
@@ -104,6 +108,9 @@
 - Suggestion volume is capped separately from findings: `LUFFY_SUGGESTION_MAX` (default 3) bounds apply blocks, `LUFFY_INLINE_MAX` (default 6) bounds finding notes — raising one does not raise the other, and a review with many `### Code suggestions` will silently post only the first N.
 - A well-formed suggestion can still vanish: because mapping requires the `-` lines to line up with contiguous PR `+` lines, a suggestion that rewrites *unchanged* context (or reflows lines) has no valid anchor and is skipped. Confirm with plan mode before assuming the poster failed.
 - `LUFFY_INLINE_SEVERITY` filtering applies to findings only — it is not a lever on F9c, so severity tuning will not suppress apply blocks.
+
+- Budget-exhaustion detection is **log-string matching**, not an exit code: `run-hermes-review.sh` / `scripts/max_turns.py` look for `Iteration budget exhausted`, `max_iterations_reached`, and `Reached maximum iterations`. A Hermes upgrade that rewords any of these silently degrades `signals.max_turns_hit` to false while the run still gets truncated — re-check the three patterns whenever the Hermes pin moves.
+- `run-bundle.loop` (not the raw Hermes log) is the intended operator surface for loop behaviour: read `tool_call_turns`, `message_count`, `step_count`, `max_turns` from the bundle rather than re-parsing stdout.
 
 ## Patterns
 

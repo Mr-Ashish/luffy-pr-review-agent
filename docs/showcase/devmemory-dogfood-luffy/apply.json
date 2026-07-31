@@ -4,17 +4,44 @@
     "kind": "dev",
     "action": "merge",
     "section": "Design decisions",
-    "bytes": 23057,
+    "bytes": 23626,
     "applied": true,
     "unit_path": "."
+  },
+  {
+    "path": "DEV.md",
+    "kind": "dev",
+    "action": "merge",
+    "section": "Pitfalls",
+    "bytes": 24254,
+    "applied": true,
+    "unit_path": "."
+  },
+  {
+    "path": "agent/DEV.md",
+    "kind": "dev",
+    "action": "merge",
+    "section": "Design decisions",
+    "bytes": 4170,
+    "applied": true,
+    "unit_path": "agent"
   },
   {
     "path": "ui/review-console/DEV.md",
     "kind": "dev",
     "action": "merge",
     "section": "Architecture",
-    "bytes": 631,
+    "bytes": 846,
     "applied": true,
     "unit_path": "ui/review-console"
+  },
+  {
+    "path": "USAGE.md",
+    "kind": "usage",
+    "action": "merge",
+    "section": "Debugging",
+    "bytes": 20326,
+    "applied": true,
+    "unit_path": "."
   }
 ]

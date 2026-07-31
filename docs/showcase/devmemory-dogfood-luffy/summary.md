@@ -1,9 +1,9 @@
-# Run run-20260731T210154-8bd0d0
+# Run run-20260731T210947-7428e6
 
 - session: `dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
-- units: 2
-- summary: Session documents the F40 ops-signals contract: which artifact/text source each bundle signal flag is derived from in pack-run-for-ui.py's collect_signals, that path-skip steps must persist ops-signals.env for the signal to survive into the pack, and how the Run Console surfaces the flags. The USAGE-level F40 bullet already exists verbatim in USAGE.md, so no usage unit is emitted.
-- at: 2026-07-31T15:32:21Z
-- timings: {"assemble_s": 0.14, "extract_s": 26.234, "normalize_s": 0.002}
+- units: 5
+- summary: F41 adds a Hermes iteration budget (max_turns, default 40) to Luffy reviews with a two-file source of truth, log-string exhaustion detection, and a new run-bundle.loop surface consumed by the Run Console. Durable knowledge not yet recorded: the SoT/sync constraint, the three detection strings, the CLI/workflow knobs, and how the loop metrics reach the console.
+- at: 2026-07-31T15:40:32Z
+- timings: {"assemble_s": 0.135, "extract_s": 44.789, "normalize_s": 0.004}

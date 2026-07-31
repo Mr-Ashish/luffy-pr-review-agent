@@ -19,6 +19,8 @@
 - The SOUL's *optional* **Code suggestions** field is now load-bearing downstream: F9c turns each `#### title (`path`)` + ```diff``` block into a GitHub apply-suggestion comment, so the section's shape (heading with backticked path, diff fence with `-`/`+` lines that mirror real PR lines) is a machine contract, not free-form prose.
 - Consequence for prompt/SOUL edits: changing how suggestions are formatted, or encouraging suggestions against unchanged context, degrades F9c to zero posted apply blocks without any error — the reviewer instruction "only when you can show a concrete better snippet for **new** code" is what keeps suggestions anchorable.
 
+- The cap is applied to the *disposable* `HERMES_HOME` config that `run-hermes-review.sh` rewrites per run, so `agent/config.yaml` is the template, not the live file the agent reads.
+
 ## Pitfalls
 
 - Same anchoring applies to `**Score:** <int>[/100]` and `**Confidence:** low|medium|high` — score/confidence are parsed only for reporting, and a missed match yields empty strings rather than an error.

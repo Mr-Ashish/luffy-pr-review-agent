@@ -1,20 +1,19 @@
-# Showcase · `run-20260731T210154-8bd0d0`
+# Dogfood showcase — Luffy F41 (Hermes max_turns)
 
-Live dogfood run of **devmemory on itself**.
+Session: `dogfood-luffy-session` · model `anthropic/claude-opus-5` · hermes_rc=0
 
-| Field | Value |
-|-------|-------|
-| model | `anthropic/claude-opus-5` |
-| hermes_rc | 0 |
-| units | 2 |
+## Product
 
-## Files
+F41 caps Hermes tool-calling turns (default 40) and packs `loop` metrics +
+`signals.max_turns_hit` into the Run Console.
 
-- `units.json` — normalized knowledge units
-- `apply.json` — files written
-- `prompt.md` / `session.md` / `repo-context.md` — assembled context (redacted)
-- `agent-loop/` — Hermes usage, logs, structured loop
+## Knowledge applied
 
-## Privacy
+- `DEV.md` — design + pitfalls (log-string detect, bundle.loop surface)
+- `agent/DEV.md` — HERMES_HOME config rewrite
+- `ui/review-console/DEV.md` — Overview + Loop tab metrics
+- `USAGE.md` — debugging knobs / regression gate
 
-Secrets redacted. Raw `.env` never copied. `.devmemory/` remains gitignored; this showcase is a **curated** public slice.
+## Validate
+
+`devmemory validate` → ok (warn: non-canonical USAGE H2s only)

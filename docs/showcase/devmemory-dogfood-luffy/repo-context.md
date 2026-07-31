@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T15:31:54Z
+- **assembled_at:** 2026-07-31T15:39:47Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+50c4712 feat(cost): F41 Hermes max_turns iteration budget + loop metrics
+8bd5ded docs(knowledge): dogfood F40 ops signals + showcase
 903f6df feat(ui): F40 ops signals in run-bundle + Run Console
 81d2b63 docs(knowledge): dogfood F39 Modal parity + showcase
 19fbe7e feat(modal): F39 host parity — path-skip + report-verdict
-6f9a862 docs(knowledge): dogfood F9c suggestions + showcase
-b2d2f91 feat(product): F9c GitHub apply-suggestion blocks
 ```
 
 ## tree (sample)
@@ -29,6 +29,7 @@ USAGE.md
 demo/__init__.py
 demo/hello.py
 ui/review-console/DESIGN.md
+ui/review-console/DEV.md
 ui/review-console/PRODUCT.md
 ui/review-console/README.md
 ui/review-console/index.html
@@ -86,6 +87,7 @@ tests/test_hermes_pin.py
 tests/test_hub_ingest.py
 tests/test_install_luffy.py
 tests/test_local_memory.py
+tests/test_max_turns.py
 tests/test_memory_health.py
 tests/test_modal_parity.py
 tests/test_normalize_review.py
@@ -124,11 +126,13 @@ docs/experiments/2026-07-31-f37-verdict-labels.md
 docs/experiments/2026-07-31-f38-path-skip.md
 docs/experiments/2026-07-31-f39-modal-parity.md
 docs/experiments/2026-07-31-f40-ops-signals.md
+docs/experiments/2026-07-31-f41-max-turns.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-f9c-suggestions.md
 docs/experiments/2026-07-31-roi-fire.md
 docs/experiments/f28-repo-local-memory.md
+docs/experiments/hermes-inspired-roi.md
 docs/experiments/loop-no-work-streak.md
 docs/blog/building-luffy-agentic-pr-review.md
 docs/benchmarks/hermes-startup-latest.json
@@ -180,6 +184,7 @@ scripts/distill-memory.sh
 scripts/hermes-pin.sh
 scripts/hub-ingest-run.py
 scripts/install-luffy.sh
+scripts/max_turns.py
 scripts/memory-health.sh
 scripts/modal_parity.py
 scripts/normalize-review.py
@@ -217,11 +222,6 @@ assets/twemoji-ship.png
 assets/brand-options/README.md
 assets/brand-options/RECOMMENDATION.md
 assets/brand-options/SELECTED-orbital-core.png
-assets/brand-options/SELECTED.md
-assets/brand-options/hero-A-baseline.svg
-assets/brand-options/hero-B-glass.svg
-assets/brand-options/hero-C-isometric.svg
-assets/brand-options/hero-D-mesh.svg
 ```
 
 ## git diff
@@ -268,6 +268,12 @@ assets/brand-options/hero-D-mesh.svg
 - Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact + F27 diff-truncation banner), usage-summary.py (F21 cost footer/job summary + F29 soft max budget), parse-verdict.py + report-verdict.sh (F22 reaction/status + F23 formal PR review + F24 dismiss-prior + F9 inline), post-inline-comments.py (F9 path anchors), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-local.sh (F28 `.luffy/`), publish-run-to-hub.sh (opt-in), hub-ingest-run.py (hub + local layouts), pack-run-for-ui.py (F31 Run Console `run-bundle.json`, soft).
 - **F20/F10 install:** `scripts/install-luffy.sh` is the adoption entrypoint. Default **pack** mode copies `agent/`, runtime scripts, thin `luffy-pr-review.yml`, and `luffy-review-reusable.yml`. **`--caller`** installs only the hub-managed thin workflow from `pack/luffy-pr-review-caller.yml` (no agent/scripts). Optional `--with-hub-ingest` / `--with-runner-build` (pack mode). Stamp `.luffy-install-stamp` rec
 … [truncated; do not restate] …
+
+### ui/review-console/DEV.md
+
+## Architecture
+- The console renders `bundle.signals` in two places: header **chips** (shown only when at least one flag is set) and an **Ops signals (F40)** panel in the Overview tab — so a clean run stays visually quiet and any degraded run is visible without opening a tab.
+- Phase tracker state: Phase 2 (standalone review console shell) is **superseded** by the full Run Console; F40 ("ops signals in console", phase 4d) is done, while **4c live progress streaming remains pending** — treat streaming as the next console workstream, not signals.
 
 ### readme-kit/DEV.md
 
@@ -341,7 +347,7 @@ assets/brand-options/hero-D-mesh.svg
 
 ## Run console
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
-- **F40 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated + `flags[]`). Overview shows **Ops signals (F40)**; header chips when any flag is set. Path-skip writes `ops-signals.env` for durable pack.
+- **F40/F41 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns + `flags[]`) and `loop` metrics (tool_call_turns, message_count, max_turns). Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip writes `ops-signals.env`; F41 writes `hermes-max-turns.env`.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
 
@@ -355,10 +361,7 @@ assets/brand-options/hero-D-mesh.svg
 - Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).
 - Hub-managed thin install (F10, no agent/scripts copy): `./scripts/install-luffy.sh --caller /path/to/target-repo`.
 - Build prebaked Hermes runner image: `./scripts/build-luffy-runner-image.sh` (optional `PUSH=1`).
-- Benchmark Hermes startup paths: `SKIP_COLD=1 ./scripts/benchmark-hermes-startup.sh` → `docs/benchmarks/`.
-
-## Setup
-- 
+- Benc
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md
@@ -384,4 +387,5 @@ assets/brand-options/hero-D-mesh.svg
 - If a live POST is rejected, reproduce locally first: `python3 scripts/webhook_auth.py sign` to mint an `X-Hub-Signature-256` over the exact raw body, then `python3 scripts/webhook_auth.py authorize` to see which branch fired, rather than guessing from the Modal response.
 - Modal profile version `0.6.0-f39` (F39 host parity): path-skip before clone + report-verdict after review. Quote it when comparing behaviour across deployed revisions.
 - Path-skip offline: `python3 scripts/modal_parity.py path-skip --path README.md --globs docs` → exit 2 means Modal would skip OpenRouter.
+- F41: `LUFFY_MAX_TURNS` (default 40) caps Hermes tool iterations on Modal; set `0`/`off` to disable. App version `0.6.1-f41`.
 

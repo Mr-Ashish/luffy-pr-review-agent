@@ -220,6 +220,9 @@ REPO=owner/name HERMES_HOME=/tmp/hh LUFFY_MEMORY_MODE=local bash scripts/preload
 - Disable just apply blocks while keeping inline findings: set repo variable `LUFFY_INLINE_SUGGESTIONS=0`. Tune volume with `LUFFY_SUGGESTION_MAX` (default 3).
 - Posted suggestion comments carry the `<!-- luffy-suggestion -->` marker — grep for it to tell F9c output apart from F9/F9b finding notes when auditing a PR.
 
+- Set the cap per host: repo variable `LUFFY_MAX_TURNS` for GitHub Actions, env `LUFFY_MAX_TURNS` for Modal; use `0` or `off` to disable the cap entirely when debugging a long legitimate review.
+- F41 regression gate: `pytest` (204 passing at 50c4712), `bash -n scripts/run-hermes-review.sh`, and `cd ui/review-console && npm run pack-fixture && npm run build` — the shell syntax check and fixture re-pack are what catch the config-rewrite and bundle-shape halves.
+
 ## Troubleshooting
 
 - Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` (`mode=pack|caller`, `source_sha`) and compare with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`. For `mode=caller`, runtime tracks hub `main`, not the stamp alone.
