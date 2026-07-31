@@ -55,6 +55,7 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 39 | **F38** | Path-glob free skip (docs-only / filtered PRs) | XS | 🔥 Cost — no OpenRouter when every path matches skip globs | **Shipped** (`path-skip-check.py`, opt-in) |
 | 40 | **F9c** | Multi-line GitHub apply-suggestion blocks from Code suggestions | S | 🔥 Product — one-click apply on Files changed | **Shipped** (`post-inline-comments.py` suggestions) |
 | 41 | **F39** | Modal host parity (F38 path-skip + F22–F37/F9 report-verdict) | S | 🔥 Cost/trust — Modal no longer second-class kitchen | **Shipped** (`modal_parity.py`, `review_pr`) |
+| 42 | **F40** | Ops signals in run-bundle + Run Console overview | XS | 🔥 UI ops — timeout/path-skip/budget/truncation visible in 30s | **Shipped** (`pack-run-for-ui` signals, console) |
 
 ### Sprint 1 (shipped)
 
@@ -179,6 +180,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 31 (shipped)
 
 **F39** Modal host parity: `review_pr` runs F38 path-skip **before** sparse clone (env `LUFFY_SKIP_PATH_GLOBS`); on skip posts stub COMMENT + report-verdict labels (no OpenRouter). After a paid run, calls `report-verdict.sh` for commit status / PR review / inline / labels. Sets `LUFFY_REVIEW_TIMEOUT_SECONDS` (F36). Helper `scripts/modal_parity.py`. App version `0.6.0-f39`.
+
+### Sprint 32 (shipped)
+
+**F40** ops signals in Run Console: `pack-run-for-ui.py` emits `signals` (timeout F36, path-skip F38, over-budget F29, diff-truncated F27 + `flags[]`). Path-skip steps write `ops-signals.env`. Console header chips + Overview **Ops signals (F40)** panel so operators answer “why free-skip / kill / overspend / incomplete?” without grepping artifacts.
 
 ### readme-kit (shipped)
 

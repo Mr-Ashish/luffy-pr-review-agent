@@ -480,6 +480,12 @@ table.grid td.mono {
   padding: var(--space-8) 0;
 }
 
+.muted {
+  font-size: 0.8rem;
+  color: var(--mute-deep);
+  line-height: 1.45;
+}
+
 .banner-error {
   border: 1px solid oklch(58% 0.15 35 / 0.45);
   background: oklch(58% 0.15 35 / 0.1);

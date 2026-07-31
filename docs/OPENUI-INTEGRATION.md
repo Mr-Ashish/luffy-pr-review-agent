@@ -212,4 +212,5 @@ pr-review-agent/
 | 4 Trigger from console (F32) | **done** — Run tab + `trigger-review.sh` + Modal bit4 webhook/spawn (no in-browser Hermes) |
 | 4b Deep-link from PR comment (F35) | **done** — `ops_footer.py` Actions run + run-bundle tip (+ optional `LUFFY_CONSOLE_URL`) |
 | 4c Stream progress | pending (live status stream while review runs) |
-| 5 Docs complete | **done** for Phases 0–4b + F31/F32/F35 |
+| 4d Ops signals in console (F40) | **done** — pack `signals` + Overview chips (timeout/path-skip/budget/truncation) |
+| 5 Docs complete | **done** for Phases 0–4b + F31/F32/F35/F40 |

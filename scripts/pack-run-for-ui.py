@@ -108,6 +108,129 @@ def detect_host(explicit: str | None = None) -> str:
     return "local"
 
 
+def _parse_env_file(p: Path) -> dict[str, str]:
+    out: dict[str, str] = {}
+    if not p.is_file():
+        return out
+    for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        out[k.strip()] = v.strip()
+    return out
+
+
+def collect_signals(
+    dir_path: Path,
+    *,
+    review_md: str = "",
+    meta_env: str | None = None,
+    usage: dict | None = None,
+) -> dict:
+    """F40: ops signals for Run Console overview (timeout, path-skip, budget, truncation).
+
+    Sources (files preferred, review text as soft fallback):
+      hermes-timeout.env / hermes-timeout-seconds.txt  → timeout (F36)
+      path-skip / ops-signals.env PATH_SKIP=1          → path_skip (F38)
+      meta.env DIFF_TRUNCATED / review banner (F27)    → diff_truncated
+      review OVER BUDGET / usage + env max (F29)       → over_budget
+    """
+    signals: dict = {
+        "timeout": False,
+        "timeout_seconds": None,
+        "path_skip": False,
+        "diff_truncated": False,
+        "over_budget": False,
+        "flags": [],  # short chip labels for UI
+    }
+    te = _parse_env_file(dir_path / "hermes-timeout.env")
+    if te.get("timed_out") in ("1", "true", "yes") or te.get("timeout_seconds"):
+        signals["timeout"] = True
+        try:
+            signals["timeout_seconds"] = int(te.get("timeout_seconds") or 0) or None
+        except ValueError:
+            pass
+        if te.get("stage"):
+            signals["timeout_stage"] = te["stage"]
+    ts_file = dir_path / "hermes-timeout-seconds.txt"
+    if ts_file.is_file() and signals["timeout_seconds"] is None:
+        try:
+            signals["timeout_seconds"] = int(ts_file.read_text().strip())
+        except ValueError:
+            pass
+    # Soft: review body mentions F36 timeout
+    low = (review_md or "").lower()
+    if not signals["timeout"] and (
+        "timed out" in low and ("f36" in low or "wall-clock" in low or "timeout" in low)
+    ):
+        signals["timeout"] = True
+
+    ops = _parse_env_file(dir_path / "ops-signals.env")
+    if ops.get("PATH_SKIP") in ("1", "true", "yes") or ops.get("path_skip") in (
+        "1",
+        "true",
+        "yes",
+    ):
+        signals["path_skip"] = True
+        if ops.get("sample"):
+            signals["path_skip_sample"] = ops["sample"]
+        if ops.get("globs"):
+            signals["path_skip_globs"] = ops["globs"]
+    if not signals["path_skip"] and (
+        "path-skip (f38" in low or "path-skip (f38/f39" in low or "intentional free skip" in low
+    ):
+        signals["path_skip"] = True
+
+    # F27 truncation
+    env_map = _parse_env_file(dir_path / "meta.env") if meta_env is None else {}
+    if meta_env:
+        for line in meta_env.splitlines():
+            if "=" in line and not line.startswith("#"):
+                k, _, v = line.partition("=")
+                env_map[k.strip()] = v.strip()
+    # also merge from file always
+    env_map.update(_parse_env_file(dir_path / "meta.env"))
+    if env_map.get("DIFF_TRUNCATED", "").lower() in ("true", "1", "yes"):
+        signals["diff_truncated"] = True
+    if not signals["diff_truncated"] and (
+        "diff was truncated" in low or "max_diff_bytes" in low or "incomplete context" in low
+    ):
+        signals["diff_truncated"] = True
+
+    # F29 over budget
+    if "over budget" in low:
+        signals["over_budget"] = True
+    usage = usage or {}
+    cost = usage.get("estimated_cost_usd")
+    max_raw = (os.environ.get("LUFFY_MAX_COST_USD") or "").strip()
+    if (
+        not signals["over_budget"]
+        and cost is not None
+        and max_raw
+        and max_raw.lower() not in ("0", "off", "false", "no")
+    ):
+        try:
+            if float(cost) > float(max_raw):
+                signals["over_budget"] = True
+                signals["budget_max_usd"] = float(max_raw)
+        except (TypeError, ValueError):
+            pass
+
+    flags: list[str] = []
+    if signals["path_skip"]:
+        flags.append("path-skip")
+    if signals["timeout"]:
+        flags.append("timeout")
+    if signals["over_budget"]:
+        flags.append("over-budget")
+    if signals["diff_truncated"]:
+        flags.append("diff-truncated")
+    signals["flags"] = flags
+    signals["any"] = bool(flags)
+    return signals
+
+
 def _resolve_review_md(dir_path: Path) -> str:
     """Prefer review.md; fall back to review-<pr>.md under OUT_DIR layouts."""
     direct = read_text(dir_path / "review.md")
@@ -194,6 +317,13 @@ def pack(dir_path: Path, *, comment_url: str = "", host: str = "gha") -> dict:
             if "=" in line and not line.startswith("#"):
                 k, _, v = line.partition("=")
                 memory_health[k.strip()] = v.strip()
+
+    signals = collect_signals(
+        dir_path,
+        review_md=review_md or "",
+        meta_env=meta_env,
+        usage=usage if isinstance(usage, dict) else {},
+    )
 
     # Artifact inventory from meta or directory listing
     artifacts = []
@@ -289,6 +419,7 @@ def pack(dir_path: Path, *, comment_url: str = "", host: str = "gha") -> dict:
             "health": memory_health,
             "after_md": memory,
         },
+        "signals": signals,  # F40: timeout / path-skip / budget / truncation
         "trace": {
             "meta": meta,
             "trace_json": trace if isinstance(trace, dict) else {},

@@ -388,6 +388,12 @@ jobs:
           mkdir -p "$OUT_DIR"
           SAMPLE="${{ steps.pathskip.outputs.sample }}"
           GLOBS="${{ steps.pathskip.outputs.globs }}"
+          # F40: durable signal for Run Console pack
+          {
+            echo "PATH_SKIP=1"
+            echo "sample=${SAMPLE:-}"
+            echo "globs=${GLOBS:-}"
+          } >"$OUT_DIR/ops-signals.env"
           bash "$LUFFY_ROOT/scripts/write-failure-review.sh" "$PR_NUMBER" "$OUT_DIR" \
             "Path-skip (F38): every changed file matched skip globs (\`${GLOBS:-docs}\`) — no OpenRouter spend. Sample: ${SAMPLE:-n/a}. Re-run with \`@luffy review force\` to review anyway." \
             "None — intentional free skip for docs/filtered paths. Use \`@luffy review force\` to pay for a full review."

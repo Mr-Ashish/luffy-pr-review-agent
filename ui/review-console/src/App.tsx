@@ -285,6 +285,7 @@ export default function App() {
   }
 
   const { run, pr, result, cost, timings, memory, trace, diff } = bundle;
+  const signals = bundle.signals;
   const vClass = verdictClass(result.verdict);
 
   return (
@@ -300,6 +301,11 @@ export default function App() {
             <span className="tag mono">{run.total_seconds}s</span>
           )}
           <span className="tag mono">{run.status}</span>
+          {signals?.flags?.map((f) => (
+            <span className="tag bad mono" key={f}>
+              {f}
+            </span>
+          ))}
         </div>
         <div className="strip-actions">
           {pr.url && (
@@ -404,6 +410,66 @@ export default function App() {
                   <div className="val mono">{shortSha(run.github_sha)}</div>
                 </div>
               </div>
+
+              {signals?.any && (
+                <div className="block">
+                  <h3>Ops signals (F40)</h3>
+                  <p className="muted" style={{ marginBottom: "0.75rem" }}>
+                    Gates that explain free-skips, hung kills, spend alerts, or
+                    incomplete context — without opening raw logs.
+                  </p>
+                  <dl className="dl">
+                    {signals.path_skip && (
+                      <>
+                        <dt>Path-skip (F38)</dt>
+                        <dd>
+                          Free skip — every changed path matched skip globs
+                          {signals.path_skip_globs
+                            ? ` (${signals.path_skip_globs})`
+                            : ""}
+                          {signals.path_skip_sample
+                            ? ` · sample: ${signals.path_skip_sample}`
+                            : ""}
+                        </dd>
+                      </>
+                    )}
+                    {signals.timeout && (
+                      <>
+                        <dt>Timeout (F36)</dt>
+                        <dd>
+                          Hermes wall-clock kill
+                          {signals.timeout_seconds != null
+                            ? ` after ${signals.timeout_seconds}s`
+                            : ""}
+                          {signals.timeout_stage
+                            ? ` · stage ${signals.timeout_stage}`
+                            : ""}
+                        </dd>
+                      </>
+                    )}
+                    {signals.over_budget && (
+                      <>
+                        <dt>Over budget (F29)</dt>
+                        <dd>
+                          Estimated cost exceeded soft max
+                          {signals.budget_max_usd != null
+                            ? ` ($${signals.budget_max_usd})`
+                            : ""}
+                        </dd>
+                      </>
+                    )}
+                    {signals.diff_truncated && (
+                      <>
+                        <dt>Diff truncated (F27)</dt>
+                        <dd>
+                          Assembled PR diff hit MAX_DIFF_BYTES — findings may be
+                          incomplete
+                        </dd>
+                      </>
+                    )}
+                  </dl>
+                </div>
+              )}
 
               <div className="block">
                 <h3>Summary</h3>

@@ -42,6 +42,39 @@ class PackRunForUiTests(unittest.TestCase):
             self.assertIn("cost", bundle)
             self.assertIn("timings", bundle)
             self.assertIn("trace", bundle)
+            self.assertIn("signals", bundle)
+            self.assertIn("flags", bundle["signals"])
+
+    def test_f40_signals_timeout_and_path_skip(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "run"
+            src.mkdir()
+            (src / "review.md").write_text(
+                "## Luffy Review — PR #1\n\n**Verdict:** COMMENT\n\n"
+                "### Summary\nPath-skip (F38): free skip.\n",
+                encoding="utf-8",
+            )
+            (src / "hermes-timeout.env").write_text(
+                "timed_out=1\ntimeout_seconds=1500\nstage=hermes-z\n",
+                encoding="utf-8",
+            )
+            (src / "ops-signals.env").write_text(
+                "PATH_SKIP=1\nsample=README.md\nglobs=docs\n",
+                encoding="utf-8",
+            )
+            (src / "meta.env").write_text("DIFF_TRUNCATED=true\n", encoding="utf-8")
+            out = Path(td) / "bundle.json"
+            r = _run(["--dir", str(src), "-o", str(out), "--host", "local"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            sig = json.loads(out.read_text())["signals"]
+            self.assertTrue(sig["timeout"])
+            self.assertEqual(sig["timeout_seconds"], 1500)
+            self.assertTrue(sig["path_skip"])
+            self.assertTrue(sig["diff_truncated"])
+            self.assertTrue(sig["any"])
+            self.assertIn("timeout", sig["flags"])
+            self.assertIn("path-skip", sig["flags"])
+            self.assertIn("diff-truncated", sig["flags"])
 
     def test_also_writes_second_path(self):
         with tempfile.TemporaryDirectory() as td:

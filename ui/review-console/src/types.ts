@@ -69,6 +69,20 @@ export interface RunBundle {
     total_seconds?: number;
     stages?: { name: string; seconds: number; exit_code: number }[];
   };
+  /** F40: ops gates — timeout, path-skip, budget, truncation */
+  signals?: {
+    any?: boolean;
+    flags?: string[];
+    timeout?: boolean;
+    timeout_seconds?: number | null;
+    timeout_stage?: string;
+    path_skip?: boolean;
+    path_skip_sample?: string;
+    path_skip_globs?: string;
+    diff_truncated?: boolean;
+    over_budget?: boolean;
+    budget_max_usd?: number;
+  };
   memory: {
     health?: Record<string, string>;
     after_md?: string | null;

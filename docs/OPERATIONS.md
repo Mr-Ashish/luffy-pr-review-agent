@@ -51,6 +51,20 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 29 (F38):** Path-glob free skip (opt-in docs-only / filtered PRs — no OpenRouter)
 - **Sprint 30 (F9c):** GitHub apply-suggestion blocks from `### Code suggestions`
 - **Sprint 31 (F39):** Modal host parity (path-skip + report-verdict on bit 3)
+- **Sprint 32 (F40):** Ops signals in run-bundle + Run Console overview
+
+## Ops signals in Run Console (F40)
+
+Every auto-pack (`run-bundle.json`) includes a `signals` object:
+
+| Flag | Source |
+|------|--------|
+| `timeout` | `hermes-timeout.env` / F36 review text |
+| `path_skip` | `ops-signals.env` / F38 stub text |
+| `over_budget` | review OVER BUDGET / F29 |
+| `diff_truncated` | `meta.env` DIFF_TRUNCATED / F27 |
+
+Console: header chips + Overview **Ops signals (F40)**.
 
 ## Modal host parity (F39)
 

@@ -382,6 +382,16 @@ def review_pr(
                 "None — free skip.",
             )
         )
+        # F40: durable signal for Run Console pack
+        try:
+            (out_dir / "ops-signals.env").write_text(
+                "PATH_SKIP=1\n"
+                f"sample={path_skip_info.get('sample') or ''}\n"
+                f"globs={path_skip_info.get('globs') or ''}\n",
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
         stub_script = pack / "scripts" / "write-failure-review.sh"
         review_path: Path | None = None
         if stub_script.is_file():
