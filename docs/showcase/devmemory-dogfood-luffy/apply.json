@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "path": "DEV.md",
+    "kind": "dev",
+    "action": "merge",
+    "section": "Design decisions",
+    "bytes": 16231,
+    "applied": true,
+    "unit_path": "."
+  }
+]

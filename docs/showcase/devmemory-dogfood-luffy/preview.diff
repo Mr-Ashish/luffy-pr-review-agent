@@ -1,0 +1,39 @@
+diff --git a/DEV.md b/DEV.md
+--- a/DEV.md
++++ b/DEV.md
+@@ -14,7 +14,6 @@
+ ## Design decisions
+ 
+ - **F8 prebaked runner:** `ensure_hermes` short-circuits when `LUFFY_HERMES_PREBAKED=1` or `/root/.hermes-pin`/`$HOME/.hermes-pin` exists and `hermes` is on PATH (image from `docker/luffy-runner/`). Workflow optional `container: vars.LUFFY_RUNNER_IMAGE`; Hermes Actions cache is skipped when prebaked is detected.
+-- Hermes install is pinned for repro (F7/F25): `scripts/hermes-pin.sh` is the **single source of truth** for `DEFAULT_HERMES_COMMIT`. Workflows pass through `vars.LUFFY_HERMES_COMMIT` only; when empty, **Resolve Hermes pin (F25)** writes `hermes-pin.sh default` into `$GITHUB_ENV` (empty GHA var must not float). Explicit `latest`/`main`/`floating` still float. `install.sh` args via `install-args`; cache key suffix `v4-<12-char-pin>`.
+ - Re-runs replace prior Luffy comments by deleting bodies matching the `<!-- luffy-review pr=N` marker before posting; set `LUFFY_REPLACE_PREVIOUS=0` to stack instead.
+ - Failure UX is always-publish: missing OpenRouter secret, Hermes/model failure, and job crash before the review file each still produce a PR comment (failure stub / low-confidence COMMENT verdict) rather than a silent red X.
+ 
+@@ -25,7 +24,6 @@
+ - The installer copies **itself** into the target pack (`install-luffy.sh` is in `RUNTIME_SCRIPTS`), so an installed repo can re-run the install/update from its own tree; executable bits are preserved per-file (`[[ -x "$from" ]] && chmod +x`).
+ - Installing the pack into the Luffy source tree itself (`SRC == DEST`) is refused unless `--force`, explicitly to avoid half-copies over the canonical tree.
+ 
+-- **F22/F23/F24 verdict signal** is a post-post decoration: `scripts/parse-verdict.py` reads `**Verdict:**` and maps APPROVE→`+1`/`success`/`APPROVE`, REQUEST CHANGES→`-1`/`failure`/`REQUEST_CHANGES`, COMMENT→`eyes`/`success`/`COMMENT`; pipeline_rc≠0 forces `-1`/`error`/`COMMENT`. `report-verdict.sh` applies soft reaction + commit status + **F24 dismiss prior** Luffy PR reviews + short formal PR Review (F23). Opt-outs: `LUFFY_COMMIT_STATUS=0`, `LUFFY_PR_REVIEW=0`; replace/dismiss share `LUFFY_REPLACE_PREVIOUS`.
+ - Telemetry is explicitly non-load-bearing: missing, empty, non-dict, or unparseable usage files are soft no-ops that exit 0, and `run-hermes-review.sh` calls the `append` step guarded by `[[ -f … ]]` with `|| notice "usage-summary append soft-failed"` — cost reporting can never fail a review.
+ - **F29 soft budget** (`LUFFY_MAX_COST_USD` / `--max-usd`) is opt-in and post-hoc: when estimated cost exceeds the max, footer/job-summary note ⚠️ OVER BUDGET and emit `::warning::`, but the pipeline still exits 0 (OpenRouter spend already happened; this is alerting, not a hard gate).
+ - Both the PR-comment footer and the job summary are fed from the same usage file so cost is visible without downloading an artifact; number formatting is deliberately lossy/human (tokens as `1.5k`/`10k`/`1.0M`, `n/a` when a field is absent or non-numeric, booleans rejected as numbers).
+@@ -33,6 +31,10 @@
+ - The reusable workflow declares **no `permissions:` block** — "Permissions come from the caller workflow/job", so every caller must grant `contents`/`pull-requests`/`issues`/`actions` write itself; a caller that forgets one fails at post/cache time, not at call time.
+ - Both reusable secrets (`OPENROUTER_API_KEY`, `LUFFY_HUB_TOKEN`) are declared `required: false` and callers are expected to use `secrets: inherit`; this keeps forks/unfunded repos from failing the `workflow_call` contract up front, with `LUFFY_HUB_TOKEN` falling back to `GITHUB_TOKEN`.
+ - `install-luffy.sh` preflights **both** F10 files (`.github/workflows/luffy-review-reusable.yml` and `pack/luffy-pr-review-caller.yml`) before copying anything, so a source tree missing the reusable pair dies before producing a half-install.
++
++- When a budget *is* enabled the cost footer changes shape in both directions: under budget appends ` · budget max $X`, over budget appends ` · ⚠️ OVER BUDGET (max $X)`. The presence of the `budget max` suffix is the cheapest way to confirm from a posted PR comment that the var was actually parsed.
++- `budget_status` compares strictly (`cost > max`), and returns `cost: None` when the usage file is missing/empty — so `over_budget` is `False` whenever cost telemetry is absent, keeping the missing-usage case a soft no-op consistent with the other modes.
++- Cost rendering is threshold-based, not fixed precision: `>= $0.01` → 2 decimals, `> 0` but smaller → 4 decimals, `0`/unknown → `$0`; cheap-model runs therefore show `$0.0034`-style values on the same line format.
+ 
+ ## Pitfalls
+ 
+@@ -64,8 +66,6 @@
+ - Hub-managed callers point at `…/luffy-review-reusable.yml@main`, i.e. unpinned by design — a broken hub `main` breaks every `--caller` target repo at once, and there is no per-target rollback short of editing that `uses:` ref.
+ 
+ - Pipeline failures map to `review_event=COMMENT` on purpose: an OpenRouter outage must not show as "Changes requested" on the product.
+-- F24 dismiss only covers GitHub-dismissible states (`APPROVED`, `CHANGES_REQUESTED`). Prior `COMMENTED` Luffy reviews (including APPROVE soft-fallback and pipeline-fail COMMENT) **cannot** be dismissed via the API and may stack in the Reviews panel — expected limitation, not a bug in `dismiss-prior-pr-reviews.sh`.
+-- F24 reuses the paginated JSON walk from F19 (`json.JSONDecoder().raw_decode`) because `gh api --paginate` concatenates arrays; a plain `json.loads` would miss all but the first page of reviews.
+ 
+ - Sparse-checkout path counting is fragile (F13): `grep -c ... || echo 0` emitted `0\n0` for an empty PR path list, which the workflow read as non-zero and fell back to a **full monorepo clone** (observed ~3.5 min on Odoo with `fetch-depth: 0`). Any change to `scripts/sparse-pr-paths.sh` must keep the count a single integer.
+ - The Hermes Actions cache must be saved **only on miss** with a stable key (F14); an earlier key including `run_id` thrashed the cache (never a hit, burned GH cache quota). Symptom to watch for: `cache write denied` even with `actions: write`.

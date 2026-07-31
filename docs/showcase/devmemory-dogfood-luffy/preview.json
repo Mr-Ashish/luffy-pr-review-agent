@@ -1,9 +1,16 @@
 {
   "stats": {
-    "files": 0,
-    "lines_added": 0,
-    "lines_removed": 0,
-    "changes": 0
+    "files": 1,
+    "lines_added": 4,
+    "lines_removed": 4,
+    "changes": 1
   },
-  "files": []
+  "files": [
+    {
+      "path": "DEV.md",
+      "is_new": false,
+      "lines_added": 4,
+      "lines_removed": 4
+    }
+  ]
 }

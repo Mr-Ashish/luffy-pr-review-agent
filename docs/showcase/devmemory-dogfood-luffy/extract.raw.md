@@ -1,7 +1,22 @@
 ```json
 {
-  "summary": "The session is the F26 default-model dogfood pass: OPERATIONS/ROI-FIXES/DEV excerpts restating that `DEFAULT_LUFFY_MODEL=anthropic/claude-opus-5` in `run-hermes-review.sh` is the single source of truth, that docs/.env.example were realigned, and that an empty `vars.LUFFY_MODEL` is left unset so the script default applies. All of this is already recorded in DEV.md (F26/F25 design-decision bullets) and USAGE.md (Setup optional variables), so no new durable knowledge was extracted.",
+  "summary": "The session is largely a restatement of already-indexed F29 soft-budget knowledge (OPERATIONS/USAGE/DEV/ROI-FIXES all already document LUFFY_MAX_COST_USD). The only non-duplicative durable detail is the concrete parsing/formatting contract inside usage-summary.py's budget path (disable vocabulary, under-budget footer shape, cost formatting thresholds).",
   "session_ids": ["dogfood-luffy-session"],
-  "units": []
+  "units": [
+    {
+      "kind": "dev",
+      "path": ".",
+      "action": "merge",
+      "section": "Design decisions",
+      "content": "- `parse_max_usd` (usage-summary.py) treats a wide disable vocabulary as \"budget off\": empty, `0`, `off`, `false`, `no`, `none`, `disabled`, any non-float string, and any value `<= 0` all return `None` — a typo'd `LUFFY_MAX_COST_USD` silently disables F29 rather than erroring, so a missing OVER BUDGET note is not proof the run was under budget.\n- When a budget *is* enabled the cost footer changes shape in both directions: under budget appends ` · budget max $X`, over budget appends ` · ⚠️ OVER BUDGET (max $X)`. The presence of the `budget max` suffix is the cheapest way to confirm from a posted PR comment that the var was actually parsed.\n- `budget_status` compares strictly (`cost > max`), and returns `cost: None` when the usage file is missing/empty — so `over_budget` is `False` whenever cost telemetry is absent, keeping the missing-usage case a soft no-op consistent with the other modes.\n- Cost rendering is threshold-based, not fixed precision: `>= $0.01` → 2 decimals, `> 0` but smaller → 4 decimals, `0`/unknown → `$0`; cheap-model runs therefore show `$0.0034`-style values on the same line format.",
+      "evidence": [
+        "\"\"\"Parse LUFFY_MAX_COST_USD / --max-usd. Empty/0/off/invalid → disabled.\"\"\"",
+        "if not s or s in {\"0\", \"off\", \"false\", \"no\", \"none\", \"disabled\"}",
+        "budget_note = f\" · budget max {format_cost_usd(bud['max_usd'])}\"",
+        "cost = None if usage is None else _num(usage.get(\"estimated_cost_usd\"))"
+      ],
+      "confidence": "medium"
+    }
+  ]
 }
 ```
