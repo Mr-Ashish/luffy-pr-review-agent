@@ -59,6 +59,75 @@ class HubIngestTests(unittest.TestCase):
             self.assertTrue(index.exists())
             self.assertIn("acme--widgets", index.read_text())
 
+    def test_ingest_tenant_layout_f65(self):
+        """F65: LUFFY_MEMORY_TENANT writes under memory/tenants/{t}/repos/{slug}."""
+        with tempfile.TemporaryDirectory() as td:
+            hub = Path(td)
+            payload = {
+                "run": {
+                    "schema_version": 1,
+                    "source_repo": "acme/widgets",
+                    "pr_number": "9",
+                    "run_id": "999",
+                    "run_attempt": "1",
+                    "trace_id": "pr9-run999-a1",
+                    "model": "openai/gpt-4.1-mini",
+                    "status": "success",
+                    "verdict": "COMMENT",
+                    "tenant": "team-alpha",
+                    "review_md": "## Review\n\n**Verdict:** COMMENT\n\n### Summary\nok\n",
+                    "memory_block": "## Review run pr9-run999-a1\n- Verdict: COMMENT\n",
+                    "timings": {},
+                    "meta": {},
+                }
+            }
+            env = os.environ.copy()
+            env["CLIENT_PAYLOAD"] = json.dumps(payload)
+            env["HUB_ROOT"] = str(hub)
+            env["LUFFY_MEMORY_TENANT"] = "team-alpha"
+            subprocess.check_call([sys.executable, str(INGEST)], env=env, cwd=str(hub))
+            mem = (
+                hub
+                / "memory"
+                / "tenants"
+                / "team-alpha"
+                / "repos"
+                / "acme--widgets"
+                / "MEMORY.md"
+            )
+            self.assertTrue(mem.exists(), f"missing tenant MEMORY at {mem}")
+            self.assertIn("COMMENT", mem.read_text())
+            # classic path must stay empty
+            classic = hub / "memory" / "repos" / "acme--widgets" / "MEMORY.md"
+            self.assertFalse(classic.exists())
+            index = json.loads((hub / "memory" / "index.json").read_text())
+            self.assertEqual(index.get("schema_version"), 2)
+            tenants = [r for r in index["repos"] if r.get("tenant") == "team-alpha"]
+            self.assertEqual(len(tenants), 1)
+            self.assertEqual(
+                tenants[0]["path"],
+                "memory/tenants/team-alpha/repos/acme--widgets",
+            )
+
+    def test_sanitize_tenant_helpers(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("hub_ingest_run", INGEST)
+        assert spec and spec.loader
+        hir = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(hir)
+
+        self.assertEqual(hir.sanitize_tenant(""), "")
+        self.assertEqual(hir.sanitize_tenant("  Team A!! "), "Team-A")
+        self.assertEqual(
+            hir.hub_repos_relpath("acme--widgets", "t1"),
+            "memory/tenants/t1/repos/acme--widgets",
+        )
+        self.assertEqual(
+            hir.hub_repos_relpath("acme--widgets", ""),
+            "memory/repos/acme--widgets",
+        )
+
     def test_build_payload_redacts_keys(self):
         with tempfile.TemporaryDirectory() as td:
             out = Path(td)

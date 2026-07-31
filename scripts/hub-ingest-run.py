@@ -4,6 +4,8 @@ Apply a luffy-run payload onto memory storage and prepare a commit.
 
 Layouts (LUFFY_INGEST_LAYOUT):
   hub   (default) — memory/repos/{owner}--{repo}/ under HUB_ROOT
+                    F65 multi-tenant: memory/tenants/{tenant}/repos/{slug}/
+                    when LUFFY_MEMORY_TENANT is set
   local           — {LUFFY_MEMORY_PATH}/ (default .luffy/) under LUFFY_MEMORY_ROOT
 
 Reads CLIENT_PAYLOAD JSON from env (object with key "run" or the run object itself).
@@ -32,6 +34,29 @@ def slugify_repo(source_repo: str) -> str:
     return f"{owner}--{name}"
 
 
+def sanitize_tenant(raw: str | None = None) -> str:
+    """F65: optional multi-tenant hub namespace (empty = classic shared layout)."""
+    t = (raw if raw is not None else os.environ.get("LUFFY_MEMORY_TENANT") or "").strip()
+    if not t:
+        return ""
+    t = re.sub(r"[^A-Za-z0-9._-]+", "-", t)
+    t = t.strip("-.")[:64]
+    return t
+
+
+def hub_repos_relpath(slug: str, tenant: str = "") -> str:
+    """Relative hub path for a repo memory root (no trailing slash)."""
+    if tenant:
+        return f"memory/tenants/{tenant}/repos/{slug}"
+    return f"memory/repos/{slug}"
+
+
+def hub_repo_dir(root: Path, slug: str, tenant: str = "") -> Path:
+    if tenant:
+        return root / "memory" / "tenants" / tenant / "repos" / slug
+    return root / "memory" / "repos" / slug
+
+
 def rotate_memory(text: str, max_bytes: int) -> str:
     data = text.encode("utf-8")
     if len(data) <= max_bytes:
@@ -51,7 +76,15 @@ def _safe_trace_id(trace_id: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "-", trace_id)
 
 
-def write_run_pack(repo_dir: Path, run: dict, source_repo: str, slug: str | None) -> tuple[Path, Path, dict]:
+def write_run_pack(
+    repo_dir: Path,
+    run: dict,
+    source_repo: str,
+    slug: str | None,
+    *,
+    tenant: str = "",
+    hub_rel: str | None = None,
+) -> tuple[Path, Path, dict]:
     """Write runs/{trace}/meta|review|summary + MEMORY.md under repo_dir. Returns (memory_file, run_dir, meta)."""
     pr = str(run.get("pr_number") or "unknown")
     trace_id = str(run.get("trace_id") or f"pr{pr}-run{run.get('run_id', 'unknown')}")
@@ -66,6 +99,7 @@ def write_run_pack(repo_dir: Path, run: dict, source_repo: str, slug: str | None
         "ingested_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source_repo": source_repo,
         "slug": slug,
+        "tenant": tenant or None,
         "trace_id": trace_id,
         "pr_number": pr,
         "run_id": run.get("run_id"),
@@ -78,6 +112,7 @@ def write_run_pack(repo_dir: Path, run: dict, source_repo: str, slug: str | None
         "meta": run.get("meta") or {},
         "schema_version": run.get("schema_version", 1),
         "layout": "local" if slug is None else "hub",
+        "feature": "F65" if tenant else None,
     }
 
     (run_dir / "meta.json").write_text(json.dumps(meta, indent=2) + "\n")
@@ -90,11 +125,12 @@ def write_run_pack(repo_dir: Path, run: dict, source_repo: str, slug: str | None
             memory_block if memory_block.endswith("\n") else memory_block + "\n"
         )
 
-    run_path_rel = (
-        f"{repo_dir.name}/runs/{safe_trace}"
-        if slug is None
-        else f"memory/repos/{slug}/runs/{safe_trace}"
-    )
+    if slug is None:
+        run_path_rel = f"{repo_dir.name}/runs/{safe_trace}"
+    else:
+        base = hub_rel or hub_repos_relpath(slug, tenant)
+        run_path_rel = f"{base}/runs/{safe_trace}"
+
     latest_payload = {
         "trace_id": trace_id,
         "pr_number": pr,
@@ -179,32 +215,60 @@ def merge_fp_rules_file(path: Path, incoming: dict | list) -> None:
     path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
 
 
+def _index_entry(path: Path, rel: str, *, tenant: str | None = None) -> dict:
+    latest: dict = {}
+    lf = path / "latest.json"
+    if lf.exists():
+        try:
+            latest = json.loads(lf.read_text())
+        except json.JSONDecodeError:
+            latest = {}
+    entry: dict = {
+        "slug": path.name,
+        "path": rel,
+        "latest": latest,
+    }
+    if tenant:
+        entry["tenant"] = tenant
+    return entry
+
+
 def update_hub_index(root: Path, meta: dict) -> None:
+    """Index classic memory/repos/* and F65 memory/tenants/*/repos/*."""
     index_path = root / "memory" / "index.json"
-    repos = []
+    repos: list[dict] = []
     repos_root = root / "memory" / "repos"
     if repos_root.exists():
         for p in sorted(repos_root.iterdir()):
             if p.is_dir() and (p / "MEMORY.md").exists():
-                latest = {}
-                lf = p / "latest.json"
-                if lf.exists():
-                    try:
-                        latest = json.loads(lf.read_text())
-                    except json.JSONDecodeError:
-                        latest = {}
-                repos.append(
-                    {
-                        "slug": p.name,
-                        "path": f"memory/repos/{p.name}",
-                        "latest": latest,
-                    }
-                )
+                repos.append(_index_entry(p, f"memory/repos/{p.name}"))
+
+    tenants_root = root / "memory" / "tenants"
+    if tenants_root.exists():
+        for tdir in sorted(tenants_root.iterdir()):
+            if not tdir.is_dir():
+                continue
+            t_repos = tdir / "repos"
+            if not t_repos.is_dir():
+                continue
+            tenant = tdir.name
+            for p in sorted(t_repos.iterdir()):
+                if p.is_dir() and (p / "MEMORY.md").exists():
+                    repos.append(
+                        _index_entry(
+                            p,
+                            f"memory/tenants/{tenant}/repos/{p.name}",
+                            tenant=tenant,
+                        )
+                    )
+
     index_path.parent.mkdir(parents=True, exist_ok=True)
     index_path.write_text(
         json.dumps(
             {
                 "updated_at": meta["ingested_at"],
+                "schema_version": 2,
+                "feature": "F65",
                 "repos": repos,
             },
             indent=2,
@@ -260,21 +324,35 @@ def main() -> int:
         print("LAYOUT=local")
         return 0
 
-    # hub layout (default)
+    # hub layout (default); F65 optional tenant namespace
     slug = slugify_repo(source_repo)
+    tenant = sanitize_tenant(
+        run.get("tenant") if isinstance(run.get("tenant"), str) else None
+    )
     root = Path(os.environ.get("HUB_ROOT", ".")).resolve()
-    repo_dir = root / "memory" / "repos" / slug
-    memory_file, run_dir, meta = write_run_pack(repo_dir, run, source_repo, slug=slug)
+    repo_dir = hub_repo_dir(root, slug, tenant)
+    hub_rel = hub_repos_relpath(slug, tenant)
+    memory_file, run_dir, meta = write_run_pack(
+        repo_dir,
+        run,
+        source_repo,
+        slug=slug,
+        tenant=tenant,
+        hub_rel=hub_rel,
+    )
     update_hub_index(root, meta)
 
     summary_path = root / ".luffy-ingest-summary.txt"
+    t_note = f" tenant={tenant}" if tenant else ""
     summary_path.write_text(
-        f"ingest {source_repo} PR #{pr} trace={trace_id} verdict={run.get('verdict')}\n"
+        f"ingest {source_repo} PR #{pr} trace={trace_id} verdict={run.get('verdict')}{t_note}\n"
     )
-    print(f"Wrote memory for {slug} trace={_safe_trace_id(trace_id)}")
+    print(f"Wrote memory for {hub_rel} trace={_safe_trace_id(trace_id)}")
     print(f"MEMORY={memory_file}")
     print(f"RUN_DIR={run_dir}")
     print("LAYOUT=hub")
+    if tenant:
+        print(f"TENANT={tenant}")
     return 0
 
 

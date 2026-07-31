@@ -29,7 +29,8 @@ from typing import Any
 import modal
 
 APP_NAME = "luffy-pr-review"
-LUFFY_MODAL_VERSION = "0.6.1-f41"
+# F66: Modal is the default prod live e2e host (lens auto + F65 tenant pass-through)
+LUFFY_MODAL_VERSION = "0.7.0-f66"
 HERMES_PIN = "53559aaf86b84dadae83cd9bb605ca476f9a0606"
 # OpenRouter — keep Modal compute cheap AND LLM spend low
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
@@ -330,14 +331,23 @@ def review_pr(
         "OPENROUTER_MODEL": model,
         "LUFFY_HERMES_PREBAKED": "1",
         "LUFFY_HERMES_COMMIT": HERMES_PIN,
-        "LUFFY_MEMORY_MODE": "local",
-        "LUFFY_LOCAL_PUBLISH": "0",  # skip git push (saves time + failures)
-        "LUFFY_HUB_PUBLISH": "0",
+        # F66 prod defaults: local memory in-container; hub opt-in via Modal secret/env
+        "LUFFY_MEMORY_MODE": os.environ.get("LUFFY_MEMORY_MODE", "local"),
+        "LUFFY_LOCAL_PUBLISH": os.environ.get("LUFFY_LOCAL_PUBLISH", "0"),
+        "LUFFY_HUB_PUBLISH": os.environ.get("LUFFY_HUB_PUBLISH", "0"),
+        # F65 multi-tenant hub namespace (empty = classic shared layout)
+        "LUFFY_MEMORY_TENANT": os.environ.get("LUFFY_MEMORY_TENANT", ""),
+        "LUFFY_HUB_REPO": os.environ.get(
+            "LUFFY_HUB_REPO", "Mr-Ashish/luffy-pr-review-agent"
+        ),
         "POST_COMMENT": "1" if post_comment else "0",
         "TRIGGER_COMMENT": "modal cheap e2e",
         "MAX_DIFF_BYTES": "200000",  # smaller context = fewer tokens
         "LUFFY_TOOLSETS": "terminal",
-        "LUFFY_HOST": "modal",  # F31 Run Console host label
+        "LUFFY_HOST": "modal",  # F31/F66 Run Console host label (prod default e2e)
+        # F63: domain pack auto-select from changed paths (default product)
+        "LUFFY_LENS_PACK": os.environ.get("LUFFY_LENS_PACK", "auto"),
+        "LUFFY_LENS_PACKS": os.environ.get("LUFFY_LENS_PACKS", "1"),
         # F36: wall-clock (script default 1500s if unset)
         "LUFFY_REVIEW_TIMEOUT_SECONDS": os.environ.get(
             "LUFFY_REVIEW_TIMEOUT_SECONDS", "1500"

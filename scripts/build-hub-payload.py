@@ -132,6 +132,11 @@ def main() -> int:
                 }
                 break
 
+    # F65: optional multi-tenant hub namespace (also honored via LUFFY_MEMORY_TENANT at ingest)
+    tenant = (os.environ.get("LUFFY_MEMORY_TENANT") or "").strip()
+    if tenant:
+        tenant = re.sub(r"[^A-Za-z0-9._-]+", "-", tenant).strip("-.")[:64]
+
     payload = {
         "schema_version": 1,
         "event": "luffy-run",
@@ -149,12 +154,14 @@ def main() -> int:
         "memory_block": memory_block,
         "timings": timings,
         "fp_rules": fp_rules,
+        "tenant": tenant or None,
         "meta": {
             "github_sha": os.environ.get("GITHUB_SHA"),
             "github_ref": os.environ.get("GITHUB_REF"),
             "github_event_name": os.environ.get("GITHUB_EVENT_NAME"),
             "started_at": os.environ.get("LUFFY_STARTED_AT"),
             "trace_meta": meta if isinstance(meta, dict) else {},
+            "memory_tenant": tenant or None,
         },
     }
 

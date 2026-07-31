@@ -10,6 +10,7 @@
 #   LUFFY_HUB_TOKEN    write token (or GH_TOKEN/GITHUB_TOKEN)
 #   LUFFY_HUB_MODE     auto|direct|dispatch  (default auto)
 #   LUFFY_MEMORY_MODE  local|hub|both  (default local — hub off unless hub|both or LUFFY_HUB_PUBLISH=1)
+#   LUFFY_MEMORY_TENANT F65 optional multi-tenant hub namespace (memory/tenants/{t}/repos/…)
 #   LUFFY_HUB_PUBLISH  1 to force hub publish; 0 to force skip
 #   OUT_DIR, REPO, PR_NUMBER, ...
 set -euo pipefail
@@ -104,6 +105,10 @@ publish_direct() {
     export CLIENT_PAYLOAD_FILE="$OUT_DIR/client_payload.json"
     export HUB_ROOT="$WORK/hub"
     export LUFFY_INGEST_LAYOUT=hub
+    # F65: pass tenant into ingest (also embedded in hub-payload.tenant)
+    if [[ -n "${LUFFY_MEMORY_TENANT:-}" ]]; then
+      export LUFFY_MEMORY_TENANT
+    fi
     python3 "$INGEST"
     git add memory/
     if git diff --cached --quiet; then
