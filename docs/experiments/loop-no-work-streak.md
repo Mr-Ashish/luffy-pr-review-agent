@@ -6,5 +6,5 @@ Track consecutive scheduled fires that found **no P0/P1** Luffy product work
 | Field | Value |
 |-------|------:|
 | streak | **0** |
-| last_fire | 2026-07-31 (F46 SOUL context scan H13) |
-| note | P0 SOUL phrasing + scanner shipped → streak stays 0. |
+| last_fire | 2026-08-01 (F62 FP resolve + memory) |
+| note | Product F62 shipped PR #12 → streak stays 0. |

@@ -33,7 +33,7 @@
 - **left_count:** 4
 - **progress_pct:** ~93%
 - **eta:** 2 fires
-- **active_worktrees:** f62-fp-resolve-memory
+- **active_worktrees:** none (F62 merged PR #12)
 - **federated_memory_note:** F62 local FP patterns; hub still deferred
 - **agent_design_note:** F62 pure regex I/O + MEMORY merge; prompt judgment only
 - **meta_loop_note:** F62 closes named product gap from milvus D1/D8
@@ -41,4 +41,4 @@
 
 ## Status line
 
-`features_built_count=19 types_built=agent_quality,product,memory left_count=4 progress_pct=93 eta=2fires active_worktrees=1 federated_memory_note=local_fp milvus_corpus=3`
+`features_built_count=19 types_built=agent_quality,product,memory left_count=4 progress_pct=93 eta=2fires active_worktrees=0 federated_memory_note=local_fp milvus_corpus=3`
