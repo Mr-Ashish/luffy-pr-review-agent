@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T15:20:53Z
+- **assembled_at:** 2026-07-31T15:26:18Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+19fbe7e feat(modal): F39 host parity — path-skip + report-verdict
+6f9a862 docs(knowledge): dogfood F9c suggestions + showcase
 b2d2f91 feat(product): F9c GitHub apply-suggestion blocks
 13ddcd0 docs(knowledge): dogfood F38 path-skip + showcase
 974ba39 feat(cost): F38 path-glob free skip for docs-only PRs
-9633311 docs(knowledge): dogfood F37 verdict labels + showcase
-bbe2cfa feat(ops): F37 verdict-aware PR labels
 ```
 
 ## tree (sample)
@@ -87,6 +87,7 @@ tests/test_hub_ingest.py
 tests/test_install_luffy.py
 tests/test_local_memory.py
 tests/test_memory_health.py
+tests/test_modal_parity.py
 tests/test_normalize_review.py
 tests/test_ops_footer.py
 tests/test_pack_run_for_ui.py
@@ -121,6 +122,7 @@ docs/experiments/2026-07-31-f35-ops-footer.md
 docs/experiments/2026-07-31-f36-review-timeout.md
 docs/experiments/2026-07-31-f37-verdict-labels.md
 docs/experiments/2026-07-31-f38-path-skip.md
+docs/experiments/2026-07-31-f39-modal-parity.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-f9c-suggestions.md
@@ -178,6 +180,7 @@ scripts/hermes-pin.sh
 scripts/hub-ingest-run.py
 scripts/install-luffy.sh
 scripts/memory-health.sh
+scripts/modal_parity.py
 scripts/normalize-review.py
 scripts/ops_footer.py
 scripts/pack-run-for-ui.py
@@ -219,9 +222,6 @@ assets/brand-options/hero-B-glass.svg
 assets/brand-options/hero-C-isometric.svg
 assets/brand-options/hero-D-mesh.svg
 assets/brand-options/hero-E-volumetric.svg
-assets/brand-options/hero-F-cyber.svg
-assets/brand-options/hero-G-mark.svg
-assets/brand-options/hero-H-cinematic.svg
 ```
 
 ## git diff
@@ -383,5 +383,6 @@ assets/brand-options/hero-H-cinematic.svg
 
 ## Debugging
 - If a live POST is rejected, reproduce locally first: `python3 scripts/webhook_auth.py sign` to mint an `X-Hub-Signature-256` over the exact raw body, then `python3 scripts/webhook_auth.py authorize` to see which branch fired, rather than guessing from the Modal response.
-- Modal cheap profile in use for these checks is version `0.5.1-cheap`; quote it when comparing behaviour across deployed revisions.
+- Modal profile version `0.6.0-f39` (F39 host parity): path-skip before clone + report-verdict after review. Quote it when comparing behaviour across deployed revisions.
+- Path-skip offline: `python3 scripts/modal_parity.py path-skip --path README.md --globs docs` → exit 2 means Modal would skip OpenRouter.
 

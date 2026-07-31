@@ -2,59 +2,49 @@
   "units": [
     {
       "kind": "dev",
-      "path": ".",
+      "path": "modal_app",
       "action": "merge",
-      "section": "Design decisions",
-      "content": "- **F9c apply-suggestion blocks:** `scripts/post-inline-comments.py` parses the review's `### Code suggestions` section (`#### title (`path`)` heading + ```diff``` fence) and re-emits each one as an inline comment whose body wraps the suggested code in a GitHub ```suggestion``` fence, so the author gets a one-click **Apply** button in Files changed instead of prose to retype.\n- Anchoring is derived, not trusted: the suggestion's `-` lines must match a **contiguous run of `+` lines in the PR diff for the same file**; a match yields `start_line`/`line` on side RIGHT (multi-line comment), and no match means the suggestion is dropped rather than anchored to a guessed line.\n- F9c rides the existing F9 rails deliberately — same soft-fail policy (never raises on network), same `LUFFY_INLINE_FIXTURE` offline path, same posted review, and comment bodies are tagged `<!-- luffy-suggestion -->` so they are distinguishable from F9/F9b finding notes.\n- Two independent kill switches by design: `LUFFY_INLINE_COMMENTS=0` disables *all* inline output (findings + suggestions), while `LUFFY_INLINE_SUGGESTIONS=0` disables only F9c and leaves F9/F9b finding notes running.",
+      "section": "Architecture",
+      "content": "- F39 makes `review_pr` (bit 3) a full three-stage host rather than comment-only: (1) list PR paths via the GitHub API and run the F38 path-skip preflight, (2) sparse checkout + `run-luffy-review.sh` (F36 timeout, F31 bundle), (3) `report-verdict.sh` for commit status, formal PR review, F9/F9c inline notes, and F37 verdict labels.\n- The cost gate is ordered deliberately: path-skip runs **before** clone and before any OpenRouter call, so a docs-only PR costs neither a checkout nor tokens (result payload notes `\"F39 path-skip: no OpenRouter / no clone\"`).\n- On a free skip the run is not silent — it still posts a stub COMMENT built by `path_skip_stub_summary()` and still invokes `report-verdict.sh` so labels/status appear (`skipped_paid: true`).\n- Shared logic lives in the pure helper `scripts/modal_parity.py` (`path_skip_preflight`, `path_skip_stub_summary`), which re-exports `decide`/`load_paths`/`parse_globs` from the hyphenated `scripts/path-skip-check.py` via `importlib.util.spec_from_file_location` — Modal and GHA therefore share one decision function instead of two copies.\n- Host contract knobs: `LUFFY_SKIP_PATH_GLOBS` (globs), `LUFFY_SKIP_PATHS_FORCE=1` (force skip), `LUFFY_REVIEW_TIMEOUT_SECONDS` (default 1500). App profile stamp `LUFFY_MODAL_VERSION = \"0.6.0-f39\"` is returned in every result payload.",
       "evidence": [
-        "F9c — ### Code suggestions → GitHub ```suggestion``` apply blocks (multi-line when the suggestion's `-` lines match PR `+` lines)",
-        "Mapping: suggestion `-` lines must match a contiguous run of PR `+` lines (same file). Multi-line → `start_line`/`line` on RIGHT. Soft-fail with F9.",
-        "body = f\"**Suggestion (F9c):** {title}\\n\\n```suggestion\\n{inner}\\n```\\n\\n<!-- luffy-suggestion -->\""
+        "F39: path-skip preflight (F38) BEFORE clone / OpenRouter spend",
+        "Shared pure helper: `scripts/modal_parity.py`.",
+        "F39: labels/status even on free skip (COMMENT)",
+        "LUFFY_MODAL_VERSION = \"0.6.0-f39\""
       ],
       "confidence": "high"
     },
     {
       "kind": "dev",
-      "path": ".",
+      "path": "modal_app",
       "action": "merge",
       "section": "Pitfalls",
-      "content": "- Suggestion volume is capped separately from findings: `LUFFY_SUGGESTION_MAX` (default 3) bounds apply blocks, `LUFFY_INLINE_MAX` (default 6) bounds finding notes — raising one does not raise the other, and a review with many `### Code suggestions` will silently post only the first N.\n- A well-formed suggestion can still vanish: because mapping requires the `-` lines to line up with contiguous PR `+` lines, a suggestion that rewrites *unchanged* context (or reflows lines) has no valid anchor and is skipped. Confirm with plan mode before assuming the poster failed.\n- `LUFFY_INLINE_SEVERITY` filtering applies to findings only — it is not a lever on F9c, so severity tuning will not suppress apply blocks.",
+      "content": "- The parity helpers are **soft-imported**: on ImportError `path_skip_preflight` / `path_skip_stub_summary` are set to `None` and the skip gate is simply bypassed, so a packaging regression that drops `scripts/modal_parity.py` (or breaks the importlib load of `scripts/path-skip-check.py`) degrades into paying for every review instead of erroring. Verify skip behaviour by asserting the result payload carries a non-null `path_skip` field, not just that the run succeeded.\n- The path listing step fails open too: an API error records `path_skip_info = {\"skip\": False, \"reason\": \"list_paths_error:…\"}` and continues to the paid path — check that `reason` when a docs-only PR unexpectedly costs OpenRouter spend.\n- Because the helper is imported by file path from the `scripts/` directory inside the packaged app, the F10 pack must ship both `scripts/modal_parity.py` and `scripts/path-skip-check.py`; shipping only one silently disables the gate.",
       "evidence": [
-        "`LUFFY_SUGGESTION_MAX` | `3` | Max suggestion comments per run",
-        "`LUFFY_INLINE_MAX` | `6` | Cap finding notes per run",
-        "LUFFY_INLINE_SEVERITY=critical,high   (comma list; empty = all)"
+        "path_skip_preflight = None  # type: ignore",
+        "path_skip_info = {\"skip\": False, \"reason\": f\"list_paths_error:{e}\"}",
+        "_ps_spec = importlib.util.spec_from_file_location(\"path_skip_check\", _SCRIPTS / \"path-skip-check.py\")"
       ],
-      "confidence": "high"
-    },
-    {
-      "kind": "dev",
-      "path": "agent",
-      "action": "merge",
-      "section": "Design decisions",
-      "content": "- The SOUL's *optional* **Code suggestions** field is now load-bearing downstream: F9c turns each `#### title (`path`)` + ```diff``` block into a GitHub apply-suggestion comment, so the section's shape (heading with backticked path, diff fence with `-`/`+` lines that mirror real PR lines) is a machine contract, not free-form prose.\n- Consequence for prompt/SOUL edits: changing how suggestions are formatted, or encouraging suggestions against unchanged context, degrades F9c to zero posted apply blocks without any error — the reviewer instruction \"only when you can show a concrete better snippet for **new** code\" is what keeps suggestions anchorable.",
-      "evidence": [
-        "**F9c** GitHub apply-suggestion blocks: parse `### Code suggestions` (`#### title (`path`)` + ```diff```), map the suggestion’s `-` lines onto contiguous PR `+` lines",
-        "**Code suggestions (optional):** only when you can show a concrete better snippet for new code."
-      ],
-      "confidence": "high"
+      "confidence": "medium"
     },
     {
       "kind": "usage",
-      "path": ".",
+      "path": "modal_app",
       "action": "merge",
-      "section": "Debugging",
-      "content": "- Verify F9c offline before blaming the GitHub API: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff` prints JSON with a suggestions count and `kind=suggestion` entries alongside the finding entries (`anchor`, `line_hint`). Zero suggestions with a non-empty `### Code suggestions` section means the `-` lines did not map onto contiguous PR `+` lines.\n- Disable just apply blocks while keeping inline findings: set repo variable `LUFFY_INLINE_SUGGESTIONS=0`. Tune volume with `LUFFY_SUGGESTION_MAX` (default 3).\n- Posted suggestion comments carry the `<!-- luffy-suggestion -->` marker — grep for it to tell F9c output apart from F9/F9b finding notes when auditing a PR.",
+      "section": "Common commands",
+      "content": "- Bit 3 cheap paid review worker (spends OpenRouter): `modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini`.\n- Bit 1 = smoke, bit 2 = clone target repo + list PRs: `modal run modal_app/app.py [--bit 2]`.\n- Unified host-agnostic entrypoint: `./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post` (also accepts `print` and `local` hosts).\n- Enable the F39 free skip on Modal by setting `LUFFY_SKIP_PATH_GLOBS=docs` in the Modal app env/secret; add `LUFFY_SKIP_PATHS_FORCE=1` to force a skip, and `LUFFY_REVIEW_TIMEOUT_SECONDS` to override the 1500s review timeout.",
       "evidence": [
-        "python3 scripts/post-inline-comments.py plan \\\n  --review review.md --diff pr.diff   # JSON: suggestions count + kind=suggestion",
-        "`LUFFY_INLINE_SUGGESTIONS` | `1` | `0` disables F9c (findings F9/F9b still run)"
+        "modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini",
+        "./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post",
+        "# Modal secret/app env: LUFFY_SKIP_PATH_GLOBS=docs"
       ],
       "confidence": "high"
     }
   ],
-  "summary": "Session documents F9c (GitHub apply-suggestion inline blocks) — a new capability layered on the existing F9/F9b inline-comment path: parsing the review's `### Code suggestions` section into ```suggestion``` fences, the diff-mapping constraint that gates them, the two new caps/opt-out vars, and how the optional SOUL 'Code suggestions' field became load-bearing. None of this appears in the existing claim index (which covers F9/F9b anchoring only).",
+  "summary": "The session documents F39 Modal host parity: modal_app.review_pr now runs the F38 path-skip preflight before sparse clone, passes the F36 timeout into the orchestrator, and calls report-verdict.sh after a paid review, with pure logic factored into scripts/modal_parity.py (which loads the hyphenated path-skip-check.py via importlib and is soft-imported so failures fail open).",
   "session_ids": [
     "dogfood-luffy-session"
   ],
   "model": "anthropic/claude-opus-5",
-  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T205053-188e15/extract.raw.md"
+  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T205618-16333b/extract.raw.md"
 }

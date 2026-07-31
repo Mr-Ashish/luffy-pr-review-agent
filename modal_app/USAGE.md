@@ -10,6 +10,9 @@
 - F33/F34 auth: set `LUFFY_WEBHOOK_TOKEN` (`Authorization: Bearer …`) and/or `LUFFY_WEBHOOK_SECRET` (GitHub `X-Hub-Signature-256`). Fail-closed without either unless `LUFFY_WEBHOOK_ALLOW_OPEN=1`. Helper: `python3 scripts/webhook_auth.py sign|authorize [--allow-open]`.
 - Unified trigger CLI wraps all hosts: `./scripts/trigger-review.sh print <repo> <pr>` (no spend, just prints the commands), `local` (delegates to `scripts/review-local.sh`), `modal` (bit-3 worker) — e.g. `./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post`.
 
+- Bit 1 = smoke, bit 2 = clone target repo + list PRs: `modal run modal_app/app.py [--bit 2]`.
+- Enable the F39 free skip on Modal by setting `LUFFY_SKIP_PATH_GLOBS=docs` in the Modal app env/secret; add `LUFFY_SKIP_PATHS_FORCE=1` to force a skip, and `LUFFY_REVIEW_TIMEOUT_SECONDS` to override the 1500s review timeout.
+
 ## Debugging
 
 - If a live POST is rejected, reproduce locally first: `python3 scripts/webhook_auth.py sign` to mint an `X-Hub-Signature-256` over the exact raw body, then `python3 scripts/webhook_auth.py authorize` to see which branch fired, rather than guessing from the Modal response.

@@ -20,9 +20,16 @@
 - Bit 4 (F32) splits the enqueue path into four units in `modal_app/app.py`: `parse_enqueue_payload` (normalize an incoming request into repo/pr/model/post_comment), `plan_enqueue` (pure plan, no side effects), `enqueue_review` (the spawn call), and `review_webhook` (the HTTP entrypoint). Parsing/planning are separable from spawning so the parser can be self-checked without any OpenRouter spend.
 - `review_webhook` accepts two payload shapes: the simple API `{repo, pr, model, post_comment}`, and a raw GitHub `issue_comment` event whose comment body matches `@luffy … review` and whose issue is a PR. There is no third shape — non-PR issue comments and non-matching bodies are not enqueued.
 
+- On a free skip the run is not silent — it still posts a stub COMMENT built by `path_skip_stub_summary()` and still invokes `report-verdict.sh` so labels/status appear (`skipped_paid: true`).
+- Shared logic lives in the pure helper `scripts/modal_parity.py` (`path_skip_preflight`, `path_skip_stub_summary`), which re-exports `decide`/`load_paths`/`parse_globs` from the hyphenated `scripts/path-skip-check.py` via `importlib.util.spec_from_file_location` — Modal and GHA therefore share one decision function instead of two copies.
+- Host contract knobs: `LUFFY_SKIP_PATH_GLOBS` (globs), `LUFFY_SKIP_PATHS_FORCE=1` (force skip), `LUFFY_REVIEW_TIMEOUT_SECONDS` (default 1500). App profile stamp `LUFFY_MODAL_VERSION = "0.6.0-f39"` is returned in every result payload.
+
 ## Pitfalls
 
 - **F33/F34:** production must set `LUFFY_WEBHOOK_SECRET` and/or `LUFFY_WEBHOOK_TOKEN` on the Modal function (e.g. fold into `luffy-github`). **F34 fail-closed:** if neither is set, requests are **denied** unless `LUFFY_WEBHOOK_ALLOW_OPEN=1` (dev escape only).
 - HMAC verification needs the **raw** request body (not a re-serialized dict). The webhook reads `await request.body()` before `json.loads`; do not switch back to a typed `item: dict` parameter or signatures will never match.
 - Two independent dry switches exist and they are easy to confuse: `LUFFY_WEBHOOK_DRY_RUN=1` makes the *deployed HTTP handler* plan-only, while the CLI `--bit 4` is dry by default and needs `--spawn` to actually enqueue. Setting one does not affect the other — a "dry" CLI run says nothing about the deployed webhook's behaviour.
 - Do not add work (Hermes, cloning, review assembly) to the HTTP handler even for convenience; the spawn-only rule is what keeps the request short-lived and the billed work inside `review_pr`.
+
+- The path listing step fails open too: an API error records `path_skip_info = {"skip": False, "reason": "list_paths_error:…"}` and continues to the paid path — check that `reason` when a docs-only PR unexpectedly costs OpenRouter spend.
+- Because the helper is imported by file path from the `scripts/` directory inside the packaged app, the F10 pack must ship both `scripts/modal_parity.py` and `scripts/path-skip-check.py`; shipping only one silently disables the gate.

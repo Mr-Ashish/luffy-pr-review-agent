@@ -1,31 +1,31 @@
-# Agent loop · `run-20260731T205053-188e15`
+# Agent loop · `run-20260731T205618-16333b`
 
 - **model:** `anthropic/claude-opus-5`
 - **hermes_rc:** 0
-- **units:** 4
-- **at:** 2026-07-31T15:21:37Z
+- **units:** 3
+- **at:** 2026-07-31T15:26:54Z
 
 ## Summary
 
-Session documents F9c (GitHub apply-suggestion inline blocks) — a new capability layered on the existing F9/F9b inline-comment path: parsing the review's `### Code suggestions` section into ```suggestion``` fences, the diff-mapping constraint that gates them, the two new caps/opt-out vars, and how the optional SOUL 'Code suggestions' field became load-bearing. None of this appears in the existing claim index (which covers F9/F9b anchoring only).
+The session documents F39 Modal host parity: modal_app.review_pr now runs the F38 path-skip preflight before sparse clone, passes the F36 timeout into the orchestrator, and calls report-verdict.sh after a paid review, with pure logic factored into scripts/modal_parity.py (which loads the hyphenated path-skip-check.py via importlib and is soft-imported so failures fail open).
 
 ## Usage
 
 ```json
 {
-  "estimated_cost_usd": 0.3189975,
+  "estimated_cost_usd": 0.300735,
   "cost_status": "estimated",
   "cost_source": "provider_models_api",
   "input_tokens": 2,
-  "output_tokens": 2976,
+  "output_tokens": 2714,
   "cache_read_tokens": 0,
-  "cache_write_tokens": 39134,
-  "reasoning_tokens": 268,
-  "total_tokens": 42112,
+  "cache_write_tokens": 37260,
+  "reasoning_tokens": 337,
+  "total_tokens": 39976,
   "api_calls": 1,
   "model": "anthropic/claude-opus-5",
   "provider": "openrouter",
-  "session_id": "20260731_205054_6f29a5",
+  "session_id": "20260731_205619_192979",
   "completed": true,
   "failed": false,
   "service_tier": null
@@ -36,11 +36,11 @@ Session documents F9c (GitHub apply-suggestion inline blocks) — a new capabili
 
 ```json
 {
-  "assemble_s": 0.145,
-  "extract_s": 40.185,
+  "assemble_s": 0.11,
+  "extract_s": 35.342,
   "normalize_s": 0.002,
-  "apply_s": 3.651,
-  "total_s": 43.987
+  "apply_s": 0.171,
+  "total_s": 35.629
 }
 ```
 

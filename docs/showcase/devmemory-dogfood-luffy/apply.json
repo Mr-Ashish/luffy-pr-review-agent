@@ -1,38 +1,29 @@
 [
   {
-    "path": "DEV.md",
+    "path": "modal_app/DEV.md",
     "kind": "dev",
     "action": "merge",
-    "section": "Design decisions",
-    "bytes": 22051,
+    "section": "Architecture",
+    "bytes": 4648,
     "applied": true,
-    "unit_path": "."
+    "unit_path": "modal_app"
   },
   {
-    "path": "DEV.md",
+    "path": "modal_app/DEV.md",
     "kind": "dev",
     "action": "merge",
     "section": "Pitfalls",
-    "bytes": 22768,
+    "bytes": 5126,
     "applied": true,
-    "unit_path": "."
+    "unit_path": "modal_app"
   },
   {
-    "path": "agent/DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Design decisions",
-    "bytes": 3792,
-    "applied": true,
-    "unit_path": "agent"
-  },
-  {
-    "path": "USAGE.md",
+    "path": "modal_app/USAGE.md",
     "kind": "usage",
     "action": "merge",
-    "section": "Debugging",
-    "bytes": 18282,
+    "section": "Common commands",
+    "bytes": 2022,
     "applied": true,
-    "unit_path": "."
+    "unit_path": "modal_app"
   }
 ]

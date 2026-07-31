@@ -7,153 +7,77 @@
 
 ## Transcript / notes
 
-# Luffy dogfood — F9c apply-suggestion blocks
+# Luffy dogfood — F39 Modal host parity
 
-## ARCHITECTURE
-# Luffy architecture
+## ARCHITECTURE Modal section
+## Modal host (F39)
 
-## One sentence
+`modal_app.review_pr` is a first-class kitchen (not comment-only):
 
-Luffy is a gated GitHub Actions control plane that assembles a bounded PR context, runs Hermes Agent + OpenRouter with a growing `MEMORY.md`, validates Markdown against a fixed contract, and always publishes the result as a PR comment.
+1. List PR paths via API → optional F38 path-skip (no clone / no OpenRouter)
+2. Sparse checkout → `run-luffy-review.sh` (F36 timeout, F31 bundle)
+3. Post PR comment → `report-verdict.sh` (F22 status, F23 review, F9/F9c inline, F37 labels)
 
-## Flow
-
-```text
-@luffy review this pr
-    → gate + concurrency + cooldown (F19)
-    → sparse path list → path-glob free skip (F38, opt-in)
-    → dual checkout (luffy/ + workspace/)
-    → preload MEMORY (.luffy/ first, hub opt-in)
-    → assemble-context → hermes -z (F36 timeout) → normalize → PR comment
-    → verdict signals (F22/F23/F9/F37) → distill MEMORY.md → save-trace
-    → publish slim pack → target .luffy/ (default)
-    → hub memory only if LUFFY_MEMORY_MODE=hub|both or LUFFY_HUB_PUBLISH=1
-```
-
-## Stages
-
-| Stage | Script | Responsibility |
-|-------|--------|----------------|
-| Assemble | `scripts/assemble-context.sh` | `gh pr` meta + diff + prompt (no LLM) |
-| Review | `scripts/run-hermes-review.sh` + `run-with-timeout.py` | Hermes one-shot on `WORKSPACE_ROOT`; F36 wall-clock kill (default 1500s) |
-| Normalize | `scripts/normalize-review.py` | Contract, fences, size, HTML marker, secret redact |
-| Cost UX | `scripts/usage-summary.py` | Append cost/tokens footer + job-summary from `hermes-usage.json` (F21) |
-| Verdict signal | `scripts/parse-verdict.py` + `report-verdict.sh` | Map verdict → reaction + commit status `luffy/review` + job summary (F22) + F23 PR review + F9 inline + F37 PR labels |
-| Inline notes | `scripts/post-inline-comments.py` | Path-anchored findings (F9/F9b) + Code suggestions → ```suggestion``` apply blocks (F9c) |
-| Distill | `scripts/distill-memory.sh` | Append structured memory block |
-| Post | `scripts/post-review-comment.sh` | Delete prior `<!-- luffy-review pr=N` comments, then `gh pr comment` |
-| Orchestrate | `scripts/run-luffy-review.sh` | Compose stages + timings |
-| Trace | `scripts/save-trace.sh` | Redacted per-run package → Actions artifact (fat; not committed) |
-| Local memory | `scripts/publish-run-local.sh` + `hub-ingest-run.py` layout=local | Commit target `.luffy/` slim pack (F28 default) |
-| Hub publish | `scripts/publish-run-to-hub.sh` | Opt-in hub clone/ingest or `repository_dispatch` |
-| Hub ingest | `scripts/hub-ingest-run.py` | Hub: `memory/repos/{slug}/…`; local: `.luffy/` |
-
-## Dual workspace
-
-| Path | Contents |
-|------|----------|
-| `luffy/` | Agent SOUL, prompts, scripts (from default branch) |
-| `workspace/` | PR head only (code under review) |
-| `.luffy-hermes-home/` | Hermes config + growing memory (cached) |
-| target `.luffy/` | **Repo-local** MEMORY + slim run history (committed; F28 SoT) |
-
-## Memory layers (F28)
-
-1. **L0** — single-run Hermes home  
-2. **L1** — preload from target **`.luffy/MEMORY.md`** (default branch via API; sparse PR workspace is not enough)  
-3. **L2** — Actions artifacts (fat traces + debug; 14–90 day expiry OK)  
-4. **L3** — opt-in hub `memory/repos/{slug}/` when `LUFFY_MEMORY_MODE=hub|both` or `LUFFY_HUB_PUBLISH=1`  
-5. **Distill** — explicit append after each review (then local publish)  
-
-Layout under the target repo:
-
-```text
-.luffy/
-  MEMORY.md
-  runs/{trace_id}/
-    meta.json
-    review.md
-    summary.md
-```
-
-Vars: `LUFFY_MEMORY_MODE` (`local` default | `hub` | `both`), `LUFFY_MEMORY_PATH` (default `.luffy`), `LUFFY_HUB_PUBLISH` (force hub on/off).
-
-**F30 health:** each run writes `.luffy-out/memory-health.env` (`MEMORY_SOURCE`, `LOCAL_PUBLISH`, `HUB_PUBLISH`). Job summary **Memory health** + `::warning::` when local publish fails (branch protection / token). Review still succeeds — learning loss is no longer silent.
-
-## Security
-
-- PR body/diff treated as untrusted data  
-- Least-privilege token permissions (`contents: write` also enables local `.luffy` push)  
-- Secrets only via env / Hermes `.env` (mode 0600)  
-- Slim git history only — full hermes logs stay in artifacts, not git  
-
+Shared pure helper: `scripts/modal_parity.py`.
 
 ## Packaging (F10)
 
-| Mode | What lives on the target | Runtime source |
-|------|--------------------------|----------------|
-| **Caller** (`install-luffy.sh --caller`) | Thin `.github/workflows/luffy-pr-review.yml` only | Hub `agent/`+`scripts/` via `luffy-review-reusable.yml@main` |
-| **Pack** (default install) | `agent/`, runtime `scripts/`, thin caller + local copy of reusable | Target default branch |
+## OPERATIONS F39
+## Modal host parity (F39)
 
-Hub implementation file: `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`, inputs `luffy_repository` + `luffy_ref`).
+`modal_app` `review_pr` (bit 3) now mirrors GHA cost/trust gates:
 
-## Run console (ops UI)
+| Gate | Behaviour on Modal |
+|------|--------------------|
+| F38 path-skip | Before clone; env `LUFFY_SKIP_PATH_GLOBS`; force `LUFFY_SKIP_PATHS_FORCE=1` |
+| F36 timeout | `LUFFY_REVIEW_TIMEOUT_SECONDS` (default 1500) |
+| F22–F37 / F9 | `report-verdict.sh` after review (status, PR review, inline, labels) |
 
-Luffy’s PR comment remains Markdown. The **Run Console** (`ui/review-console/`) is the full-run ops surface (Impeccable Operate / Neo kinpaku):
+Offline helper: `python3 scripts/modal_parity.py path-skip …`. App version `0.6.0-f39`.
 
-```text
-review pipeline (GHA / Modal / local)
-    → F31 soft stage pack_ui_bundle
-    → .luffy-out/run-bundle.json (+ traces/<id>/run-bundle.json)
-    → Vite app Load bundle → tabs: PR · result · findings · diff · trace · loop · cost · memory · artifacts
-```
-
-Host label: auto (`GITHUB_ACTIONS` → `gha`, Modal env → `modal`, else `local`) or `LUFFY_HOST`. Manual: `scripts/pack-run-for-ui.py`. Optional OpenUI Lang export: `scripts/review-to-openui.py`. See [OPENUI-INTEGRATION.md](OPENUI-INTEGRATION.md).
-
-**F32 trigger:** `scripts/trigger-review.sh` (`print|local|modal`) + console **Run** tab. Modal bit 4 webhook/`enqueue_review` only **spawns** `review_pr` (never Hermes in the doorbell).
-
-## OPERATIONS F9c
 ## Apply-suggestion blocks (F9c)
 
-When the review includes `### Code suggestions` with a ```diff``` fence, Luffy posts
-inline comments containing a GitHub ```suggestion``` block so authors can **Apply**
-in the Files changed UI.
+## MODAL F39
+### F39 host parity (bit 3)
 
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `LUFFY_INLINE_SUGGESTIONS` | `1` | `0` disables F9c (findings F9/F9b still run) |
-| `LUFFY_SUGGESTION_MAX` | `3` | Max suggestion comments per run |
+Modal is no longer comment-only:
 
-Mapping: suggestion `-` lines must match a contiguous run of PR `+` lines (same
-file). Multi-line → `start_line`/`line` on RIGHT. Soft-fail with F9.
+1. **F38 path-skip** — if `LUFFY_SKIP_PATH_GLOBS` is set and every changed path matches, skip clone + Hermes; post stub + labels (`skipped_paid: true`).
+2. **F36 timeout** — `LUFFY_REVIEW_TIMEOUT_SECONDS` (default 1500) passed into the orchestrator.
+3. **F22–F37 / F9** — after a paid review, `report-verdict.sh` posts commit status, formal PR review, inline notes/suggestions, and verdict labels.
 
 ```bash
-python3 scripts/post-inline-comments.py plan \
-  --review review.md --diff pr.diff   # JSON: suggestions count + kind=suggestion
+# Self-check path-skip offline
+python3 scripts/modal_parity.py path-skip --path README.md --globs docs   # exit 2
+# Modal secret/app env: LUFFY_SKIP_PATH_GLOBS=docs
 ```
 
-## Path-glob free skip (F38)
-## Inline comments (F9 / F9b / F9c)
+## Commands
 
-After the formal F23 review, Luffy may post a second COMMENT review with **inline** notes. Anchors (F9b):
+```bash
+# Bit 1
+modal run modal_app/app.py
 
-1. `` `path:LINE` `` / line hint from the finding when LINE is a changed `+` line → **exact**
-2. else nearest changed line on that file → **nearest**
-3. else first added line → **first** (F9)
+# Bit 2 (clone Mr-Ashish/odoo + list PRs)
+modal run modal_app/app.py --bit 2
 
-**F9c:** also posts apply-suggestion blocks from `### Code suggestions` (see section above).
+# Bit 3 — cheap review worker (OpenRouter spend)
+modal run modal_app/app.py --bit 3 --repo Mr-Ashish/odoo --pr 3 --model openai/gpt-4.1-mini
 
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `LUFFY_INLINE_COMMENTS` | `1` | `0`/`off` disables all inline (findings + suggestions) |
-| `LUFFY_INLINE_SEVERITY` | `critical,high,blocking` | Comma list; `all` = no filter |
-| `LUFFY_INLINE_MAX` | `6` | Cap finding notes per run |
-| `LUFFY_INLINE_SUGGESTIONS` | `1` | F9c apply blocks |
-| `LUFFY_SUGGESTION_MAX` | `3` | Cap suggestion notes per run |
+# Bit 4 — dry enqueue plan (no Hermes spend; parser self-check)
+modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3
+# Bit 4 — actually spawn worker
+modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3 --spawn
 
-Offline plan: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff` (see `anchor` / `line_hint` / `kind` in JSON).
+# Unified CLI (also print|local)
+./scripts/trigger-review.sh print Mr-Ashish/odoo 3
+./scripts/trigger-review.sh modal Mr-Ashish/odoo 3 --cheap --no-post
 
-## Repo-local memory (F28 default)
+# Deploy — public webhook URL for review_webhook
+modal deploy modal_app/app.py
+```
+
+### Webhook (bit 4 + F33 auth)
 
 ## SOUL
 # Luffy — PR Review Agent
@@ -213,7 +137,7 @@ Respond with **only** a single Markdown document suitable for a GitHub PR commen
 No preamble (“Sure!”), no tool chatter, no wrapping the entire review in a code fence.
 Follow the template in the user prompt exactly.
 
-## Scripts
+## Scripts inventory
 __pycache__
 apply-verdict-labels.py
 assemble-context.sh
@@ -229,6 +153,7 @@ hermes-pin.sh
 hub-ingest-run.py
 install-luffy.sh
 memory-health.sh
+modal_parity.py
 normalize-review.py
 ops_footer.py
 pack-run-for-ui.py
@@ -252,54 +177,79 @@ usage-summary.py
 webhook_auth.py
 write-failure-review.sh
 
-## ROI Sprint 30
-### Sprint 30 (shipped)
+## ROI Sprint 31
+### Sprint 31 (shipped)
 
-**F9c** GitHub apply-suggestion blocks: parse `### Code suggestions` (`#### title (`path`)` + ```diff```), map the suggestion’s `-` lines onto contiguous PR `+` lines, post multi-line inline comments with a ```suggestion``` fence (one-click apply in Files changed). Cap `vars.LUFFY_SUGGESTION_MAX` (default 3); opt-out `vars.LUFFY_INLINE_SUGGESTIONS=0`. Shares F9 soft-fail + fixture path.
+**F39** Modal host parity: `review_pr` runs F38 path-skip **before** sparse clone (env `LUFFY_SKIP_PATH_GLOBS`); on skip posts stub COMMENT + report-verdict labels (no OpenRouter). After a paid run, calls `report-verdict.sh` for commit status / PR review / inline / labels. Sets `LUFFY_REVIEW_TIMEOUT_SECONDS` (F36). Helper `scripts/modal_parity.py`. App version `0.6.0-f39`.
 
 ### readme-kit (shipped)
 
-## post-inline F9c headers
+## modal_parity header
 #!/usr/bin/env python3
-"""F9/F9b/F9c: post path-anchored inline GitHub PR review comments.
+"""F39: Modal host parity helpers (path-skip preflight + verdict signals).
 
-Maps Key findings (+ Blocking bullets) onto lines in pr.diff:
-  F9  — first *added* line per file (fallback)
-  F9b — prefer path:line / L### hints when that line is a changed `+` line
-        (else nearest changed line, else first)
-  F9c — ### Code suggestions → GitHub ```suggestion``` apply blocks
-        (multi-line when the suggestion's `-` lines match PR `+` lines)
+Pure functions used by modal_app/review_pr so Modal runs the same cost/trust
+gates as GHA (F38 path skip before clone, F22–F37/F9 after review).
 
-Usage:
-  python3 scripts/post-inline-comments.py plan \\
-    --review review.md --diff pr.diff
-
-  python3 scripts/post-inline-comments.py post \\
-    --review review.md --diff pr.diff --repo owner/name --pr 3 --commit SHA
-
-Env:
-  LUFFY_INLINE_COMMENTS=1 (default) | 0/off to skip
-  LUFFY_INLINE_MAX=6
-  LUFFY_INLINE_SEVERITY=critical,high   (comma list; empty = all)
-  LUFFY_INLINE_SUGGESTIONS=1 (default) | 0/off to skip F9c
-  LUFFY_SUGGESTION_MAX=3
-  GH_TOKEN / GITHUB_TOKEN for post
-  LUFFY_INLINE_FIXTURE=path.json  — write planned payload instead of API (tests)
-
-Soft-fail policy: never raises for network; plan mode is pure offline.
+Usage (offline):
+  python3 scripts/modal_parity.py path-skip --path README.md --globs docs
+  python3 scripts/modal_parity.py path-skip --paths-file pr-paths.txt
 """
 
 from __future__ import annotations
-2:"""F9/F9b/F9c: post path-anchored inline GitHub PR review comments.
-8:  F9c — ### Code suggestions → GitHub ```suggestion``` apply blocks
-22:  LUFFY_INLINE_SUGGESTIONS=1 (default) | 0/off to skip F9c
-342:    # F9c: GitHub apply-suggestion blocks from ### Code suggestions
-353:# F9c: Code suggestions → GitHub ```suggestion``` apply blocks
-379:def parse_code_suggestions(review_md: str) -> list[dict[str, Any]]:
-536:    body = f"**Suggestion (F9c):** {title}\n\n```suggestion\n{inner}\n```\n\n<!-- luffy-suggestion -->"
-540:def plan_suggestions(
-546:    """Plan F9c multi-line suggestion comments."""
-653:        bits.append(f"{n_sug} apply-suggestion(s) (F9c)")
-655:        "## 🏴‍☠️ Luffy inline findings (F9/F9c)\n\n"
-669:        # F9c multi-line
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Any
+
+# Import path-skip pure API (hyphenated filename)
+_SCRIPTS = Path(__file__).resolve().parent
+import importlib.util
+
+_ps_spec = importlib.util.spec_from_file_location(
+    "path_skip_check",
+    _SCRIPTS / "path-skip-check.py",
+)
+assert _ps_spec and _ps_spec.loader
+_ps = importlib.util.module_from_spec(_ps_spec)
+_ps_spec.loader.exec_module(_ps)
+decide = _ps.decide
+load_paths = _ps.load_paths
+parse_globs = _ps.parse_globs
+
+
+def path_skip_preflight(
+    paths: list[str],
+    *,
+    globs_raw: str | None = None,
+
+## modal_app version
+32:LUFFY_MODAL_VERSION = "0.6.0-f39"
+89:        path_skip_preflight,
+90:        path_skip_stub_summary,
+94:    path_skip_preflight = None  # type: ignore
+95:    path_skip_stub_summary = None  # type: ignore
+123:        "version": LUFFY_MODAL_VERSION,
+165:        "version": LUFFY_MODAL_VERSION,
+352:    # F39: path-skip preflight (F38) BEFORE clone / OpenRouter spend
+354:    path_skip_info: dict[str, Any] | None = None
+359:        path_skip_info = {"skip": False, "reason": f"list_paths_error:{e}"}
+366:    if path_skip_preflight is not None and pr_paths is not None:
+367:        path_skip_info = path_skip_preflight(
+373:    if path_skip_info and path_skip_info.get("skip"):
+375:            path_skip_stub_summary(
+376:                str(path_skip_info.get("sample") or ""),
+377:                str(path_skip_info.get("globs") or ""),
+379:            if path_skip_stub_summary
+381:                "Path-skip: all paths matched globs (F39 Modal).",
+418:            # F39: labels/status even on free skip (COMMENT)
+419:            if (pack / "scripts" / "report-verdict.sh").is_file():
+423:                        str(pack / "scripts" / "report-verdict.sh"),
+438:            "version": LUFFY_MODAL_VERSION,
+442:            "path_skip": path_skip_info,
+449:            "note": "F39 path-skip: no OpenRouter / no clone",
+488:    # F39: GHA-parity signals — commit status, PR review, inline, labels
 
