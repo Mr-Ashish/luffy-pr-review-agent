@@ -32,6 +32,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 10 (F10):** reusable `workflow_call` job + `install-luffy.sh --caller` hub-managed thin install
 - **Sprint 11 (F22):** verdict-aware reaction + commit status `luffy/review` + job-summary verdict section
 - **Sprint 12 (F23):** formal GitHub PR Review event from verdict (Reviews panel); opt-out `vars.LUFFY_PR_REVIEW=0`
+- **Sprint 13 (F24):** dismiss prior Luffy PR reviews on re-run (APPROVED/CHANGES_REQUESTED); shares `LUFFY_REPLACE_PREVIOUS`
 
 ## Central hub memory (cross-repo)
 
@@ -106,6 +107,7 @@ Requires: `gh` authenticated, network for Hermes install + OpenRouter.
 - **Per-PR cooldown (F19):** default 900s after a *successful* Luffy comment — skip paid run (rocket reaction). Override `vars.LUFFY_COOLDOWN_SECONDS` (`0`/`off` disables). Bypass: `@luffy review force` or workflow_dispatch
 - **Cost visibility (F21):** each successful review footer includes estimated OpenRouter cost + token/API counts from `hermes-usage.json`; the Actions job summary has a matching **Luffy cost / usage** section (no artifact download required)
 - **Formal PR Review (F23):** after the full issue comment, Luffy also submits a short Pull Request Review with event `APPROVE` / `REQUEST_CHANGES` / `COMMENT` so the Reviews panel matches the verdict. Opt-out: `vars.LUFFY_PR_REVIEW=0`. APPROVE may soft-fall back to COMMENT (self-review / org policy).
+- **Dismiss prior PR reviews (F24):** before a new F23 review, prior Luffy reviews with marker `<!-- luffy-pr-review pr=N` in state APPROVED/CHANGES_REQUESTED are dismissed (soft). Controlled by `LUFFY_REPLACE_PREVIOUS` (same as comment replace). COMMENTED reviews cannot be dismissed by GitHub and may remain.
 
 ## Memory
 

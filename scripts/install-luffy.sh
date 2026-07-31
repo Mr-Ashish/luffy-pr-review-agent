@@ -101,6 +101,7 @@ RUNTIME_SCRIPTS=(
   build-hub-payload.py
   capture-hermes-loop.py
   cooldown-check.sh
+  dismiss-prior-pr-reviews.sh
   distill-memory.sh
   hermes-pin.sh
   hub-ingest-run.py

@@ -69,7 +69,9 @@ After each run Luffy derives a **verdict signal** from the posted review body:
 | Pipeline failed | `-1` | `error` | `COMMENT` (not REQUEST_CHANGES) |
 
 - CLI: `python3 scripts/parse-verdict.py review.md --pipeline-rc 0` (kv lines; includes `review_event=`)
+- Wrapper: `scripts/report-verdict.sh review.md [pipeline_rc]` (reaction + status + F23 PR review + F24 dismiss-prior)
 - Disable commit status: repo var `LUFFY_COMMIT_STATUS=0`
 - Disable formal PR review: repo var `LUFFY_PR_REVIEW=0`
 - Status context override: `LUFFY_STATUS_CONTEXT` (default `luffy/review`)
 - Full Markdown stays on the **issue comment** (F12 replace). F23 posts a short Reviews-panel review with marker `<!-- luffy-pr-review pr=N`.
+- **F24:** re-runs dismiss prior Luffy APPROVED/CHANGES_REQUESTED reviews with that marker before posting a new one (`scripts/dismiss-prior-pr-reviews.sh`). Set `LUFFY_REPLACE_PREVIOUS=0` to keep history (also disables F12 comment delete). Offline fixture: `LUFFY_PR_REVIEWS_FIXTURE=/path/reviews.json`.

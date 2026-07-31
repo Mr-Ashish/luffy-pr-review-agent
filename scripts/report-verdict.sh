@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# F22/F23: Apply verdict-aware done signals after a Luffy run.
+# F22/F23/F24: Apply verdict-aware done signals after a Luffy run.
 #
 # - Parses review.md via parse-verdict.py
 # - Writes key=value to GITHUB_OUTPUT (when set)
@@ -7,6 +7,7 @@
 # - Optionally reacts to the trigger comment (REACTION_COMMENT_ID)
 # - Optionally posts a commit status on the PR head SHA (LUFFY_COMMIT_STATUS)
 # - F23: Optionally submits a formal PR Review event (LUFFY_PR_REVIEW)
+# - F24: Dismisses prior Luffy PR reviews (same marker) before posting a new one
 #
 # Usage:
 #   ./scripts/report-verdict.sh [review.md] [pipeline_rc]
@@ -20,6 +21,7 @@
 #   LUFFY_COMMIT_STATUS — 1 (default) to post status; 0/off to skip
 #   LUFFY_STATUS_CONTEXT — default "luffy/review"
 #   LUFFY_PR_REVIEW — 1 (default) to submit formal PR review; 0/off to skip
+#   LUFFY_REPLACE_PREVIOUS — 1 (default) also dismisses prior F23 PR reviews
 #   HEAD_SHA — optional; resolved via gh pr view when empty
 #   OUT_DIR — fallback locate review-*.md
 set -euo pipefail
@@ -27,6 +29,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT/.luffy-out}"
 PARSE="$ROOT/scripts/parse-verdict.py"
+DISMISS="$ROOT/scripts/dismiss-prior-pr-reviews.sh"
 
 log() { echo "$*" >&2; }
 notice() { echo "::notice::$*" >&2; log "$*"; }
@@ -164,6 +167,7 @@ fi
 # Soft; disable with LUFFY_PR_REVIEW=0. Full Markdown stays on the issue comment
 # (F12 replace path); this is a short verdict signal + merge UX.
 # APPROVE can be rejected by GitHub (self-review / org policy) → fall back to COMMENT.
+# F24: dismiss prior Luffy reviews (APPROVED/CHANGES_REQUESTED) first when replace on.
 # ---------------------------------------------------------------------------
 case "${PR_REVIEW_ON}" in
   0|false|FALSE|off|OFF|no|NO) PR_REVIEW_ON=0 ;;
@@ -178,6 +182,13 @@ if [[ "$PR_REVIEW_ON" == "1" && -n "$REPO" && -n "${PR_NUMBER:-}" && -n "$TOKEN"
     HEAD_SHA="$(
       gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid' 2>/dev/null || true
     )"
+  fi
+
+  # F24: clear prior Luffy Reviews-panel rows (soft)
+  if [[ -x "$DISMISS" ]]; then
+    bash "$DISMISS" "$PR_NUMBER" || log "warn: F24 dismiss-prior soft-failed"
+  elif [[ -f "$DISMISS" ]]; then
+    bash "$DISMISS" "$PR_NUMBER" || log "warn: F24 dismiss-prior soft-failed"
   fi
 
   # Short body: full review lives on the issue comment (marker <!-- luffy-review pr=N)

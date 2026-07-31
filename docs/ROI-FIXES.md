@@ -36,7 +36,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 20 | **F10** | Reusable `workflow_call` + thin hub caller | M | 🔥 Multi-repo DX | **Shipped** (`luffy-review-reusable.yml`, `--caller`) |
 | 21 | **F22** | Verdict-aware done signal (reaction + commit status + job summary) | XS | 🔥 Trust UX — REQUEST CHANGES no longer looks like ✅ | **Shipped** (`parse-verdict.py`, `report-verdict.sh`) |
 | 22 | **F23** | Formal GitHub PR Review event from verdict (Reviews panel) | XS | 🔥 Trust UX — APPROVE/REQUEST_CHANGES/COMMENT as real PR reviews | **Shipped** (`review_event` + `report-verdict.sh`) |
-| 23 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 23 | **F24** | Dismiss prior Luffy PR reviews on re-run (Reviews hygiene) | XS | 🔥 Trust UX — re-@luffy no longer stacks APPROVE/REQUEST_CHANGES | **Shipped** (`dismiss-prior-pr-reviews.sh`) |
+| 24 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -85,6 +86,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 12 (shipped)
 
 **F23** formal PR Review: same verdict map emits `review_event` (`APPROVE` / `REQUEST_CHANGES` / `COMMENT`) and `report-verdict.sh` posts a short GitHub Pull Request Review so the Reviews panel matches the reaction/status. Full Markdown stays on the issue comment (F12). Pipeline failures use `COMMENT` (not REQUEST_CHANGES). APPROVE soft-falls back to COMMENT when GitHub rejects self/bot approve. Opt-out: `vars.LUFFY_PR_REVIEW=0`.
+
+### Sprint 13 (shipped)
+
+**F24** dismiss prior Luffy PR reviews: before posting a new F23 review, `dismiss-prior-pr-reviews.sh` finds bodies with `<!-- luffy-pr-review pr=N` and dismisses `APPROVED` / `CHANGES_REQUESTED` (GitHub cannot dismiss `COMMENTED`). Shares `LUFFY_REPLACE_PREVIOUS` with F12 (0 = leave history). Soft-fail; fixture-testable via `LUFFY_PR_REVIEWS_FIXTURE`.
 
 ### readme-kit (shipped)
 
