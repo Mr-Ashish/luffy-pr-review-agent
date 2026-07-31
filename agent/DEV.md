@@ -9,3 +9,12 @@
 - Finding discipline is asymmetric by design: thorough on bugs/security, high bar elsewhere — every finding needs file + symbol + concrete trigger, and silence beats speculation (an empty Blocking section is an acceptable output).
 - Every review must emit structured judgment fields: Score 0–100, review effort 1–5, security audit verdict, relevant-tests yes/no, key findings, optional concrete code suggestions.
 - Output contract is a single bare Markdown document (no preamble, no tool chatter, not fence-wrapped) so `normalize-review.py` can validate and post it directly as a PR comment.
+
+- Verdict text is normalized rather than required to be exact: aliases map `APPROVED`/`LGTM` → `APPROVE`, `REQUEST_CHANGES`/`REQUEST-CHANGES`/`CHANGES REQUESTED` → `REQUEST_CHANGES`, `COMMENTS`/`NEUTRAL` → `COMMENT`; whitespace is collapsed, trailing `.` stripped, and any trailing parenthetical/bracket note removed.
+- After exact-alias lookup there is a prefix pass, so decorated verdicts like `REQUEST CHANGES — see blocking` still resolve. This tolerance is intentional: the model is allowed prose after the token, but not allowed to move the label off the line start.
+
+## Pitfalls
+
+- The F22 signal depends on a *textual* contract with the model output, not a structured field: `scripts/parse-verdict.py` matches `^\*\*Verdict:\*\*\s*(.+)$` (MULTILINE, case-insensitive), so the verdict must be a bold `**Verdict:**` label at the start of a line in the normalized body. Reformatting that line in `agent/review-prompt.md` (plain text, inline, indented, inside a fence) silently degrades every run to `UNKNOWN`.
+- Same anchoring applies to `**Score:** <int>[/100]` and `**Confidence:** low|medium|high` — score/confidence are parsed only for reporting, and a missed match yields empty strings rather than an error.
+- `UNKNOWN` is deliberately non-blocking (reaction `eyes`, status `success`), so a broken prompt contract looks like a healthy neutral review instead of failing loudly. Verify the posted body still carries the bold verdict line after any prompt/template edit.

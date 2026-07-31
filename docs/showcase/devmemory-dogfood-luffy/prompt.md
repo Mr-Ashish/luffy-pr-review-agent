@@ -44,7 +44,11 @@ Respond with **only** the JSON object (fence optional).
 
 ### Transcript
 
-# Luffy dogfood session — F10 reusable workflow packaging
+# Luffy dogfood session — F22 verdict-aware done signal
+Generated: 2026-07-31T12:50:49Z
+
+## Product focus this fire
+F22: parse **Verdict:** from the posted review → honest trigger reaction (+1 / -1 / eyes) + PR-head commit status context `luffy/review` (success / failure / error) + job-summary section. Pipeline_rc≠0 forces -1/error. Opt-out LUFFY_COMMIT_STATUS=0. Callers grant statuses: write. Scripts: parse-verdict.py, report-verdict.sh.
 
 ## Scripts inventory
 assemble-context.sh
@@ -59,9 +63,11 @@ hermes-pin.sh
 hub-ingest-run.py
 install-luffy.sh
 normalize-review.py
+parse-verdict.py
 post-review-comment.sh
 preload-hub-memory.sh
 publish-run-to-hub.sh
+report-verdict.sh
 review-local.sh
 run-hermes-review.sh
 run-luffy-review.sh
@@ -76,12 +82,20 @@ ingest-luffy-run.yml
 luffy-pr-review.yml
 luffy-review-reusable.yml
 
-## pack/
+## Pack templates
+DEV.md
 README.md
 luffy-pr-review-caller.yml
 
----
-# ARCHITECTURE
+## Agent files
+DEV.md
+MEMORY.seed.md
+SOUL.md
+config.yaml
+review-prompt.md
+
+## Architecture (`docs/ARCHITECTURE.md`)
+
 # Luffy architecture
 
 ## One sentence
@@ -107,6 +121,7 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 | Review | `scripts/run-hermes-review.sh` | Hermes one-shot on `WORKSPACE_ROOT` |
 | Normalize | `scripts/normalize-review.py` | Contract, fences, size, HTML marker, secret redact |
 | Cost UX | `scripts/usage-summary.py` | Append cost/tokens footer + job-summary from `hermes-usage.json` (F21) |
+| Verdict signal | `scripts/parse-verdict.py` + `report-verdict.sh` | Map verdict → reaction + commit status `luffy/review` + job summary (F22) |
 | Distill | `scripts/distill-memory.sh` | Append structured memory block |
 | Post | `scripts/post-review-comment.sh` | Delete prior `<!-- luffy-review pr=N` comments, then `gh pr comment` |
 | Orchestrate | `scripts/run-luffy-review.sh` | Compose stages + timings |
@@ -145,8 +160,8 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 
 Hub implementation file: `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`, inputs `luffy_repository` + `luffy_ref`).
 
----
-# OPERATIONS (install + sprints)
+## Operations (`docs/OPERATIONS.md`)
+
 # Luffy operations
 
 ## Required setup
@@ -179,6 +194,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 8 (F20):** `scripts/install-luffy.sh` one-command pack install into target repos
 - **Sprint 9 (F21):** cost/usage line on PR comments + job summary from `hermes-usage.json`
 - **Sprint 10 (F10):** reusable `workflow_call` job + `install-luffy.sh --caller` hub-managed thin install
+- **Sprint 11 (F22):** verdict-aware reaction + commit status `luffy/review` + job-summary verdict section
 
 ## Central hub memory (cross-repo)
 
@@ -237,12 +253,107 @@ Requires: `gh` authenticated, network for Hermes install + OpenRouter.
 ## Failure UX
 
 | Failure | What users see |
+|---------|----------------|
+| Missing OpenRouter secret | PR comment explaining config error |
+| Hermes/model failure | PR comment with low-confidence COMMENT verdict |
+| Job crash before review file | Always-post step writes failure stub + comments |
 
----
-# ROI F10
+## Cost controls
+
+- Explicit comment trigger only (no auto on every push)
+- **Author association allowlist** (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`) — override with repo variable `LUFFY_ALLOWED_ASSOCIATIONS` (comma list; empty = no gate)
+- Concurrency cancel-in-progress per PR
+- Diff size cap (`MAX_DIFF_BYTES`, default 400000)
+- Job timeout 45 minutes
+- Re-runs **replace** prior Luffy comments on the same PR (marker `<!-- luffy-review pr=N`); set `LUFFY_REPLACE_PREVIOUS=0` to stack
+- **Per-PR cooldown (F19):** default 900s after a *successful* Luffy comment — skip paid run (rocket reaction). Override `vars.LUFFY_COOLDOWN_SECONDS` (`0`/`off` disables). Bypass: `@luffy review force` or workflow_dispatch
+- **Cost visibility (F21):** each successful review footer includes estimated OpenRouter cost + token/API counts from `hermes-usage.json`; the Actions job summary has a matching **Luffy cost / usage** section (no artifact download required)
+
+## Memory
+
+- Path: `.luffy-hermes-home/memories/MEMORY.md`
+- Grows via `distill-memory.sh` after each review
+- Rotates when exceeding `MAX_MEMORY_BYTES` (default 100000)
+- Gitignored; restored via Actions cache
+
+## Debug
+
+- Download artifact `luffy-out-pr<N>-run<id>` — full `.luffy-out/` + memory snapshot (14 days)
+- Download artifact **`luffy-trace-pr<N>-run<id>`** — structured per-run trace (90 days)
+
+### Per-run trace layout
+
+```text
+traces/pr{N}-run{RUN_ID}-a{ATTEMPT}/
+  meta.json          # identity, status, timings pointer, file hashes
+  trace.json         # index
+  prompt.md          # agent prompt
+  context.md         # PR context
+  pr.json / pr.diff  # GitHub PR data
+  review.raw.md      # Hermes stdout
+  review.md          # normalized posted body
+  hermes.stderr      # errors if any
+  timings.json       # stage durations
+  memory-before.md   # MEMORY.md before review (if any)
+  memory-after.md    # MEMORY.md after distill
+```
+
+Secrets (`sk-or-…`, `[REDACTED] common `ghp_`/`github_pat_` tokens) are redacted in **posted review bodies** (`normalize-review.py`, F18) and again before trace packaging / hub payload.
+
+```bash
+# Download latest trace for a run
+gh run download <run-id> -R owner/repo -n luffy-trace-pr1-run<run-id>
+```
+
+## F8 Prebaked Hermes runner (faster CI startup)
+
+Cold Hermes install is the expensive part of job startup (~2 minutes locally). Mitigation:
+
+1. **Actions cache** (default): pin-keyed restore of `~/.local` + `~/.hermes` (F2/F14/F7).
+2. **Prebaked image** (optional): build with workflow **Build Luffy Hermes runner** or `./scripts/build-luffy-runner-image.sh`. Image sets `LUFFY_HERMES_PREBAKED=1`. On runners that already have Hermes, export the same env so install is skipped.
+3. **Benchmark:** `./scripts/benchmark-hermes-startup.sh` → `docs/benchmarks/hermes-startup-latest.md`.
+
+
+## ROI fixes (`docs/ROI-FIXES.md`)
+
+# High-ROI minimal fixes (triage)
+
+Evidence from live e2e (Odoo monorepo + hub memory):
+
+| Symptom | Observed |
+|---------|----------|
+| Monorepo checkout | ~3.5 min for full Odoo PR head (`fetch-depth: 0`) |
+| Hermes cold install | ~1–2 min every job |
+| Actions cache | `cache write denied` despite `actions: write` |
+| Hub memory | Written after run, **not loaded into** next review |
+| UX | Only 👀 reaction; no done/fail signal |
+
+## Ranked list
+
+| Rank | ID | Fix | Effort | ROI | Status |
+|------|-----|-----|--------|-----|--------|
+| 1 | **F1** | PR head `fetch-depth: 1` + **sparse-checkout of changed paths only** | S | 🔥 Huge time on monorepos | **Shipped** (e2e: sparse cone 1 path on Odoo) |
+| 2 | **F2** | **Cache Hermes install** (`~/.local` + `~/.hermes` bin) | S | 🔥 Cuts cold install | **Shipped** (cache step; warm on 2nd run) |
+| 3 | **F3** | **Preload hub `MEMORY.md`** into `HERMES_HOME` before review | S | 🔥 Real memory-backed reviews | **Shipped** (e2e: `HUB_MEMORY=preloaded` 1126B) |
+| 4 | **F4** | Drop broken hermes-home Actions cache (hub is SoT) / soft-fail | XS | Removes noise, simpler | **Shipped** |
+| 5 | **F5** | ✅ / ❌ reactions on trigger comment | XS | Clear UX | **Shipped** (`+1`/`-1`) |
+| 6 | **F6** | Cap hub clone depth=1 (already ~20) → 1 | XS | Small | **Shipped** |
+| 7 | **F11** | Author association allowlist (default OWNER/MEMBER/COLLABORATOR/CONTRIBUTOR; override via `vars.LUFFY_ALLOWED_ASSOCIATIONS`) | XS | 🔥 Cost control | **Shipped** |
+| 8 | **F12** | Replace previous Luffy comment (delete prior `<!-- luffy-review pr=N` before post) | XS | 🔥 Less PR noise | **Shipped** |
+| 9 | **F13** | Fix sparse path `grep -c \|\| echo 0` → empty PR path count was `0\\n0`, forcing full monorepo clone | XS | 🔥 Correct sparse path | **Shipped** |
+| 10 | **F14** | Hermes cache: stable key `v3`, save **only on miss** (drop per-run_id thrash) | XS | 🔥 Cache hits + GH cache quota | **Shipped** |
+| 11 | **F15** | Config error `pipeline_rc=1` (was 0 → false ✅ reaction) | XS | Honest UX | **Shipped** |
+| 12 | **F16** | Association deny → 😕 reaction (no OpenRouter spend) | XS | Visible deny | **Shipped** |
+| 13 | **F17** | Drop dead `RUNNER_TEMP` Hermes tree copy after cold install | XS | Faster cold path | **Shipped** |
+| 14 | **F18** | Redact secrets in **posted** review (`normalize-review.py` choke-point) | XS | 🔥 Trust — no keys on PR comments | **Shipped** |
+| 15 | **F7** | Pin Hermes install (`scripts/hermes-pin.sh` + `LUFFY_HERMES_COMMIT` + cache key `v4-<pin>`) | S | 🔥 Repro CI | **Shipped** |
+| 16 | **F19** | Per-PR re-trigger cooldown (`scripts/cooldown-check.sh`, default 900s) | S | 🔥 Cost/abuse | **Shipped** |
+| 17 | **F20** | `scripts/install-luffy.sh` copy pack to target repo | S | 🔥 Adoption | **Shipped** |
+| 18 | **F8** | Prebaked Hermes runner image + startup benchmark | M | 🔥 Fast CI startup | **Shipped** (docker/ + build workflow + benchmark script) |
 | 19 | **F21** | Surface OpenRouter cost/tokens on PR comment + job summary | XS | 🔥 Cost visibility | **Shipped** (`usage-summary.py`) |
 | 20 | **F10** | Reusable `workflow_call` + thin hub caller | M | 🔥 Multi-repo DX | **Shipped** (`luffy-review-reusable.yml`, `--caller`) |
-| 21 | F9 | Inline GitHub review comments | L | Product | Later |
+| 21 | **F22** | Verdict-aware done signal (reaction + commit status + job summary) | XS | 🔥 Trust UX — REQUEST CHANGES no longer looks like ✅ | **Shipped** (`parse-verdict.py`, `report-verdict.sh`) |
+| 22 | F9 | Inline GitHub review comments | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -284,268 +395,16 @@ Requires: `gh` authenticated, network for Hermes install + OpenRouter.
 
 **F10** reusable packaging: `luffy-review-reusable.yml` holds the full review job (`workflow_call` + `luffy_repository` / `luffy_ref` inputs). Thin `luffy-pr-review.yml` triggers and calls it. `install-luffy.sh --caller` installs only `pack/luffy-pr-review-caller.yml` pointing at hub `@main` (no agent/scripts copy — free upgrades). Default pack mode still copies agent/scripts + both workflow files for self-contained targets.
 
+### Sprint 11 (shipped)
+
+**F22** verdict-aware done signal: parse `**Verdict:**` from the posted review → trigger-comment reaction (`+1` / `-1` / `eyes`) and PR-head commit status `luffy/review` (`success` / `failure` / `error`). Pipeline failures stay `error`+`-1`. Job summary gets a **Luffy verdict (F22)** section. Opt-out: `vars.LUFFY_COMMIT_STATUS=0`. Required-status checks can require context `luffy/review`.
+
 ### readme-kit (shipped)
 
 YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser removed.
 
----
-# install-luffy header + caller branch
-#!/usr/bin/env bash
-# F20/F10: install Luffy into a target repository.
-#
-# Modes:
-#   pack (default)  Copy agent/, runtime scripts/, thin caller + reusable workflow
-#                   so the target is self-contained (scripts live on its default branch).
-#   --caller        F10 hub-managed: only copy pack/luffy-pr-review-caller.yml
-#                   (runtime checked out from hub each run — free upgrades).
-#
-# Usage:
-#   ./scripts/install-luffy.sh /path/to/target-repo
-#   ./scripts/install-luffy.sh --caller /path/to/target-repo
-#   ./scripts/install-luffy.sh --dest /path/to/target-repo --dry-run
-#   ./scripts/install-luffy.sh --dest . --force   # re-install over existing
-#
-# Options:
-#   --dest DIR          Target repo root (required unless positional DIR)
-#   --caller            Hub-managed thin workflow only (no agent/scripts copy)
-#   --dry-run           Print actions; do not write
-#   --force             Overwrite existing files without prompting
-#   --with-hub-ingest   Also copy ingest-luffy-run.yml (hub repo only; pack mode)
-#   --with-runner-build Also copy build-luffy-runner.yml + docker/luffy-runner/
-#   --source DIR        Luffy source root (default: parent of scripts/)
-#   -h | --help
-#
-# Exit: 0 ok (skips existing files unless --force), 1 usage/error
-set -euo pipefail
+## SOUL (`agent/SOUL.md`)
 
-SRC=""
-DEST=""
-DRY_RUN=0
-FORCE=0
-WITH_INGEST=0
-WITH_RUNNER=0
-CALLER_MODE=0
-
-log() { printf '%s\n' "$*" >&2; }
-die() { log "ERROR: $*"; exit 1; }
-
-usage() {
-  # Header comment only (stop before set -euo pipefail)
-  sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'
-  exit "${1:-0}"
-}
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --dest)
-      DEST="${2:-}"
-      shift 2
-      ;;
-    --source)
-      SRC="${2:-}"
-      shift 2
-      ;;
-    --dry-run) DRY_RUN=1; shift ;;
-    --force) FORCE=1; shift ;;
-    --caller) CALLER_MODE=1; shift ;;
-    --with-hub-ingest) WITH_INGEST=1; shift ;;
-    --with-runner-build) WITH_RUNNER=1; shift ;;
-    -h | --help) usage 0 ;;
-    --)
-      shift
-      break
-      ;;
-    -*)
-      die "unknown option: $1 (try --help)"
-      ;;
-    *)
-      if [[ -z "$DEST" ]]; then
-        DEST="$1"
-        shift
-      else
-        die "unexpected argument: $1"
-      fi
-      ;;
-  esac
-done
-
-SRC="${SRC:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-[[ -n "$DEST" ]] || die "target directory required (positional or --dest)"
-DEST="$(cd "$DEST" 2>/dev/null && pwd)" || die "target not found: $DEST"
-SRC="$(cd "$SRC" && pwd)"
-
-[[ -d "$SRC/agent" ]] || die "source missing agent/: $SRC"
-[[ -d "$SRC/scripts" ]] || die "source missing scripts/: $SRC"
-[[ -f "$SRC/.github/workflows/luffy-pr-review.yml" ]] || die "source missing luffy-pr-review.yml"
-[[ -f "$SRC/.github/workflows/luffy-review-reusable.yml" ]] || die "source missing luffy-review-reusable.yml (F10)"
-[[ -f "$SRC/pack/luffy-pr-review-caller.yml" ]] || die "source missing pack/luffy-pr-review-caller.yml (F10)"
-
-# Refuse installing pack into itself unless forced (avoids half-copies)
-if [[ "$SRC" == "$DEST" && "$FORCE" != "1" ]]; then
-  die "refusing to install into the Luffy source tree itself (use --force if intentional)"
-fi
-
-# Runtime script allowlist — exclude image build / bench from target packs by default
-# (still available when --with-runner-build copies docker tooling separately).
-RUNTIME_SCRIPTS=(
-  assemble-context.sh
-  association-allowed.sh
-
----
-# thin caller
-# Luffy — comment-triggered PR review (thin caller, F10)
-#
-# Triggers live here; implementation is .github/workflows/luffy-review-reusable.yml
-# Pack install (default): uses this repo as luffy_repository (agent/scripts on default branch).
-# For hub-managed multi-repo installs see pack/luffy-pr-review-caller.yml (--caller).
-
-name: Luffy PR Review
-
-on:
-  issue_comment:
-    types: [created]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: PR number to review
-        required: true
-        type: string
-
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  actions: write
-
-concurrency:
-  group: luffy-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.run_id }}
-  cancel-in-progress: true
-
-jobs:
-  luffy-review:
-    name: Luffy review
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event.issue.pull_request &&
-        (
-          contains(github.event.comment.body, '@luffy review this pr') ||
-          contains(github.event.comment.body, '@luffy review')
-        )
-      )
-    uses: ./.github/workflows/luffy-review-reusable.yml
-    secrets: inherit
-    with:
-      # Pack / self: load agent+scripts from the repo that owns this workflow file
-      luffy_repository: ${{ github.repository }}
-      luffy_ref: ${{ github.event.repository.default_branch }}
-
----
-# hub caller template
-# Luffy — hub-managed thin caller (F10)
-#
-# Install with: ./scripts/install-luffy.sh --caller /path/to/target-repo
-# No agent/ or scripts/ copy required; runtime is checked out from the hub on each run.
-#
-# Required secret on this repo: OPENROUTER_API_KEY
-# Optional: LUFFY_HUB_TOKEN, vars LUFFY_MODEL / LUFFY_HERMES_COMMIT / LUFFY_COOLDOWN_SECONDS / LUFFY_RUNNER_IMAGE
-# Trigger: @luffy review this pr
-
-name: Luffy PR Review
-
-on:
-  issue_comment:
-    types: [created]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: PR number to review
-        required: true
-        type: string
-
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  actions: write
-
-concurrency:
-  group: luffy-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.run_id }}
-  cancel-in-progress: true
-
-jobs:
-  luffy-review:
-    name: Luffy review
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event.issue.pull_request &&
-        (
-          contains(github.event.comment.body, '@luffy review this pr') ||
-          contains(github.event.comment.body, '@luffy review')
-        )
-      )
-    uses: Mr-Ashish/luffy-pr-review-agent/.github/workflows/luffy-review-reusable.yml@main
-    secrets: inherit
-    with:
-      luffy_repository: Mr-Ashish/luffy-pr-review-agent
-      luffy_ref: main
-
----
-# reusable header
-# Luffy reusable review job (F10)
-#
-# Called by thin trigger workflows in this repo or any target repo.
-# Does not listen to events itself — caller owns issue_comment / workflow_dispatch.
-#
-# Inputs:
-#   luffy_repository — where agent/ + scripts/ live (hub or target pack)
-#   luffy_ref        — git ref for that pack (empty = default branch of luffy_repository)
-#
-# Secrets (caller passes via secrets: inherit or explicit map):
-#   OPENROUTER_API_KEY (required for paid runs)
-#   LUFFY_HUB_TOKEN (optional; falls back to GITHUB_TOKEN)
-#
-# Caller must grant: contents, pull-requests, issues, actions (write as needed).
-
-name: Luffy review (reusable)
-
-on:
-  workflow_call:
-    inputs:
-      luffy_repository:
-        description: "Repo that provides agent/ + scripts/ (hub or installed pack)"
-        type: string
-        required: false
-        default: "Mr-Ashish/luffy-pr-review-agent"
-      luffy_ref:
-        description: "Git ref for luffy_repository (branch/tag/SHA)"
-        type: string
-        required: false
-        default: "main"
-    # Prefer caller `secrets: inherit` so OPENROUTER_API_KEY / LUFFY_HUB_TOKEN flow through.
-    secrets:
-      OPENROUTER_API_KEY:
-        required: false
-      LUFFY_HUB_TOKEN:
-        required: false
-
-# Permissions come from the caller workflow/job.
-
-jobs:
-  luffy-review:
-    name: Luffy review
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event.issue.pull_request &&
-        (
-          contains(github.event.comment.body, '@luffy review this pr') ||
-          contains(github.event.comment.body, '@luffy review')
-        )
-
----
-# SOUL
 # Luffy — PR Review Agent
 
 You are **Luffy**, a staff-level code reviewer running inside CI. You review **this PR’s changes**, not the whole product history.
@@ -586,6 +445,139 @@ You are **Luffy**, a staff-level code reviewer running inside CI. You review **t
 4. API / contract / payload shape breaks  
 5. Missing tests for risky paths  
 6. Performance regressions that are concrete  
+7. Maintainability  
+8. Style nits last (or omit)
+
+## Structured judgment (required in every review)
+- **Score** 0–100: production readiness of *this* diff (100 = merge-ready at scale).
+- **Review effort** 1–5: cost for an experienced human to re-review (1 easy … 5 hard).
+- **Security audit:** `No` if clean; otherwise a short labeled concern (e.g. `XSS: …`).
+- **Relevant tests:** yes/no — were tests added/updated for the risk?
+- **Key findings:** 0–N high-signal issues with file + trigger scenario (not vague vibes).
+- **Code suggestions (optional):** only when you can show a concrete better snippet for new code.
+
+## Output contract
+Respond with **only** a single Markdown document suitable for a GitHub PR comment.
+No preamble (“Sure!”), no tool chatter, no wrapping the entire review in a code fence.
+Follow the template in the user prompt exactly.
+
+## parse-verdict.py (F22) (`scripts/parse-verdict.py`)
+
+#!/usr/bin/env python3
+"""F22: Parse Luffy review Markdown for verdict signals (reaction + commit status).
+
+Reads a normalized review body and emits key=value lines suitable for
+GitHub Actions $GITHUB_OUTPUT / shell eval:
+
+  verdict=APPROVE|REQUEST_CHANGES|COMMENT|UNKNOWN
+  score=<int or empty>
+  confidence=low|medium|high|empty
+  reaction=+1|-1|eyes
+  status_state=success|failure|error
+  status_desc=<short description>
+  pipeline_ok=true|false
+
+Mapping (when pipeline_rc is 0 / pipeline_ok=true):
+  APPROVE          → reaction +1,  status success
+  REQUEST CHANGES  → reaction -1,  status failure  (blocks required-status checks)
+  COMMENT          → reaction eyes, status success (review completed, neutral)
+  UNKNOWN          → reaction eyes, status success
+
+When pipeline_ok=false (Hermes/config/crash):
+  reaction -1, status error, verdict kept from body if present else UNKNOWN.
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+_VERDICT_RX = re.compile(
+    r"^\*\*Verdict:\*\*\s*(.+?)\s*$",
+    re.MULTILINE | re.IGNORECASE,
+)
+_SCORE_RX = re.compile(
+    r"^\*\*Score:\*\*\s*(\d+)\s*(?:/100)?",
+    re.MULTILINE | re.IGNORECASE,
+)
+_CONF_RX = re.compile(
+    r"^\*\*Confidence:\*\*\s*(low|medium|high)\b",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+# Normalize free-form model text → canonical token
+_VERDICT_ALIASES: dict[str, str] = {
+    "APPROVE": "APPROVE",
+    "APPROVED": "APPROVE",
+    "LGTM": "APPROVE",
+    "REQUEST CHANGES": "REQUEST_CHANGES",
+    "REQUEST_CHANGES": "REQUEST_CHANGES",
+    "REQUEST-CHANGES": "REQUEST_CHANGES",
+    "CHANGES REQUESTED": "REQUEST_CHANGES",
+    "COMMENT": "COMMENT",
+    "COMMENTS": "COMMENT",
+    "NEUTRAL": "COMMENT",
+}
+
+
+def normalize_verdict(raw: str) -> str:
+    s = re.sub(r"\s+", " ", (raw or "").strip())
+    # Strip trailing punctuation / parenthetical notes
+    s = re.sub(r"\s*[\(\[].*$", "", s).strip()
+    s = s.rstrip(".").strip()
+    key = s.upper()
+    if key in _VERDICT_ALIASES:
+        return _VERDICT_ALIASES[key]
+    # Prefix match (e.g. "REQUEST CHANGES — see blocking")
+    for alias, canon in _VERDICT_ALIASES.items():
+        if key.startswith(alias):
+            return canon
+    return "UNKNOWN"
+
+
+def parse_review(text: str) -> dict[str, str]:
+    verdict = "UNKNOWN"
+    m = _VERDICT_RX.search(text or "")
+    if m:
+        verdict = normalize_verdict(m.group(1))
+
+    score = ""
+    sm = _SCORE_RX.search(text or "")
+    if sm:
+        score = sm.group(1)
+
+    confidence = ""
+    cm = _CONF_RX.search(text or "")
+    if cm:
+        confidence = cm.group(1).lower()
+
+    return {"verdict": verdict, "score": score, "confidence": confidence}
+
+
+def signal_for(verdict: str, *, pipeline_ok: bool) -> dict[str, str]:
+    """Map verdict + pipeline health → reaction and commit-status fields."""
+    if not pipeline_ok:
+        return {
+            "reaction": "-1",
+            "status_state": "error",
+            "status_desc": f"Luffy pipeline failed (verdict={verdict})",
+        }
+
+    if verdict == "APPROVE":
+        return {
+            "reaction": "+1",
+            "status_state": "success",
+            "status_desc": "Luffy: APPROVE",
+        }
+    if verdict == "REQUEST_CHANGES":
+        return {
+            "reaction": "-1",
+            "status_state": "failure",
+        
+
+… [session truncated] …
 
 
 ## Existing directories (allowed `path` values)
@@ -627,11 +619,11 @@ agent
 
 ### recent log
 ```
+caea511 feat(trust): F22 verdict-aware reaction + commit status
+5f17665 docs(knowledge): dogfood F10 reusable caller packaging + showcase
 fbf3452 feat(install): reusable workflow_call + hub thin caller (F10)
 41e7b66 docs(knowledge): dogfood F21 cost/usage into DEV/USAGE + showcase
 91262f5 feat(cost): surface usage on PR comments + job summary (F21)
-b20f7c3 feat(ops): prebaked Hermes runner image + startup benchmark (F8)
-7f5dc5b docs(knowledge): dogfood F20 install-luffy pack semantics + showcase
 ```
 
 ### tree (sample)
@@ -677,7 +669,9 @@ tests/test_hermes_pin.py
 tests/test_hub_ingest.py
 tests/test_install_luffy.py
 tests/test_normalize_review.py
+tests/test_parse_verdict.py
 tests/test_usage_summary.py
+pack/DEV.md
 pack/README.md
 pack/luffy-pr-review-caller.yml
 agent/DEV.md
@@ -691,6 +685,7 @@ docs/README-BRANDING-ECOSYSTEM.md
 docs/README-KIT-MVP.md
 docs/ROI-FIXES.md
 docs/experiments/2026-07-31-roi-fire.md
+docs/experiments/loop-no-work-streak.md
 docs/blog/building-luffy-agentic-pr-review.md
 docs/benchmarks/hermes-startup-latest.json
 docs/benchmarks/hermes-startup-latest.md
@@ -736,9 +731,11 @@ scripts/hermes-pin.sh
 scripts/hub-ingest-run.py
 scripts/install-luffy.sh
 scripts/normalize-review.py
+scripts/parse-verdict.py
 scripts/post-review-comment.sh
 scripts/preload-hub-memory.sh
 scripts/publish-run-to-hub.sh
+scripts/report-verdict.sh
 scripts/review-local.sh
 scripts/run-hermes-review.sh
 scripts/run-luffy-review.sh
@@ -783,10 +780,11 @@ assets/brand-options/three-artifacts.html
 ### claim index (do not restate these claims)
 - [DEV.md#Architecture] @luffy action assemble cacheartifact checkout comment concurrency context
 - [DEV.md#Architecture] artifact compos deterministic every inner llm-driven orchestr record
-- [DEV.md#Architecture] assemble-contextsh contractfencessizehtml distill-memorysh f21 footer hermes-pinsh hermes-usagejson hub-ingest-runpy
-- [DEV.md#Architecture] --with-hub-ingest --with-runner-build adoption agent allowlist entrypoint f20 image-buildbench
-- [DEV.md#Architecture] branch config default domain luffy luffy-hermes-home memory prompt
-- [DEV.md#Design decisions] 400000 45-minute 900s @luffy allowlist author-associ below block
+- [DEV.md#Architecture] assemble-contextsh contractfencessizehtml distill-memorysh f21 f22 footer hermes-pinsh hermes-usagejson
+- [DEV.md#Architecture] --caller --with-hub-ingest --with-runner-build adoption agent agentscript default entrypoint
+- [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
+- [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
+- [DEV.md#Design decisions] 400000 900s @luffy allowlist author-associ block bypas cancel-in-progres
 - [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
 - [DEV.md#Design decisions] --commit --force-commit --skip-setup action cache default float install
 - [DEV.md#Design decisions] comment delet luffy luffy-review luffyreplaceprevious=0 marker match prior
@@ -799,12 +797,10 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] --source agent check default githubworkflowsluffy-pr-reviewyml half-install overrid parent
 - [DEV.md#Design decisions] --force avoid canonical explicitly half-cop install itself luffy
 - [DEV.md#Design decisions] --force contract exist human includ install output refuse
-- [DEV.md#Design decisions] --short content installedat luffy-install-stamp outside plain-text provenance record
-- [DEV.md#Design decisions] $githubstepsummary --usage-file append decor estimat exist expos f21
-- [DEV.md#Design decisions] append empty explicitly guard never no-op non-dict non-load-bear
-- [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
-- [DEV.md#Pitfalls] 403 cannot classic clone default dispatch githubtoken ingest
-- [DEV.md
+- [DEV.md#Design decisions] description installedat luffy-install-stamp mode=pack|caller plain-text provenance record sourcepath
+- [DEV.md#Design decisions] -1error approve→+1succes changes→-1failure check comment→eyessucces commit context decor
+- [DEV.md#Design decisions] append decor expos f21 footer hermes-usagejson pipeline post-normalize
+- [DEV.md#Design
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -813,11 +809,11 @@ assets/brand-options/three-artifacts.html
 ## Architecture
 - Luffy is a gated GitHub Actions control plane, not a chat bot: `@luffy review this pr` → gate + per-PR concurrency → dual checkout → restore Hermes memory → assemble context → `hermes -z` → normalize → PR comment → distill memory → cache/artifacts.
 - Orchestration is deterministic shell (`scripts/run-luffy-review.sh` composes stages and records timings); only the inner review step is LLM-driven, so every run leaves reproducible artifacts.
-- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact), usage-summary.py (F21 cost footer + job summary from hermes-usage.json), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
-- **F20 install pack:** `scripts/install-luffy.sh` is the adoption entrypoint — copies `agent/`, a runtime-script allowlist (not image-build/bench tools), and `luffy-pr-review.yml` into a target repo; optional `--with-hub-ingest` / `--with-runner-build`; writes `.luffy-install-stamp` with source SHA.
+- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact), usage-summary.py (F21 cost footer + job summary from hermes-usage.json), parse-verdict.py + report-verdict.sh (F22 reaction/status), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
+- **F20/F10 install:** `scripts/install-luffy.sh` is the adoption entrypoint. Default **pack** mode copies `agent/`, runtime scripts, thin `luffy-pr-review.yml`, and `luffy-review-reusable.yml`. **`--caller`** installs only the hub-managed thin workflow from `pack/luffy-pr-review-caller.yml` (no agent/scripts). Optional `--with-hub-ingest` / `--with-runner-build` (pack mode). Stamp `.luffy-install-stamp` records `mode=pack|caller` + source SHA.
 
 ## Design decisions
-- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disabl
+- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review forc
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/DEV.md
@@ -836,6 +832,13 @@ assets/brand-options/three-artifacts.html
 - Hub memory is preloaded into `HERMES_HOME` at the start of each run (`preload-hub-memory.sh`), which is what makes the next review on the same repo smarter — memory is cross-run and cross-repo, not per-job.
 - Hub behaviour is env-configurable per target repo: `LUFFY_HUB_REPO` (default `Mr-Ashish/luffy-pr-review-agent`), `LUFFY_HUB_MODE` (`direct`|`dispatch`|`both`), `LUFFY_HUB_PUBLISH=0` to disable.
 
+### pack/DEV.md
+
+## Architecture
+- `pack/` holds installable templates that are *not* live workflows in this repo: `luffy-pr-review-caller.yml` is the F10 hub-managed thin caller, copied verbatim to `.github/workflows/luffy-pr-review.yml` on the target by `install-luffy.sh --caller`.
+- It differs from this repo's own `luffy-pr-review.yml` in exactly one way: `uses:` is the absolute hub ref `Mr-Ashish/luffy-pr-review-agent/.github/workflows/luffy-review-reusable.yml@main` with literal `luffy_repository`/`luffy_ref` values, instead of the local `./.github/workflows/...` path with `github.repository`.
+- Triggers, `permissions`, and the `luffy-${{ github.repository }}-<pr>` concurrency group are duplicated in the template because a `workflow_call` job cannot own them — edits to gating must be applied to `pack/luffy-pr-review-caller.yml` as well as the in-repo caller.
+
 ### agent/DEV.md
 
 ## Design decisions
@@ -847,15 +850,22 @@ assets/brand-options/three-artifacts.html
 ### USAGE.md
 
 ## Common commands
-- Install Luffy pack into another repo: `./scripts/install-luffy.sh /path/to/target-repo` (add `--force` to overwrite; `--dry-run` to preview).
+- Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).
+- Hub-managed thin install (F10, no agent/scripts copy): `./scripts/install-luffy.sh --caller /path/to/target-repo`.
 - Build prebaked Hermes runner image: `./scripts/build-luffy-runner-image.sh` (optional `PUSH=1`).
 - Benchmark Hermes startup paths: `SKIP_COLD=1 ./scripts/benchmark-hermes-startup.sh` → `docs/benchmarks/`.
-- Inspect the effective Hermes pin locally without network: `scripts/hermes-pin.sh resolve` (empty output = floating), `scripts/hermes-pin.sh default` (baked-in known-good SHA), `scripts/hermes-pin.sh install-args` (exact `install.sh` args), `scripts/hermes-pin.sh cache-suffix` (Actions cache key suffix).
 
 ## Setup
-- Install on each target repo: from this repo run `./scripts/install-luffy.sh /path/to/target-repo` (or manually copy `agent/`, runtime `scripts/`, and `.github/workflows/luffy-pr-review.yml`) onto that repo's **default branch** (workflow only runs from default branch).
+- Install on each target repo's **default branch** (workflow only runs from default branch):
+- **Hub-managed (F10):** `./scripts/install-luffy.sh --caller /path/to/target-repo` — only `.github/workflows/luffy-pr-review.yml` pointing at `luffy-review-reusable.yml@main`.
+- **Pack:** `./scripts/install-luffy.sh /path/to/target-repo` — `agent/`, runtime `scripts/`, thin caller + local reusable.
 - Required secret: `OPENROUTER_API_KEY`. For cross-repo hub memory also add `LUFFY_HUB_TOKEN` (PAT with contents write on the hub).
-- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_RUNNER_IMAGE` (optional prebaked Hermes container image, F8), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`
+
+## Debugging
+- Local dry-run (needs authenticated `gh`, network, and `.env` with `OPENROUTER_API_KEY`): `./scripts/review-local.sh owner/repo 123`; add `POST_COMMENT=1` to actually comment on the PR.
+- Two artifacts per run: `luffy-out-pr<N>-run<id>` (full `.luffy-out/` + memory snapshot, 14 days) and `luffy-trace-pr<N>-run<id>` (structured redacted trace, 90 days).
+- Fetch a trace with `gh run download <run-id> -R owner/repo -n luffy-trace-pr<N>-run<run-id>`.
+- Trace layout under `traces/pr{N}-run{RUN_ID}-a{ATTEMPT}/`: `meta.json`, `trace.json`, `prompt.md`, `co
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md

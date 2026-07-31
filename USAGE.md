@@ -54,6 +54,11 @@ devmemory extract --fixture sample-auth-module --apply
 - Preview exactly what would be written (including the stamp) with `--dry-run`; lines are prefixed `DRY  <from> → <to>`.
 - Interpret exit codes: `1` is a usage/validation error (missing dest, bad `--source`, missing F10 workflow files, or install into the Luffy source tree without `--force`). Existing target files are skipped with a stderr notice unless you pass `--force` (exit still `0`).
 
+- No `luffy/review` status on the PR head: check (1) repo variable `LUFFY_COMMIT_STATUS` is not `0` (that is the documented opt-out), (2) the caller workflow grants `statuses: write`.
+- A neutral 👀 reaction plus `success` means the verdict line was parsed as `UNKNOWN` (or the review was a genuine COMMENT); inspect `review.md` in the trace artifact for a line starting with `**Verdict:**` before blaming the status code path.
+
+- To make Luffy gate merges, add `luffy/review` as a required status check — `REQUEST CHANGES` reports `failure` while `APPROVE`/`COMMENT` report `success`, and any pipeline failure (`pipeline_rc != 0`) reports `error` with 👎 regardless of the parsed verdict.
+
 ## F22 verdict signals
 
 After each run Luffy derives a **verdict signal** from the posted review body:
@@ -71,4 +76,3 @@ After each run Luffy derives a **verdict signal** from the posted review body:
 - Disable commit status: repo var `LUFFY_COMMIT_STATUS=0`
 - Status context override: `LUFFY_STATUS_CONTEXT` (default `luffy/review`)
 - Branch protection can require status check context **`luffy/review`** so REQUEST CHANGES blocks merge when configured.
-

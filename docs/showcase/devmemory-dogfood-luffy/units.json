@@ -2,50 +2,25 @@
   "units": [
     {
       "kind": "dev",
-      "path": ".",
-      "action": "merge",
-      "section": "Architecture",
-      "content": "- **F10 packaging split:** the whole review job now lives in `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`); `luffy-pr-review.yml` is a thin trigger-only caller that owns `issue_comment` / `workflow_dispatch`, concurrency and permissions, then `uses:` the reusable job.\n- Two install shapes off the same reusable job: **pack** (default) copies `agent/`, the runtime script allowlist and *both* workflow files so the target is self-contained; **caller** (`install-luffy.sh --caller`) copies only `pack/luffy-pr-review-caller.yml`, and the runtime is checked out from the hub on every run (free upgrades, nothing to re-install).\n- Runtime source is parameterised, not hardcoded: inputs `luffy_repository` (repo providing `agent/` + `scripts/`) and `luffy_ref` (branch/tag/SHA). The in-repo caller passes `github.repository` + `github.event.repository.default_branch`; the hub caller pins `Mr-Ashish/luffy-pr-review-agent` @ `main`.",
-      "evidence": [
-        "Hub implementation file: `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`, inputs `luffy_repository` + `luffy_ref`)",
-        "Does not listen to events itself — caller owns issue_comment / workflow_dispatch."
-      ],
-      "confidence": "high"
-    },
-    {
-      "kind": "dev",
-      "path": ".",
-      "action": "merge",
-      "section": "Design decisions",
-      "content": "- The reusable workflow declares **no `permissions:` block** — \"Permissions come from the caller workflow/job\", so every caller must grant `contents`/`pull-requests`/`issues`/`actions` write itself; a caller that forgets one fails at post/cache time, not at call time.\n- Both reusable secrets (`OPENROUTER_API_KEY`, `LUFFY_HUB_TOKEN`) are declared `required: false` and callers are expected to use `secrets: inherit`; this keeps forks/unfunded repos from failing the `workflow_call` contract up front, with `LUFFY_HUB_TOKEN` falling back to `GITHUB_TOKEN`.\n- Reusable inputs default to the hub (`luffy_repository: Mr-Ashish/luffy-pr-review-agent`, `luffy_ref: main`), so an under-specified caller still resolves to a working runtime instead of erroring.\n- `install-luffy.sh` preflights **both** F10 files (`.github/workflows/luffy-review-reusable.yml` and `pack/luffy-pr-review-caller.yml`) before copying anything, so a source tree missing the reusable pair dies before producing a half-install.",
-      "evidence": [
-        "# Permissions come from the caller workflow/job.",
-        "OPENROUTER_API_KEY:\n        required: false",
-        "die \"source missing pack/luffy-pr-review-caller.yml (F10)\""
-      ],
-      "confidence": "high"
-    },
-    {
-      "kind": "dev",
-      "path": ".",
+      "path": "agent",
       "action": "merge",
       "section": "Pitfalls",
-      "content": "- The `@luffy review` gate `if:` expression is duplicated in *both* the thin caller job and the reusable job. Changing the trigger phrase or association logic in one place silently no-ops (caller filters everything out) or double-gates; keep the two conditions in sync.\n- Hub-managed callers point at `…/luffy-review-reusable.yml@main`, i.e. unpinned by design — a broken hub `main` breaks every `--caller` target repo at once, and there is no per-target rollback short of editing that `uses:` ref.\n- Only the reusable file is versioned per-mode: pack installs carry a *local copy* of the reusable workflow, so pack-installed targets do **not** pick up hub fixes until re-run through `install-luffy.sh`.",
+      "content": "- The F22 signal depends on a *textual* contract with the model output, not a structured field: `scripts/parse-verdict.py` matches `^\\*\\*Verdict:\\*\\*\\s*(.+)$` (MULTILINE, case-insensitive), so the verdict must be a bold `**Verdict:**` label at the start of a line in the normalized body. Reformatting that line in `agent/review-prompt.md` (plain text, inline, indented, inside a fence) silently degrades every run to `UNKNOWN`.\n- Same anchoring applies to `**Score:** <int>[/100]` and `**Confidence:** low|medium|high` — score/confidence are parsed only for reporting, and a missed match yields empty strings rather than an error.\n- `UNKNOWN` is deliberately non-blocking (reaction `eyes`, status `success`), so a broken prompt contract looks like a healthy neutral review instead of failing loudly. Verify the posted body still carries the bold verdict line after any prompt/template edit.",
       "evidence": [
-        "uses: Mr-Ashish/luffy-pr-review-agent/.github/workflows/luffy-review-reusable.yml@main",
-        "Default pack mode still copies agent/scripts + both workflow files for self-contained targets."
+        "_VERDICT_RX = re.compile(r\"^\\*\\*Verdict:\\*\\*\\s*(.+?)\\s*$\", re.MULTILINE | re.IGNORECASE)",
+        "UNKNOWN → reaction eyes, status success"
       ],
-      "confidence": "medium"
+      "confidence": "high"
     },
     {
-      "kind": "usage",
-      "path": ".",
+      "kind": "dev",
+      "path": "agent",
       "action": "merge",
-      "section": "Setup",
-      "content": "- Hub-managed (multi-repo, recommended) install — thin workflow only, no `agent/`/`scripts/` copy on the target: `./scripts/install-luffy.sh --caller /path/to/target-repo`. Self-contained install stays `./scripts/install-luffy.sh /path/to/target-repo`.\n- A `--caller` target still needs the repo secret `OPENROUTER_API_KEY`; optional `LUFFY_HUB_TOKEN` and vars `LUFFY_MODEL` / `LUFFY_HERMES_COMMIT` / `LUFFY_COOLDOWN_SECONDS` / `LUFFY_RUNNER_IMAGE` behave the same as in pack mode because the reusable job reads them from the calling repo.\n- Preview either mode without writing: `./scripts/install-luffy.sh --dest /path/to/target-repo --dry-run`; `install-luffy.sh` refuses to install into the Luffy source tree itself unless `--force` is passed.",
+      "section": "Design decisions",
+      "content": "- Verdict text is normalized rather than required to be exact: aliases map `APPROVED`/`LGTM` → `APPROVE`, `REQUEST_CHANGES`/`REQUEST-CHANGES`/`CHANGES REQUESTED` → `REQUEST_CHANGES`, `COMMENTS`/`NEUTRAL` → `COMMENT`; whitespace is collapsed, trailing `.` stripped, and any trailing parenthetical/bracket note removed.\n- After exact-alias lookup there is a prefix pass, so decorated verdicts like `REQUEST CHANGES — see blocking` still resolve. This tolerance is intentional: the model is allowed prose after the token, but not allowed to move the label off the line start.",
       "evidence": [
-        "# Hub-managed (F10, recommended for multi-repo): thin workflow only\n   ./scripts/install-luffy.sh --caller /path/to/target-repo",
-        "Required secret on this repo: OPENROUTER_API_KEY\n# Optional: LUFFY_HUB_TOKEN, vars LUFFY_MODEL / LUFFY_HERMES_COMMIT / LUFFY_COOLDOWN_SECONDS / LUFFY_RUNNER_IMAGE"
+        "\"CHANGES REQUESTED\": \"REQUEST_CHANGES\"",
+        "# Prefix match (e.g. \"REQUEST CHANGES — see blocking\")"
       ],
       "confidence": "high"
     },
@@ -53,19 +28,32 @@
       "kind": "dev",
       "path": "pack",
       "action": "merge",
-      "section": "Architecture",
-      "content": "- `pack/` holds installable templates that are *not* live workflows in this repo: `luffy-pr-review-caller.yml` is the F10 hub-managed thin caller, copied verbatim to `.github/workflows/luffy-pr-review.yml` on the target by `install-luffy.sh --caller`.\n- It differs from this repo's own `luffy-pr-review.yml` in exactly one way: `uses:` is the absolute hub ref `Mr-Ashish/luffy-pr-review-agent/.github/workflows/luffy-review-reusable.yml@main` with literal `luffy_repository`/`luffy_ref` values, instead of the local `./.github/workflows/...` path with `github.repository`.\n- Triggers, `permissions`, and the `luffy-${{ github.repository }}-<pr>` concurrency group are duplicated in the template because a `workflow_call` job cannot own them — edits to gating must be applied to `pack/luffy-pr-review-caller.yml` as well as the in-repo caller.",
+      "section": "Pitfalls",
+      "content": "- F22's PR-head commit status needs `statuses: write` in the *caller's* `permissions` block. Because a `workflow_call` job cannot own permissions, this grant must be added to `pack/luffy-pr-review-caller.yml` in addition to this repo's own `luffy-pr-review.yml` — a caller missing it still reviews and comments, but the `luffy/review` context never appears.",
       "evidence": [
-        "# Luffy — hub-managed thin caller (F10)\n#\n# Install with: ./scripts/install-luffy.sh --caller /path/to/target-repo",
-        "No agent/ or scripts/ copy required; runtime is checked out from the hub on each run."
+        "Callers grant statuses: write.",
+        "Triggers, `permissions`, and the ... concurrency group are duplicated in the template because a `workflow_call` job cannot own them"
+      ],
+      "confidence": "medium"
+    },
+    {
+      "kind": "usage",
+      "path": ".",
+      "action": "merge",
+      "section": "Troubleshooting",
+      "content": "- No `luffy/review` status on the PR head: check (1) repo variable `LUFFY_COMMIT_STATUS` is not `0` (that is the documented opt-out), (2) the caller workflow grants `statuses: write`.\n- A neutral 👀 reaction plus `success` means the verdict line was parsed as `UNKNOWN` (or the review was a genuine COMMENT); inspect `review.md` in the trace artifact for a line starting with `**Verdict:**` before blaming the status code path.\n- To make Luffy gate merges, add `luffy/review` as a required status check — `REQUEST CHANGES` reports `failure` while `APPROVE`/`COMMENT` report `success`, and any pipeline failure (`pipeline_rc != 0`) reports `error` with 👎 regardless of the parsed verdict.",
+      "evidence": [
+        "Opt-out LUFFY_COMMIT_STATUS=0",
+        "Required-status checks can require context `luffy/review`.",
+        "Pipeline failures stay `error`+`-1`"
       ],
       "confidence": "high"
     }
   ],
-  "summary": "The session covers F10 (shipped): the review job was extracted into a `workflow_call` reusable workflow with `luffy_repository`/`luffy_ref` inputs, plus two packaging modes — self-contained pack vs. hub-managed thin caller installed by `install-luffy.sh --caller` from `pack/luffy-pr-review-caller.yml`. None of this appears in the existing claim index (which stops at F20/F21).",
+  "summary": "Session shipped F22 (verdict-aware done signal). Beyond the already-recorded verdict→reaction/status mapping, new durable detail: the exact textual contract parse-verdict.py requires from the review body (bold `**Verdict:**` line, alias/prefix normalization, UNKNOWN fallback), the `statuses: write` grant callers must carry, and the operator knobs for the `luffy/review` commit-status context.",
   "session_ids": [
     "dogfood-luffy-session"
   ],
   "model": "anthropic/claude-opus-5",
-  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T181228-3ea39e/extract.raw.md"
+  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T182053-639eef/extract.raw.md"
 }

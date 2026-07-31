@@ -1,27 +1,21 @@
 {
   "stats": {
-    "files": 3,
-    "lines_added": 19,
+    "files": 2,
+    "lines_added": 11,
     "lines_removed": 7,
-    "changes": 5
+    "changes": 3
   },
   "files": [
     {
-      "path": "DEV.md",
-      "is_new": false,
-      "lines_added": 10,
-      "lines_removed": 4
-    },
-    {
       "path": "USAGE.md",
       "is_new": false,
-      "lines_added": 0,
-      "lines_removed": 3
+      "lines_added": 3,
+      "lines_removed": 7
     },
     {
-      "path": "pack/DEV.md",
-      "is_new": true,
-      "lines_added": 9,
+      "path": "agent/DEV.md",
+      "is_new": false,
+      "lines_added": 8,
       "lines_removed": 0
     }
   ]

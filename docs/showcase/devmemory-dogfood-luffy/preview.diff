@@ -1,54 +1,12 @@
-diff --git a/DEV.md b/DEV.md
---- a/DEV.md
-+++ b/DEV.md
-@@ -10,9 +10,10 @@
- - **F20 install pack:** `scripts/install-luffy.sh` is the adoption entrypoint — copies `agent/`, a runtime-script allowlist (not image-build/bench tools), and `luffy-pr-review.yml` into a target repo; optional `--with-hub-ingest` / `--with-runner-build`; writes `.luffy-install-stamp` with source SHA.
- - Dual workspace separates trust domains: `luffy/` holds SOUL + prompts + scripts from the default branch, `workspace/` holds only the PR head, `.luffy-hermes-home/` holds Hermes config + growing memory.
- 
-+- **F10 packaging split:** the whole review job now lives in `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`); `luffy-pr-review.yml` is a thin trigger-only caller that owns `issue_comment` / `workflow_dispatch`, concurrency and permissions, then `uses:` the reusable job.
-+
- ## Design decisions
- 
--- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout. **F21** makes spend visible on the PR comment + job summary (see below) without blocking runs.
- - **F8 prebaked runner:** `ensure_hermes` short-circuits when `LUFFY_HERMES_PREBAKED=1` or `/root/.hermes-pin`/`$HOME/.hermes-pin` exists and `hermes` is on PATH (image from `docker/luffy-runner/`). Workflow optional `container: vars.LUFFY_RUNNER_IMAGE`; Hermes Actions cache is skipped when prebaked is detected.
- - Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (default known-good SHA; `latest`/`main`/`floating`/empty = float), emits `install.sh` args (`--skip-setup --commit … --force-commit`), and supplies the Actions cache key suffix (`v4-<12-char-pin>`). Pin mismatch on a warm cache triggers reinstall.
- - Re-runs replace prior Luffy comments by deleting bodies matching the `<!-- luffy-review pr=N` marker before posting; set `LUFFY_REPLACE_PREVIOUS=0` to stack instead.
-@@ -26,12 +27,15 @@
- - The installer copies **itself** into the target pack (`install-luffy.sh` is in `RUNTIME_SCRIPTS`), so an installed repo can re-run the install/update from its own tree; executable bits are preserved per-file (`[[ -x "$from" ]] && chmod +x`).
- - Source root defaults to the parent of `scripts/` (`--source` overrides) and is validated by three presence checks — `agent/`, `scripts/`, `.github/workflows/luffy-pr-review.yml` — before any copy, so a wrong `--source` fails fast instead of half-installing.
- - Installing the pack into the Luffy source tree itself (`SRC == DEST`) is refused unless `--force`, explicitly to avoid half-copies over the canonical tree.
--- Exit contract: `0` ok, `1` usage/error (including refuse install into source tree without `--force`); existing target files are **skipped** (not exit 2) unless `--force`. All human output goes to **stderr** via `log()`.
- - Provenance is a plain-text stamp, not a version string: `.luffy-install-stamp` records `installed_at`, `source_sha` (`git rev-parse --short HEAD` of the source, `unknown` outside git), `source_path`, and the pack contents.
- 
--- **F21 cost visibility** is a post-normalize decoration, not a pipeline stage: `scripts/usage-summary.py` reads the `hermes --usage-file` JSON (`hermes-usage.json`) written by `run-hermes-review.sh` and exposes three subcommands — `footer` (emit one italic Markdown line), `append` (inject/update that line on an existing `review.md`), `step-summary` (a **Luffy cost / usage** section for `$GITHUB_STEP_SUMMARY` with model, estimated USD, tokens, API calls, stage timings).
- - Telemetry is explicitly non-load-bearing: missing, empty, non-dict, or unparseable usage files are soft no-ops that exit 0, and `run-hermes-review.sh` calls the `append` step guarded by `[[ -f … ]]` with `|| notice "usage-summary append soft-failed"` — cost reporting can never fail a review.
- - Both the PR-comment footer and the job summary are fed from the same usage file so cost is visible without downloading an artifact; number formatting is deliberately lossy/human (tokens as `1.5k`/`10k`/`1.0M`, `n/a` when a field is absent or non-numeric, booleans rejected as numbers).
-+
-+- The reusable workflow declares **no `permissions:` block** — "Permissions come from the caller workflow/job", so every caller must grant `contents`/`pull-requests`/`issues`/`actions` write itself; a caller that forgets one fails at post/cache time, not at call time.
-+- Both reusable secrets (`OPENROUTER_API_KEY`, `LUFFY_HUB_TOKEN`) are declared `required: false` and callers are expected to use `secrets: inherit`; this keeps forks/unfunded repos from failing the `workflow_call` contract up front, with `LUFFY_HUB_TOKEN` falling back to `GITHUB_TOKEN`.
-+- Reusable inputs default to the hub (`luffy_repository: Mr-Ashish/luffy-pr-review-agent`, `luffy_ref: main`), so an under-specified caller still resolves to a working runtime instead of erroring.
-+- `install-luffy.sh` preflights **both** F10 files (`.github/workflows/luffy-review-reusable.yml` and `pack/luffy-pr-review-caller.yml`) before copying anything, so a source tree missing the reusable pair dies before producing a half-install.
- 
- ## Pitfalls
- 
-@@ -55,9 +59,11 @@
- - `agent/` is copied with `-maxdepth 1 -type f`, so nested files under `agent/` are never installed — keep agent assets flat.
- - `usage()` renders help by slicing the file header (`sed -n '2,25p' "$0"`); editing or growing the top comment block silently truncates or corrupts `--help` output.
- 
--- `usage-summary.py` is textually coupled to `normalize-review.py`: `_FOOTER_RX` matches the exact brand footer line (`*Luffy · Hermes Agent · OpenRouter · memory-backed review…*`) to anchor where the cost line goes. Editing that footer string in `normalize-review.py` silently misplaces (or drops) the F21 cost line — change both together.
- - Re-appending is idempotent by design via `_COST_LINE_RX` (`^\*Cost / usage:.*\*$`): an existing cost line is replaced, not stacked. Rewriting that line's shape in one place breaks dedup and produces duplicated footers on re-runs.
- - A missing `*Cost / usage: …*` line on a posted review is not necessarily a bug — it is the documented soft no-op when `hermes-usage.json` is absent/empty/malformed. Check the usage file before suspecting the review path.
-+
-+- The `@luffy review` gate `if:` expression is duplicated in *both* the thin caller job and the reusable job. Changing the trigger phrase or association logic in one place silently no-ops (caller filters everything out) or double-gates; keep the two conditions in sync.
-+- Hub-managed callers point at `…/luffy-review-reusable.yml@main`, i.e. unpinned by design — a broken hub `main` breaks every `--caller` target repo at once, and there is no per-target rollback short of editing that `uses:` ref.
- 
- ## Patterns
- 
-
 diff --git a/USAGE.md b/USAGE.md
 --- a/USAGE.md
 +++ b/USAGE.md
-@@ -28,7 +28,6 @@
+@@ -26,12 +26,10 @@
+ ## Setup
+ 
+ - Install on each target repo's **default branch** (workflow only runs from default branch):
+-  - **Hub-managed (F10):** `./scripts/install-luffy.sh --caller /path/to/target-repo` — only `.github/workflows/luffy-pr-review.yml` pointing at `luffy-review-reusable.yml@main`.
+   - **Pack:** `./scripts/install-luffy.sh /path/to/target-repo` — `agent/`, runtime `scripts/`, thin caller + local reusable.
  - Required secret: `OPENROUTER_API_KEY`. For cross-repo hub memory also add `LUFFY_HUB_TOKEN` (PAT with contents write on the hub).
  - Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_RUNNER_IMAGE` (optional prebaked Hermes container image, F8), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
  - Trigger a review by commenting `@luffy review this pr` (or `@luffy review`) on the PR.
@@ -56,7 +14,7 @@ diff --git a/USAGE.md b/USAGE.md
  
  ## Debugging
  
-@@ -40,7 +39,6 @@
+@@ -43,7 +41,6 @@
  
  - Reproduce a cooldown decision offline (no `gh`, no network): `LUFFY_COOLDOWN_FIXTURE=/tmp/comments.json NOW_EPOCH=1753963200 bash scripts/cooldown-check.sh 1` — fixture is a JSON array of `{created_at, body}` objects; read the `allowed=`/`reason=`/`remaining_s=` lines and the exit code (0 allow, 2 skip, 1 error).
  
@@ -64,23 +22,41 @@ diff --git a/USAGE.md b/USAGE.md
  - For deeper digging, `hermes-usage.json` travels with the run package (see `docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/hermes-usage.json` for a captured example alongside `timings.json`).
  - If cost/token values render as `n/a`, the usage JSON parsed but the specific field was absent or non-numeric; if the whole line is missing, the usage file itself was missing/empty and every subcommand no-opped.
  
-@@ -49,4 +47,3 @@
- - Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` in the target and compare `source_sha` with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`.
+@@ -52,7 +49,9 @@
+ - Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` (`mode=pack|caller`, `source_sha`) and compare with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`. For `mode=caller`, runtime tracks hub `main`, not the stamp alone.
  - Installer output is entirely on stderr; capture it with `./scripts/install-luffy.sh /path/to/repo 2>&1 | tee install.log` and grep for `exists (skip` / `WARN missing` before committing the pack.
  - Preview exactly what would be written (including the stamp) with `--dry-run`; lines are prefixed `DRY  <from> → <to>`.
--- Interpret exit codes: `1` is a usage/validation error (missing dest, bad `--source`, or install into the Luffy source tree without `--force`). Existing target files are skipped with a stderr notice unless you pass `--force` (exit still `0`).
+-- Interpret exit codes: `1` is a usage/validation error (missing dest, bad `--source`, missing F10 workflow files, or install into the Luffy source tree without `--force`). Existing target files are skipped with a stderr notice unless you pass `--force` (exit still `0`).
++
++- No `luffy/review` status on the PR head: check (1) repo variable `LUFFY_COMMIT_STATUS` is not `0` (that is the documented opt-out), (2) the caller workflow grants `statuses: write`.
++- A neutral 👀 reaction plus `success` means the verdict line was parsed as `UNKNOWN` (or the review was a genuine COMMENT); inspect `review.md` in the trace artifact for a line starting with `**Verdict:**` before blaming the status code path.
+ 
+ ## F22 verdict signals
+ 
+@@ -65,10 +64,7 @@
+ | COMMENT | `eyes` | `success` |
+ | Pipeline failed | `-1` | `error` |
+ 
+-- CLI: `python3 scripts/parse-verdict.py review.md --pipeline-rc 0` (kv lines)
+-- Summary: `… --format summary` (Markdown for job summary)
+ - Wrapper: `scripts/report-verdict.sh review.md [pipeline_rc]` (reaction + status + summary)
+ - Disable commit status: repo var `LUFFY_COMMIT_STATUS=0`
+ - Status context override: `LUFFY_STATUS_CONTEXT` (default `luffy/review`)
+ - Branch protection can require status check context **`luffy/review`** so REQUEST CHANGES blocks merge when configured.
+-
 
-diff --git a/pack/DEV.md b/pack/DEV.md
-new file mode 100644
---- /dev/null
-+++ b/pack/DEV.md
-@@ -0,0 +1,9 @@
-+# DEV — engineering knowledge
+diff --git a/agent/DEV.md b/agent/DEV.md
+--- a/agent/DEV.md
++++ b/agent/DEV.md
+@@ -9,3 +9,11 @@
+ - Finding discipline is asymmetric by design: thorough on bugs/security, high bar elsewhere — every finding needs file + symbol + concrete trigger, and silence beats speculation (an empty Blocking section is an acceptable output).
+ - Every review must emit structured judgment fields: Score 0–100, review effort 1–5, security audit verdict, relevant-tests yes/no, key findings, optional concrete code suggestions.
+ - Output contract is a single bare Markdown document (no preamble, no tool chatter, not fence-wrapped) so `normalize-review.py` can validate and post it directly as a PR comment.
 +
-+> How this part of the system is built.
++- Verdict text is normalized rather than required to be exact: aliases map `APPROVED`/`LGTM` → `APPROVE`, `REQUEST_CHANGES`/`REQUEST-CHANGES`/`CHANGES REQUESTED` → `REQUEST_CHANGES`, `COMMENTS`/`NEUTRAL` → `COMMENT`; whitespace is collapsed, trailing `.` stripped, and any trailing parenthetical/bracket note removed.
++- After exact-alias lookup there is a prefix pass, so decorated verdicts like `REQUEST CHANGES — see blocking` still resolve. This tolerance is intentional: the model is allowed prose after the token, but not allowed to move the label off the line start.
 +
-+## Architecture
++## Pitfalls
 +
-+- `pack/` holds installable templates that are *not* live workflows in this repo: `luffy-pr-review-caller.yml` is the F10 hub-managed thin caller, copied verbatim to `.github/workflows/luffy-pr-review.yml` on the target by `install-luffy.sh --caller`.
-+- It differs from this repo's own `luffy-pr-review.yml` in exactly one way: `uses:` is the absolute hub ref `Mr-Ashish/luffy-pr-review-agent/.github/workflows/luffy-review-reusable.yml@main` with literal `luffy_repository`/`luffy_ref` values, instead of the local `./.github/workflows/...` path with `github.repository`.
-+- Triggers, `permissions`, and the `luffy-${{ github.repository }}-<pr>` concurrency group are duplicated in the template because a `workflow_call` job cannot own them — edits to gating must be applied to `pack/luffy-pr-review-caller.yml` as well as the in-repo caller.
++- Same anchoring applies to `**Score:** <int>[/100]` and `**Confidence:** low|medium|high` — score/confidence are parsed only for reporting, and a missed match yields empty strings rather than an error.
++- `UNKNOWN` is deliberately non-blocking (reaction `eyes`, status `success`), so a broken prompt contract looks like a healthy neutral review instead of failing loudly. Verify the posted body still carries the bold verdict line after any prompt/template edit.
