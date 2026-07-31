@@ -17,7 +17,7 @@
 | F52 | Multi-lens | product | PR #2 merged |
 | F53 | Linked issue context | product | PR #3 merged |
 | F54 | Fix-it prompt per inline comment | product | PR #4 merged |
-| F55 | Feature toggle system | product | **this fire** — registry + file + CLI |
+| F55 | Feature toggle system | product | **MERGED** PR #5 — `feature_toggles.py` |
 
 ## IN_PROGRESS
 
@@ -25,7 +25,7 @@
 |----|---------|-------|
 | — | Review lens recipes / named packs | multi-lens base in F52; recipes backlog |
 | — | Live e2e issue-ctx + fixit quality | measure Actionability/Inline after F54 |
-| — | Toggle migration (remaining scripts) | F55 core shipped; gradual consumer adopt |
+| — | Toggle migration (remaining scripts) | F55 merged; gradual consumer adopt |
 
 ## LEFT (priority product backlog)
 
@@ -52,9 +52,9 @@
 - **left_count:** 12 (items 3–15; 1–2 done)
 - **progress_pct:** ~53% of 15-item product backlog (8 product-ish of 15 ≈ 53)
 - **eta:** 5–9 more productive fires for top remaining (recipes, filler, mermaid, incremental, federated)
-- **active_worktrees:** f55-feature-toggles
+- **active_worktrees:** none (F55 merged)
 - **federated_memory_note:** still deferred; registry now has `hub_publish`/`local_publish` keys for gated compound learning
 
 ## Status line
 
-`features_built_count=12 types_built=agent_quality,product left_count=12 progress_pct=53 eta=5-9fires active_worktrees=1 federated_memory_note=keys_registered_deferred`
+`features_built_count=12 types_built=agent_quality,product left_count=12 progress_pct=53 eta=5-9fires active_worktrees=0 federated_memory_note=keys_registered_deferred`

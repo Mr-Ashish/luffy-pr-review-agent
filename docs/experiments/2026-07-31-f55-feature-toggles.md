@@ -1,7 +1,7 @@
 # F55 — Unified feature toggle system
 
 **Date:** 2026-07-31  
-**Status:** shipped (control-plane)  
+**Status:** shipped (MERGED PR #5)  
 **Tag:** PRODUCT_FEATURE | AGENT_DESIGN
 
 ## Problem
