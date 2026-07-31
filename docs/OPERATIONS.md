@@ -133,3 +133,12 @@ Secrets (`sk-or-…`, `OPENROUTER_API_KEY=…`, common `ghp_`/`github_pat_` toke
 # Download latest trace for a run
 gh run download <run-id> -R owner/repo -n luffy-trace-pr1-run<run-id>
 ```
+
+## F8 Prebaked Hermes runner (faster CI startup)
+
+Cold Hermes install is the expensive part of job startup (~2 minutes locally). Mitigation:
+
+1. **Actions cache** (default): pin-keyed restore of `~/.local` + `~/.hermes` (F2/F14/F7).
+2. **Prebaked image** (optional): build with workflow **Build Luffy Hermes runner** or `./scripts/build-luffy-runner-image.sh`. Image sets `LUFFY_HERMES_PREBAKED=1`. On runners that already have Hermes, export the same env so install is skipped.
+3. **Benchmark:** `./scripts/benchmark-hermes-startup.sh` → `docs/benchmarks/hermes-startup-latest.md`.
+
