@@ -118,6 +118,7 @@ RUNTIME_SCRIPTS=(
   run-hermes-review.sh
   run-luffy-review.sh
   save-trace.sh
+  review-to-openui.py
   sparse-pr-paths.sh
   usage-summary.py
   write-failure-review.sh

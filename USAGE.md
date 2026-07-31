@@ -2,6 +2,12 @@
 
 > How to work with this repository.
 
+## OpenUI console
+
+- Convert review to OpenUI Lang: `python3 scripts/review-to-openui.py --review path/to/review.md -o out.openui` (optional `--usage` / `--timings` / `--memory-health`).
+- Interactive viewer: `cd ui/review-console && npm install && npm run copy-fixture && npm run dev` → http://localhost:5177
+- Plan: `docs/OPENUI-INTEGRATION.md`. Fixture: `docs/showcase/openui-luffy/`.
+
 ## Common commands
 
 - Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).

@@ -82,3 +82,14 @@ Vars: `LUFFY_MEMORY_MODE` (`local` default | `hub` | `both`), `LUFFY_MEMORY_PATH
 | **Pack** (default install) | `agent/`, runtime `scripts/`, thin caller + local copy of reusable | Target default branch |
 
 Hub implementation file: `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`, inputs `luffy_repository` + `luffy_ref`).
+
+## OpenUI review console (optional UI)
+
+Luffy’s PR comment remains Markdown. An optional **Review Console** (`ui/review-console/`) renders the same review as **OpenUI Lang** (Thesys OpenUI):
+
+```text
+review.md (+ usage/timings)  →  scripts/review-to-openui.py  →  .openui
+                                                              →  Vite/React Renderer
+```
+
+Phase plan and component map: [OPENUI-INTEGRATION.md](OPENUI-INTEGRATION.md). Does not replace GHA/Modal pipelines.

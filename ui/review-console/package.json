@@ -1,0 +1,26 @@
+{
+  "name": "luffy-review-console",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "copy-fixture": "mkdir -p public/fixtures && cp ../../docs/showcase/openui-luffy/review.openui public/fixtures/review.openui"
+  },
+  "dependencies": {
+    "@openuidev/react-lang": "^0.2.9",
+    "@openuidev/react-ui": "^0.13.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.0"
+  }
+}
