@@ -1,6 +1,6 @@
 # Product feature progress
 
-**Updated:** 2026-07-31 (milvus harness + #1 e2e)  
+**Updated:** 2026-07-31 (milvus corpus #2 + e2e)  
 **Loop:** 019fb948dbe8 orchestrator
 
 ## SHIPPED
@@ -21,12 +21,11 @@
 
 | ID | Feature | Notes |
 |----|---------|-------|
-| — | Live milvus multi-feature e2e | **#1 done** (F49 mini); grow corpus ≥2–3 |
+| — | Live milvus multi-feature e2e | **#1–#2 done**; need ≥1 more corpus PR |
 | — | Reply on thread / testplan / FP+federated | next product wave |
 
 ## LEFT
 
-8. ~~INCREMENTAL REVIEW~~ → **F59**  
 9. REPLY ON THREAD  
 10. TESTPLAN GENERATION  
 11–15. FP, federated, tools eval, hermes, multi-PR e2e (milvus)  
@@ -35,15 +34,15 @@
 
 - **features_built_count:** 16 (F44–F59)
 - **types_built:** agent_quality, product
-- **left_count:** 8
-- **progress_pct:** ~80% (product) + milvus e2e 1/3 corpus
-- **eta:** 4–6 fires (corpus + F60–F62)
+- **left_count:** 7–8 (product backlog)
+- **progress_pct:** ~80% product; milvus corpus **2/3**
+- **eta:** 3–5 fires
 - **active_worktrees:** none
-- **federated_memory_note:** deferred; milvus local `.luffy` publish ok on #1
-- **agent_design_note:** tools=I/O, workflows=code, prompt=judgment, MD=persona — F49/F57 exercised on milvus
-- **meta_loop_note:** exact SHA port for monorepo; corpus-first when empty
-- **milvus_corpus:** 1 PR ([#1](https://github.com/Mr-Ashish/milvus/pull/1))
+- **federated_memory_note:** hub deferred; **local MEMORY compounds** across milvus #1→#2
+- **agent_design_note:** F49/F57/F53 exercised; tools=I/O code gates
+- **meta_loop_note:** corpus-first until ≥3; multi-lang diversity
+- **milvus_corpus:** 2 PRs ([#1](https://github.com/Mr-Ashish/milvus/pull/1), [#2](https://github.com/Mr-Ashish/milvus/pull/2))
 
 ## Status line
 
-`features_built_count=16 types_built=agent_quality,product left_count=8 progress_pct=80 eta=4-6fires active_worktrees=0 federated_memory_note=milvus_local_ok_hub_deferred milvus_corpus=1`
+`features_built_count=16 types_built=agent_quality,product left_count=8 progress_pct=80 eta=3-5fires active_worktrees=0 federated_memory_note=local_compound_ok milvus_corpus=2`

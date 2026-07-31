@@ -1,17 +1,17 @@
 # Parallel worktrees tracker
 
-Primary checkout: `/Users/ashishmishra/Documents/experiments/pr-review-agent` (main).
+Primary: `/Users/ashishmishra/Documents/experiments/pr-review-agent` (main).  
+Worktrees: `/Users/ashishmishra/Documents/experiments/pr-review-agent-wt/<slug>` (≤3).
 
-Worktree root convention: `/Users/ashishmishra/Documents/experiments/pr-review-agent-wt/<feature-slug>`.
+| Worktree | Branch | PR | Status |
+|----------|--------|-----|--------|
+| (none) | — | — | idle — next F60 reply-on-thread |
 
-| Worktree | Branch | PR | Status | Notes |
-|----------|--------|-----|--------|-------|
-| (none) | — | — | idle | F59 merged; next F60 reply-on-thread |
+## Eval corpus (Mr-Ashish/milvus)
 
-## Eval corpus (Mr-Ashish/milvus) — LIVE harness
+| PR | Upstream | Status |
+|----|----------|--------|
+| [#1](https://github.com/Mr-Ashish/milvus/pull/1) | #51991 | OPEN e2e 36/50 |
+| [#2](https://github.com/Mr-Ashish/milvus/pull/2) | #51962 | OPEN e2e 37/50 |
 
-| PR | Branch | Status |
-|----|--------|--------|
-| [#1](https://github.com/Mr-Ashish/milvus/pull/1) | luffy-eval/51991-head ← base | OPEN first e2e 36/50 |
-
-Updated: 2026-07-31 (milvus #1).
+Updated: 2026-07-31 (milvus #2).

@@ -20,6 +20,7 @@ Rubric dims (1–5 each; one-line evidence). Same schema as odoo for cross-harne
 | PR | D1 | D2 | D3 | D4 | D5 | D6 | D7 | D8 | D9 | D10 | Total/50 | Top gap |
 |----|----|----|----|----|----|----|----|----|-----|----------|---------|
 | #1 skip insert parse (F49 mini re-prompt) | 3 | 4 | 3 | 4 | 3 | 3 | 5 | 3 | 4 | 4 | **36** | Soft findings; empty Key findings; first-run memory seed |
+| #2 bloom 50M (F49 mini re-prompt) | 3 | 4 | 3 | 4 | 3 | 3 | 5 | 4 | 4 | 4 | **37** | Soft e2e-suggestion only; multi-lang covered |
 
 ### Evidence
 
@@ -28,3 +29,7 @@ Rubric dims (1–5 each; one-line evidence). Same schema as odoo for cross-harne
 ### Cross-harness note
 
 Milvus #1 first-run **36/50** ≈ odoo #2 F49 (36) / #5 F49 (37) on mini — F49 transfer holds; domain shift Go/WAL did not break gates.
+
+- **#2 F49 mini:** Soft re-prompt recovered `tool_turns` **0→36** (sessions `20260731_235714_56bd07` → `20260731_235729_160d87`); **APPROVE 85** · ~$0.103 · 37 API · **113s**; **MEMORY_SOURCE=local** (preloaded #1 notes); F57 mermaid **5 groups** (client/config/docs/internal/pkg); multi-lens ok; e2e-at-limit test suggestion only; no path:LINE findings; score **37/50** (+1 vs #1 via D8).
+
+Milvus #2 **37/50** slightly above #1; memory compound + multi-module mermaid.

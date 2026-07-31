@@ -15,3 +15,11 @@ Log ≤5 concrete process deltas per fire. Prefer implementable Luffy/docs chang
 - Prefer milvus corpus growth until ≥2–3 PRs before pure product fires.
 - Cap active worktrees ≤3 under `pr-review-agent-wt/`.
 - One primary outcome per fire (port | e2e | product), not all three.
+
+## 2026-07-31 — corpus 1→2 + memory compound
+
+1. **ROI choice:** corpus growth > new product when n_eval < 3 — second PR unblocks multi-PR e2e compare.
+2. **Memory feedback loop:** second milvus run preloaded local MEMORY from #1 → measurable D8 3→4 without hub.
+3. **Diversity metric:** prefer multi-lang/config PRs (#51962) after pure-Go (#51991) for multi-lens stress.
+4. **Stop idle:** progress (port+e2e) → streak 0; still need one more corpus PR for ≥3 target.
+5. **Next-fire default:** either #3 port OR F60 thread-reply if e2e signal plateaus.
