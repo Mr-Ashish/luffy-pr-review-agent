@@ -46,8 +46,15 @@ Artifacts: `.luffy-out-e2e-pr2-f44/` (review, raw, run-bundle, traces/pr2-runloc
 4. **Pin reinstall tax:** hermes pin mismatch forced full reinstall (~1–2 min) before the agent loop.
 5. **Verdict parse** depends on `**Verdict:**`; chat mode often emits unbolded `Verdict:` — F44 promotes loose headings.
 
+## Introspect (F47 / H14)
+
+1. **Root cause of hermes -z rc=2:** Luffy passed `--max-turns N` on the hermes CLI. Hermes has **no** such argparse flag; bare `N` is parsed as subcommand → `invalid choice: '25'` → exit 2 before any model call.
+2. **Why chat fallback looked "successful" but tool_turns=0:** `hermes chat -q` accepts the bad argv more leniently (or ignores it) and runs a non-agentic single-shot with no workspace tools.
+3. **Fix:** F47 removes CLI `--max-turns`; cap remains via `HERMES_MAX_ITERATIONS` + `agent.max_turns` config rewrite (Hermes-native). On CLI argv rejection, skip chat fallback (`hermes-cli-argv.env`) so we do not double-spend a zero-tool path.
+4. **Next:** H16 live mini re-run on #2 to confirm tool_turns>0 + SOUL loads (F46) and re-score D1/D8.
+
 ## Next learn targets
 
-- H14: Make hermes -z reliable; avoid chat -q fallback.
+- H16: Live re-score #2 mini after F47 (-z tools + F46 SOUL).
 - H15: optional one-shot re-prompt after F45 annotate (recover findings without always COMMENT-only).
-- Re-run cheap mini on #2 after F45+F46 to measure D8 lift when SOUL loads.
+- Corpus maintain ≥3; optional 4th complex upstream PR when idle.

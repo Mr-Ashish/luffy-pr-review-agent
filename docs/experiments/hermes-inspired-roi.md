@@ -21,8 +21,9 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | **H11** | **Strip hermes chat chrome + reject prompt-template echo in normalizer** | **S** | **F44 e2e: chat -q posted Query+template; contract false-positive** | **Shipped F44** |
 | **H12** | **Fail closed when tool_turns=0 on multi-file non-docs PR (COMMENT, not re-prompt)** | **S** | **#2 mini APPROVE missed known test gap; GHA/tools did not** | **Shipped F45** |
 | **H13** | **SOUL.md hermes prompt_injection false-positive workaround** | **S** | **F44 log: SOUL blocked — review discipline may not load** | **Shipped F46** |
-| H14 | Make hermes -z reliable; avoid chat -q fallback | M | -z rc=2 forced chat path that needs F44 scrubbing | **P0 next** |
+| **H14** | **Make hermes -z reliable; avoid chat -q fallback** | **S** | **-z rc=2 was bogus `--max-turns` CLI flag → chat path** | **Shipped F47** |
 | H15 | Soft re-prompt once when tool_turns=0 + multi-file (after F45 annotate) | M | Recover quality without always failing closed | backlog |
+| H16 | Live re-score #2 mini after F47 (-z tools + F46 SOUL) | S | Measure D1/D8 lift vs F44/F45 rows | **P0 next** |
 
 ## Selection rule
 
@@ -41,3 +42,5 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 **H12 → F45** (2026-07-31): `tool_turns_gate.py` fail-closed — zero tools + multi-file non-docs → downgrade APPROVE→COMMENT, score cap 55, F45 banner; pack chip `tool-turns-gate`.
 
 **H13 → F46** (2026-07-31): rephrase `agent/SOUL.md` trust model (no classic injection quotes); `soul_context_scan.py` preflight + log detect; pack chip `soul-blocked`.
+
+**H14 → F47** (2026-07-31): stop passing `--max-turns` on `hermes` CLI (argparse has no flag → `invalid choice: 'N'` → chat fallback). Cap via `HERMES_MAX_ITERATIONS` + `agent.max_turns` config only; skip chat fallback on CLI argv rejection (`hermes-cli-argv.env`).

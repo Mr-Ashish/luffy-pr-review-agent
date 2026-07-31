@@ -116,9 +116,22 @@ class ConfigYamlTests(unittest.TestCase):
     def test_run_hermes_wires_max_turns(self):
         text = (ROOT / "scripts" / "run-hermes-review.sh").read_text(encoding="utf-8")
         self.assertIn("max_turns.py", text)
-        self.assertIn("--max-turns", text)
         self.assertIn("hermes-max-turns.env", text)
         self.assertIn("LUFFY_MAX_TURNS", text)
+        # F41 still uses HERMES_MAX_ITERATIONS + config rewrite (not CLI --max-turns)
+        self.assertIn("HERMES_MAX_ITERATIONS", text)
+        self.assertIn("agent.max_turns", text)
+        # F47/H14: never pass --max-turns on the hermes binary (argparse has no flag)
+        hermes_z_block = text.split("hermes -z", 1)[1].split("hermes chat", 1)[0]
+        self.assertNotIn("--max-turns", hermes_z_block)
+        self.assertNotIn("MAX_TURNS_ARGS", text)
+        # preflight_cost.py may still take --max-turns (Luffy helper, not hermes)
+        self.assertIn("cli_argv_broken", text)
+
+    def test_max_turns_helper_documents_no_cli_flag(self):
+        text = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("Do **not** pass", text)
+        self.assertIn("HERMES_MAX_ITERATIONS", text)
 
     def test_install_includes_helper(self):
         text = (ROOT / "scripts" / "install-luffy.sh").read_text(encoding="utf-8")

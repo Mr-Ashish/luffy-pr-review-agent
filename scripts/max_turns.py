@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
-"""F41: Hermes agent.max_turns / --max-turns resolver for Luffy cost control.
+"""F41/F47: Hermes agent.max_turns resolver for Luffy cost control.
 
 Hermes defaults to 500 tool-calling iterations per turn — far too high for a
 CI PR review (a solid Odoo monorepo review finishes in ~9 tool turns). Cap the
 loop so a runaway agent cannot burn unbounded OpenRouter spend even when the
 F36 wall-clock timeout has not yet fired.
+
+**F47 (H14):** Do **not** pass ``--max-turns`` on the ``hermes`` CLI. Current
+Hermes argparse has no such flag; the bare integer is treated as a subcommand
+(``invalid choice: '25'``), ``hermes -z`` exits 2, and Luffy falls back to
+``hermes chat -q`` (zero tool turns). Apply the cap via:
+
+  - env ``HERMES_MAX_ITERATIONS=<n>`` (Hermes-native), and
+  - ``agent.max_turns: <n>`` in ``$HERMES_HOME/config.yaml``
 
 Usage:
   python3 scripts/max_turns.py resolve [RAW]   # print integer or "off"

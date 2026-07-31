@@ -187,7 +187,9 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 
 ### Sprint 33 (shipped)
 
-**F41** Hermes max_turns iteration budget: default **40** tool-calling turns (`agent/config.yaml` + `scripts/max_turns.py` + `--max-turns` in `run-hermes-review.sh`). Hermes product default is 500 — unsafe for CI OpenRouter spend. Override `vars.LUFFY_MAX_TURNS` (`0`/`off` disables). Detects “Iteration budget exhausted” → `hermes-max-turns.env` + job summary. Pack/UI: `signals.max_turns_hit` + `loop` metrics. Complements F36 wall-clock and F29 soft $.
+**F41** Hermes max_turns iteration budget: default **40** tool-calling turns (`agent/config.yaml` + `scripts/max_turns.py` + `HERMES_MAX_ITERATIONS` / config rewrite in `run-hermes-review.sh`). Hermes product default is 500 — unsafe for CI OpenRouter spend. Override `vars.LUFFY_MAX_TURNS` (`0`/`off` disables). Detects “Iteration budget exhausted” → `hermes-max-turns.env` + job summary. Pack/UI: `signals.max_turns_hit` + `loop` metrics. Complements F36 wall-clock and F29 soft $.
+
+**F47** Hermes `-z` reliability (H14): stop passing non-existent CLI `--max-turns` (argparse treated `N` as subcommand → rc=2 → chat fallback with tool_turns=0). Cap via env+config only; on CLI argv rejection skip chat fallback (`hermes-cli-argv.env`).
 
 ### readme-kit (shipped)
 

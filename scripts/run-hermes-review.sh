@@ -371,12 +371,15 @@ case "$TIMEOUT_SECS" in
 esac
 printf '%s\n' "$TIMEOUT_SECS" >"$OUT_DIR/hermes-timeout-seconds.txt" || true
 
-# F41: Hermes max_turns iteration budget (complements F36 wall-clock)
+# F41 / F47 (H14): Hermes max_turns iteration budget (complements F36 wall-clock).
+# Cap via HERMES_MAX_ITERATIONS + agent.max_turns in config.yaml ONLY.
+# Do NOT pass --max-turns on the hermes CLI: current hermes argparse has no such
+# flag; the bare integer is parsed as a subcommand → rc=2
+# ("invalid choice: '25'") and forces hermes chat -q fallback (zero tools).
 MAX_TURNS_HELPER="$LUFFY_ROOT/scripts/max_turns.py"
 MAX_TURNS_RAW="$(
   python3 "$MAX_TURNS_HELPER" resolve "${LUFFY_MAX_TURNS-}" 2>/dev/null || echo 40
 )"
-MAX_TURNS_ARGS=()
 MAX_TURNS_ENABLED=0
 MAX_TURNS_VAL=""
 if [[ "$MAX_TURNS_RAW" != "off" && -n "$MAX_TURNS_RAW" ]]; then
@@ -386,9 +389,8 @@ if [[ "$MAX_TURNS_RAW" != "off" && -n "$MAX_TURNS_RAW" ]]; then
   if [[ "$MAX_TURNS_RAW" -gt 0 ]]; then
     MAX_TURNS_ENABLED=1
     MAX_TURNS_VAL="$MAX_TURNS_RAW"
-    MAX_TURNS_ARGS=(--max-turns "$MAX_TURNS_VAL")
     export HERMES_MAX_ITERATIONS="$MAX_TURNS_VAL"
-    # Ensure HERMES_HOME config matches CLI (agent.config copy may lag installer)
+    # Ensure HERMES_HOME config matches (agent.config copy may lag installer)
     python3 - <<'PY' "$HERMES_HOME/config.yaml" "$MAX_TURNS_VAL"
 from pathlib import Path
 import re, sys
@@ -446,7 +448,6 @@ set +e
     --model "$MODEL" \
     -t "$TOOLSETS" \
     --usage-file "$USAGE_FILE" \
-    ${MAX_TURNS_ARGS[@]+"${MAX_TURNS_ARGS[@]}"} \
     >"$RAW_OUT" 2>"$STDERR_FILE"
 )
 RC=$?
@@ -470,14 +471,27 @@ if [[ $RC -eq 124 ]]; then
     } >>"$GITHUB_STEP_SUMMARY" || true
   fi
 fi
-if [[ $TIMED_OUT -eq 0 && ( $RC -ne 0 || ! -s "$RAW_OUT" ) ]]; then
+# F47: detect hermes CLI misuse (unknown flags misparsed as subcommands) so we
+# do not silently burn a chat-fallback spend that still has zero tools.
+HERMES_CLI_ARGV_BROKEN=0
+if [[ $TIMED_OUT -eq 0 && $RC -ne 0 && -s "$STDERR_FILE" ]]; then
+  if grep -qiE "invalid choice:|unrecognized arguments:|error: argument" "$STDERR_FILE" 2>/dev/null; then
+    HERMES_CLI_ARGV_BROKEN=1
+    notice "F47 hermes -z CLI argv rejected (rc=$RC); skip chat fallback (fix hermes flags / H14)"
+    {
+      echo "cli_argv_broken=1"
+      echo "stage=hermes-z"
+      echo "rc=$RC"
+    } >"$OUT_DIR/hermes-cli-argv.env" || true
+  fi
+fi
+if [[ $TIMED_OUT -eq 0 && $HERMES_CLI_ARGV_BROKEN -eq 0 && ( $RC -ne 0 || ! -s "$RAW_OUT" ) ]]; then
   notice "hermes -z failed or empty (rc=$RC); trying hermes chat -q"
   (
     cd "$WORKSPACE_ROOT"
     _hermes_wrap hermes chat -q "$PROMPT" \
       --provider openrouter \
       --model "$MODEL" \
-      ${MAX_TURNS_ARGS[@]+"${MAX_TURNS_ARGS[@]}"} \
       >"$RAW_OUT" 2>>"$STDERR_FILE"
   )
   RC=$?
@@ -604,6 +618,9 @@ if [[ ! -s "$RAW_OUT" ]]; then
   if [[ $TIMED_OUT -eq 1 ]]; then
     _fail_summary="Luffy review **timed out** after ${TIMEOUT_SECS}s wall-clock (F36). Hermes was killed to stop runaway OpenRouter spend. Re-trigger with a cheaper model or raise \`LUFFY_REVIEW_TIMEOUT_SECONDS\`."
     _fail_blocking="Agent loop exceeded \`LUFFY_REVIEW_TIMEOUT_SECONDS=${TIMEOUT_SECS}\` — increase the var, use a faster model (\`vars.LUFFY_MODEL\`), or re-run with a smaller PR diff."
+  elif [[ "${HERMES_CLI_ARGV_BROKEN:-0}" -eq 1 ]]; then
+    _fail_summary="Luffy **Hermes CLI argv rejected** (F47/H14, hermes exit ${RC}). Unknown flags (historically \`--max-turns\`) made \`hermes -z\` fail before any model call; chat fallback skipped to avoid zero-tool spend. Cap iterations via \`HERMES_MAX_ITERATIONS\` / \`agent.max_turns\` only."
+    _fail_blocking="Fix Hermes CLI flags in \`run-hermes-review.sh\` (do not pass non-Hermes flags to \`hermes -z\`) and re-trigger."
   elif [[ "$MAX_TURNS_HIT" -eq 1 ]]; then
     _fail_summary="Luffy review hit the **Hermes iteration budget** (F41, max_turns=${MAX_TURNS_VAL:-?}). The agent loop stopped before producing a full review to cap OpenRouter spend. Raise \`LUFFY_MAX_TURNS\` or simplify the PR."
     _fail_blocking="Agent loop exhausted \`LUFFY_MAX_TURNS=${MAX_TURNS_VAL:-?}\` tool turns — increase the var, disable with \`0\`/\`off\`, or re-run with a smaller diff / cheaper model."

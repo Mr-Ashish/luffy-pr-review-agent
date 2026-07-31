@@ -89,8 +89,8 @@ python3 scripts/max_turns.py resolve
 python3 scripts/max_turns.py detect .luffy-out/hermes-*.stderr
 ```
 
-Wired in `run-hermes-review.sh` (`--max-turns` + `agent.config` rewrite + detect).
-Evidence: `hermes-max-turns.env`, job-summary **Luffy max turns (F41)**.
+Wired in `run-hermes-review.sh` via `HERMES_MAX_ITERATIONS` + `agent.max_turns` in `$HERMES_HOME/config.yaml` + detect (**F47:** do **not** pass `--max-turns` on the hermes CLI — it is not a Hermes flag and breaks `-z`).
+Evidence: `hermes-max-turns.env`, job-summary **Luffy max turns (F41)**; CLI misuse → `hermes-cli-argv.env`.
 
 ## Auto model tier (F42)
 

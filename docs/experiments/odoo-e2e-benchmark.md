@@ -76,4 +76,11 @@ Product `agent/SOUL.md` no longer trips Hermes `prompt_injection` (verified with
 pin `scan_for_threats`). Future cheap runs should recover D8a vs F44’s SOUL-block;
 historical F44/F45 rows unchanged (evidence-preserving). Re-score after next live mini run on #2.
 
-_Last updated: 2026-07-31 F46_
+### F47 note (hermes -z reliability)
+
+Root cause of F44 zero-tool path: bogus CLI `--max-turns` (not a Hermes flag) → `-z` rc=2 → `chat -q`.
+F47 removes that flag; iteration cap via env/config only. Historical F44/F45 scores unchanged
+(evidence-preserving). Expect next live mini on #2 to restore agentic tools (D1/D8) if model cooperates.
+
+_Last updated: 2026-07-31 F47_
+
