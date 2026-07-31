@@ -30,7 +30,7 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 14 | **F18** | Redact secrets in **posted** review (`normalize-review.py` choke-point) | XS | 🔥 Trust — no keys on PR comments | **Shipped** |
 | 15 | **F7** | Pin Hermes install (`scripts/hermes-pin.sh` + `LUFFY_HERMES_COMMIT` + cache key `v4-<pin>`) | S | 🔥 Repro CI | **Shipped** |
 | 16 | **F19** | Per-PR re-trigger cooldown (`scripts/cooldown-check.sh`, default 900s) | S | 🔥 Cost/abuse | **Shipped** |
-| 17 | F20 | `scripts/install-luffy.sh` copy pack to target repo | S | Adoption | Next |
+| 17 | **F20** | `scripts/install-luffy.sh` copy pack to target repo | S | 🔥 Adoption | **Shipped** |
 | 18 | **F8** | Prebaked Hermes runner image + startup benchmark | M | 🔥 Fast CI startup | **Shipped** (docker/ + build workflow + benchmark script) |
 | 19 | F9 | Inline GitHub review comments | L | Product | Later |
 | 20 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
@@ -62,6 +62,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 7 (shipped)
 
 **F8** prebaked Hermes runner: `docker/luffy-runner/Dockerfile` + `scripts/build-luffy-runner-image.sh` + GHCR publish workflow; optional `vars.LUFFY_RUNNER_IMAGE` as job `container`; `ensure_hermes` short-circuits on `LUFFY_HERMES_PREBAKED=1` or `~/.hermes-pin`; startup benchmark under `docs/benchmarks/`.
+
+### Sprint 8 (shipped)
+
+**F20** one-command install: `scripts/install-luffy.sh /path/to/target-repo` copies `agent/`, runtime `scripts/`, and `luffy-pr-review.yml`; optional `--with-hub-ingest` / `--with-runner-build`; stamp `.luffy-install-stamp`.
 
 ### readme-kit (shipped)
 

@@ -2,7 +2,12 @@
 
 ## Required setup
 
-1. Put this project (or at least `agent/`, `scripts/`, `.github/workflows/luffy-pr-review.yml`) on the **default branch** of a GitHub repo.
+1. Install the pack onto the **default branch** of a GitHub repo:
+   ```bash
+   ./scripts/install-luffy.sh /path/to/target-repo
+   # or: --force to overwrite, --with-hub-ingest for hub dispatch workflow
+   ```
+   (Equivalent manual copy: `agent/`, runtime `scripts/`, `.github/workflows/luffy-pr-review.yml`.)
 2. Repository secret: `OPENROUTER_API_KEY`
 3. Optional variable: `LUFFY_MODEL` (default in scripts: `openai/gpt-5-mini`)
 4. Optional variable: `LUFFY_HERMES_COMMIT` — pin Hermes to a git SHA (default baked into workflow + `scripts/hermes-pin.sh`); set `latest` or `main` to float on install.sh tip
@@ -19,6 +24,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 5 (F7):** pin Hermes install via `LUFFY_HERMES_COMMIT` + `scripts/hermes-pin.sh` (cache key v4)
 - **Sprint 6 (F19):** per-PR re-trigger cooldown after successful review
 - **Sprint 7 (F8):** prebaked Hermes runner image (`docker/luffy-runner/`, `vars.LUFFY_RUNNER_IMAGE`)
+- **Sprint 8 (F20):** `scripts/install-luffy.sh` one-command pack install into target repos
 
 ## Central hub memory (cross-repo)
 
