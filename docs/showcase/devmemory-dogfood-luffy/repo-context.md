@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T12:58:19Z
+- **assembled_at:** 2026-07-31T13:03:51Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+22544d3 feat(trust): F24 dismiss prior Luffy PR reviews on re-run
+f514272 docs(knowledge): dogfood F23 formal PR review + showcase
 fdfad00 feat(trust): F23 formal PR Review event from verdict
 e57b96e docs(knowledge): dogfood F22 verdict signals + showcase
 caea511 feat(trust): F22 verdict-aware reaction + commit status
-5f17665 docs(knowledge): dogfood F10 reusable caller packaging + showcase
-fbf3452 feat(install): reusable workflow_call + hub thin caller (F10)
 ```
 
 ## tree (sample)
@@ -58,6 +58,7 @@ memory/repos/Mr-Ashish--odoo/latest.json
 memory/repos/Mr-Ashish--luffy-pr-review-agent/MEMORY.md
 memory/repos/Mr-Ashish--luffy-pr-review-agent/latest.json
 tests/test_cooldown_check.py
+tests/test_dismiss_prior_pr_reviews.py
 tests/test_gate_helpers.py
 tests/test_hermes_pin.py
 tests/test_hub_ingest.py
@@ -120,6 +121,7 @@ scripts/build-hub-payload.py
 scripts/build-luffy-runner-image.sh
 scripts/capture-hermes-loop.py
 scripts/cooldown-check.sh
+scripts/dismiss-prior-pr-reviews.sh
 scripts/distill-memory.sh
 scripts/hermes-pin.sh
 scripts/hub-ingest-run.py
@@ -176,11 +178,10 @@ assets/brand-options/three-artifacts.html
 ### claim index (do not restate these claims)
 - [DEV.md#Architecture] @luffy action assemble cacheartifact checkout comment concurrency context
 - [DEV.md#Architecture] artifact compos deterministic every inner llm-driven orchestr record
-- [DEV.md#Architecture] assemble-contextsh contractfencessizehtml distill-memorysh f21 f22 f23 footer formal
+- [DEV.md#Architecture] assemble-contextsh contractfencessizehtml dismiss-prior distill-memorysh f21 f22 f23 f24
 - [DEV.md#Architecture] --caller --with-hub-ingest --with-runner-build adoption agent agentscript default entrypoint
 - [DEV.md#Architecture] branch checkout config default domain luffy luffy-hermes-home memory
 - [DEV.md#Architecture] caller concurrency f10 githubworkflowsluffy-review-reusableyml input issuecomment luffy-pr-reviewyml luffyref
-- [DEV.md#Design decisions] 400000 900s @luffy allowlist author-associ block bypas cancel-in-progres
 - [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
 - [DEV.md#Design decisions] --commit --force-commit --skip-setup action cache default float install
 - [DEV.md#Design decisions] comment delet luffy luffy-review luffyreplaceprevious=0 marker match prior
@@ -188,15 +189,16 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] agentic assembl beyond capture-hermes-looppy completion default inspect luffytoolset
 - [DEV.md#Design decisions] activity agenttool hermestuitoolprogress=verbose later level observability pythonunbuffered=1 recoverable
 - [DEV.md#Design decisions] directory disposable explicitly hermeshome memory memorymd preserv through
-- [DEV.md#Design decisions] $srcagent --with-runner-build -maxdepth -type adding agent array automatically
 - [DEV.md#Design decisions] $from chmod executable install install-luffysh installer installupdate itself
-- [DEV.md#Design decisions] --source agent check default githubworkflowsluffy-pr-reviewyml half-install overrid parent
 - [DEV.md#Design decisions] --force avoid canonical explicitly half-cop install itself luffy
-- [DEV.md#Design decisions] --force contract exist human includ install output refuse
-- [DEV.md#Design decisions] description installedat luffy-install-stamp mode=pack|caller plain-text provenance record sourcepath
 - [DEV.md#Design decisions] -1errorcomment approve→+1successapprove chang changes→-1failurerequestchang check comment→eyessuccesscomment commit context
-- [DEV.md#Design decisions] append decor expos f21 footer hermes-usagejson pipeline post-normalize
-
+- [DEV.md#Design decisions] append empty explicitly guard never no-op non-dict non-load-bear
+- [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
+- [DEV.md#Design decisions] block caller contentspull-requestsissuesac declar every forget grant itself
+- [DEV.md#Design decisions] contract declar expect false forksunfund front githubtoken inherit
+- [DEV.md#Design decisions] anyth f10 githubworkflowsluffy-review-reusableyml half-install install-luffysh packluffy-pr-review-calleryml preflight produc
+- [DEV.md#Pitfalls] 403 cannot classic clone default dispatch githubtoken ingest
+- [DEV.md#Pit
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -205,11 +207,11 @@ assets/brand-options/three-artifacts.html
 ## Architecture
 - Luffy is a gated GitHub Actions control plane, not a chat bot: `@luffy review this pr` → gate + per-PR concurrency → dual checkout → restore Hermes memory → assemble context → `hermes -z` → normalize → PR comment → distill memory → cache/artifacts.
 - Orchestration is deterministic shell (`scripts/run-luffy-review.sh` composes stages and records timings); only the inner review step is LLM-driven, so every run leaves reproducible artifacts.
-- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact), usage-summary.py (F21 cost footer + job summary from hermes-usage.json), parse-verdict.py + report-verdict.sh (F22 reaction/status + F23 formal PR review), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
+- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact), usage-summary.py (F21 cost footer + job summary from hermes-usage.json), parse-verdict.py + report-verdict.sh (F22 reaction/status + F23 formal PR review + F24 dismiss-prior), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
 - **F20/F10 install:** `scripts/install-luffy.sh` is the adoption entrypoint. Default **pack** mode copies `agent/`, runtime scripts, thin `luffy-pr-review.yml`, and `luffy-review-reusable.yml`. **`--caller`** installs only the hub-managed thin workflow from `pack/luffy-pr-review-caller.yml` (no agent/scripts). Optional `--with-hub-ingest` / `--with-runner-build` (pack mode). Stamp `.luffy-install-stamp` records `mode=pack|caller` + source SHA.
 
 ## Design decisions
-- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the wind
+- **F8 prebaked runner:** `ensure_hermes` short-circuits when `LUFFY_HERMES_PREBAKED=1` or `/root/.hermes-pin`/`$HOME/.hermes-pin` exists and `hermes` is
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/DEV.md
@@ -227,6 +229,10 @@ assets/brand-options/three-artifacts.html
 - Publish path: `build-hub-payload.py` produces a redacted, size-capped payload → `publish-run-to-hub.sh` (direct push by default, `repository_dispatch luffy-run` optional) → `hub-ingest-run.py` commits under `memory/`.
 - Hub memory is preloaded into `HERMES_HOME` at the start of each run (`preload-hub-memory.sh`), which is what makes the next review on the same repo smarter — memory is cross-run and cross-repo, not per-job.
 - Hub behaviour is env-configurable per target repo: `LUFFY_HUB_REPO` (default `Mr-Ashish/luffy-pr-review-agent`), `LUFFY_HUB_MODE` (`direct`|`dispatch`|`both`), `LUFFY_HUB_PUBLISH=0` to disable.
+
+## Pitfalls
+- Direct push therefore needs write on the hub: on the hub repo itself `GITHUB_TOKEN` + `contents: write` is sufficient (self-review), but any *other* target repo requires `LUFFY_HUB_TOKEN` (PAT with contents write on the hub) or hub publishing silently degrades.
+- Original failure mode this layer exists to fix: hub memory was written after a run but **not loaded into** the next review — the preload step is the load half of the contract, and without it the `memory/` tree is write-only.
 
 ### pack/DEV.md
 
@@ -262,15 +268,13 @@ assets/brand-options/three-artifacts.html
 
 ## Setup
 - Install on each target repo's **default branch** (workflow only runs from default branch):
-- **Hub-managed (F10):** `./scripts/install-luffy.sh --caller /path/to/target-repo` — only `.github/workflows/luffy-pr-review.yml` pointing at `luffy-review-reusable.yml@main`.
 - **Pack:** `./scripts/install-luffy.sh /path/to/target-repo` — `agent/`, runtime `scripts/`, thin caller + local reusable.
 - Required secret: `OPENROUTER_API_KEY`. For cross-repo hub memory also add `LUFFY_HUB_TOKEN` (PAT with contents write on the hub).
+- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_RUNNER_IMAGE` (optional prebaked Hermes container image, F8), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
 
 ## Debugging
 - Local dry-run (needs authenticated `gh`, network, and `.env` with `OPENROUTER_API_KEY`): `./scripts/review-local.sh owner/repo 123`; add `POST_COMMENT=1` to actually comment on the PR.
-- Two artifacts per run: `luffy-out-pr<N>-run<id>` (full `.luffy-out/` + memory snapshot, 14 days) and `luffy-trace-pr<N>-run<id>` (structured redacted trace, 90 days).
-- Fetch a trace with `gh run download <run-id> -R owner/repo -n luffy-trace-pr<N>-run<run-id>`.
-- Trace layout under `traces/pr{N}-run{RUN_ID}-a{ATTEMPT}/`: `meta.json`, `trace.json`, `prompt.md`, `co
+- Two artifacts per run: `luffy-ou
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md

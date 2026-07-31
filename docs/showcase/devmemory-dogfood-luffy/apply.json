@@ -4,24 +4,15 @@
     "kind": "dev",
     "action": "merge",
     "section": "Pitfalls",
-    "bytes": 15001,
+    "bytes": 14609,
     "applied": true,
     "unit_path": "."
   },
   {
-    "path": "memory/DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Pitfalls",
-    "bytes": 1442,
-    "applied": true,
-    "unit_path": "memory"
-  },
-  {
     "path": "USAGE.md",
     "kind": "usage",
-    "action": "merge",
-    "section": "Common commands",
+    "action": "scrub",
+    "section": "Debugging",
     "bytes": 7515,
     "applied": true,
     "unit_path": "."

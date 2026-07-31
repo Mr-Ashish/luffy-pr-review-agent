@@ -1,28 +1,22 @@
 {
   "stats": {
-    "files": 3,
-    "lines_added": 11,
-    "lines_removed": 17,
-    "changes": 3
+    "files": 2,
+    "lines_added": 2,
+    "lines_removed": 5,
+    "changes": 2
   },
   "files": [
     {
       "path": "DEV.md",
       "is_new": false,
-      "lines_added": 4,
-      "lines_removed": 10
+      "lines_added": 2,
+      "lines_removed": 3
     },
     {
       "path": "USAGE.md",
       "is_new": false,
-      "lines_added": 2,
-      "lines_removed": 7
-    },
-    {
-      "path": "memory/DEV.md",
-      "is_new": false,
-      "lines_added": 5,
-      "lines_removed": 0
+      "lines_added": 0,
+      "lines_removed": 2
     }
   ]
 }

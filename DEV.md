@@ -25,7 +25,7 @@
 - The installer copies **itself** into the target pack (`install-luffy.sh` is in `RUNTIME_SCRIPTS`), so an installed repo can re-run the install/update from its own tree; executable bits are preserved per-file (`[[ -x "$from" ]] && chmod +x`).
 - Installing the pack into the Luffy source tree itself (`SRC == DEST`) is refused unless `--force`, explicitly to avoid half-copies over the canonical tree.
 
-- **F22/F23/F24 verdict signal** is a post-post decoration: `scripts/parse-verdict.py` reads `**Verdict:**` from the posted review and maps APPROVE→`+1`/`success`/`APPROVE`, REQUEST CHANGES→`-1`/`failure`/`REQUEST_CHANGES`, COMMENT→`eyes`/`success`/`COMMENT`; pipeline_rc≠0 forces `-1`/`error`/`COMMENT` (infra fail must not look like product REQUEST CHANGES). `scripts/report-verdict.sh` applies soft reaction + commit status `luffy/review` + **F24 dismiss prior** Luffy PR reviews + short formal PR Review (F23) and writes a job-summary section. Opt-outs: `LUFFY_COMMIT_STATUS=0`, `LUFFY_PR_REVIEW=0`; replace/dismiss share `LUFFY_REPLACE_PREVIOUS`. Required checks can require context `luffy/review`.
+- **F22/F23/F24 verdict signal** is a post-post decoration: `scripts/parse-verdict.py` reads `**Verdict:**` and maps APPROVE→`+1`/`success`/`APPROVE`, REQUEST CHANGES→`-1`/`failure`/`REQUEST_CHANGES`, COMMENT→`eyes`/`success`/`COMMENT`; pipeline_rc≠0 forces `-1`/`error`/`COMMENT`. `report-verdict.sh` applies soft reaction + commit status + **F24 dismiss prior** Luffy PR reviews + short formal PR Review (F23). Opt-outs: `LUFFY_COMMIT_STATUS=0`, `LUFFY_PR_REVIEW=0`; replace/dismiss share `LUFFY_REPLACE_PREVIOUS`.
 - Telemetry is explicitly non-load-bearing: missing, empty, non-dict, or unparseable usage files are soft no-ops that exit 0, and `run-hermes-review.sh` calls the `append` step guarded by `[[ -f … ]]` with `|| notice "usage-summary append soft-failed"` — cost reporting can never fail a review.
 - Both the PR-comment footer and the job summary are fed from the same usage file so cost is visible without downloading an artifact; number formatting is deliberately lossy/human (tokens as `1.5k`/`10k`/`1.0M`, `n/a` when a field is absent or non-numeric, booleans rejected as numbers).
 
@@ -68,6 +68,8 @@
 - Sparse-checkout path counting is fragile (F13): `grep -c ... || echo 0` emitted `0\n0` for an empty PR path list, which the workflow read as non-zero and fell back to a **full monorepo clone** (observed ~3.5 min on Odoo with `fetch-depth: 0`). Any change to `scripts/sparse-pr-paths.sh` must keep the count a single integer.
 - The Hermes Actions cache must be saved **only on miss** with a stable key (F14); an earlier key including `run_id` thrashed the cache (never a hit, burned GH cache quota). Symptom to watch for: `cache write denied` even with `actions: write`.
 - Config errors must exit non-zero (F15): a missing-secret path returned `pipeline_rc=0`, so the trigger comment got a false ✅ reaction while no review happened. Reaction/status honesty depends on the pipeline exit code, not on whether a comment was posted.
+
+- The dismiss step is deliberately soft-fail and keyed off the `<!-- luffy-pr-review pr=N` marker: a review body whose marker was stripped or reformatted is invisible to F24 and survives re-runs untouched.
 
 ## Patterns
 
