@@ -45,7 +45,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 29 | **F30** | Memory health visibility + README F28 truth (no silent local publish fail) | XS | 🔥 Ops — learning loss no longer invisible | **Shipped** (`memory-health.sh`, job summary) |
 | 30 | **F31** | Auto-emit `run-bundle.json` every review for Run Console | XS | 🔥 UI ops — real GHA/Modal runs openable without manual pack | **Shipped** (`pack-run-for-ui.py` in orchestrator) |
 | 31 | **F32** | Unified trigger (CLI + Modal bit4 webhook + Run Console Run tab) | S | 🔥 Ops — start reviews without hunting docs; webhook spawns only | **Shipped** (`trigger-review.sh`, `enqueue_review`) |
-| 32 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 32 | **F33** | Webhook auth (GitHub HMAC + bearer token) on Modal doorbell | XS | 🔥 Trust — stop open spend URL | **Shipped** (`webhook_auth.py`, `review_webhook`) |
+| 33 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -130,6 +131,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 21 (shipped)
 
 **F32** unified trigger + Modal bit 4 enqueue: `scripts/trigger-review.sh` (`print|local|modal`) is the single entry for starting a review; Modal adds pure `parse_enqueue_payload` / `plan_enqueue` / `enqueue_review` (spawn-only, Hermes never in HTTP path) + `review_webhook` POST endpoint; CLI `modal run … --bit 4` dry-plans (parser self-check) or `--spawn` to enqueue. Run Console **Run** tab + empty-state trigger panel copy local/modal/bit4 commands + sample webhook JSON. Install pack includes `trigger-review.sh`.
+
+### Sprint 22 (shipped)
+
+**F33** webhook auth: pure `scripts/webhook_auth.py` (GitHub `X-Hub-Signature-256` HMAC-SHA256 + `Authorization: Bearer` / `X-Luffy-Token`). `review_webhook` reads raw body + headers, authorizes before parse/spawn. Env: `LUFFY_WEBHOOK_SECRET`, `LUFFY_WEBHOOK_TOKEN` (fold into Modal `luffy-github` secret or app env). Neither set → `auth=open` + warning (dev only). CLI: `webhook_auth.py sign|authorize`. Bit 4 dry plan self-checks auth. Tests: `tests/test_webhook_auth.py`.
 
 ### readme-kit (shipped)
 

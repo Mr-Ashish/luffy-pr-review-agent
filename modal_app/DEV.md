@@ -14,6 +14,7 @@
 
 ## Pitfalls
 
-- The webhook is unauthenticated: signature verification of GitHub deliveries is explicitly deferred hardening, so a deployed `review_webhook` URL is a spend-capable open endpoint. Treat the URL itself as the only secret until verification lands.
+- **F33:** production must set `LUFFY_WEBHOOK_SECRET` and/or `LUFFY_WEBHOOK_TOKEN` on the Modal function (e.g. fold into `luffy-github`). If neither is set, `review_webhook` still accepts traffic with `auth=open` + warning — fine for local smoke, unsafe once the URL is public.
+- HMAC verification needs the **raw** request body (not a re-serialized dict). The webhook reads `await request.body()` before `json.loads`; do not switch back to a typed `item: dict` parameter or signatures will never match.
 - Two independent dry switches exist and they are easy to confuse: `LUFFY_WEBHOOK_DRY_RUN=1` makes the *deployed HTTP handler* plan-only, while the CLI `--bit 4` is dry by default and needs `--spawn` to actually enqueue. Setting one does not affect the other — a "dry" CLI run says nothing about the deployed webhook's behaviour.
 - Do not add work (Hermes, cloning, review assembly) to the HTTP handler even for convenience; the spawn-only rule is what keeps the request short-lived and the billed work inside `review_pr`.

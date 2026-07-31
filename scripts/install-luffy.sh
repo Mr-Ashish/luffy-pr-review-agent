@@ -123,6 +123,7 @@ RUNTIME_SCRIPTS=(
   sparse-pr-paths.sh
   trigger-review.sh
   usage-summary.py
+  webhook_auth.py
   write-failure-review.sh
 )
 

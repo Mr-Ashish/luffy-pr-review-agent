@@ -22,6 +22,18 @@ modal run modal_app/app.py --bit 4 --repo owner/repo --pr 123   # dry enqueue pl
 
 Run Console **Run** tab copies the same commands + sample webhook JSON. Modal webhook (after `modal deploy`) accepts `{repo,pr,model,post_comment}` or GitHub `@luffy review` issue_comment on a PR — spawns only.
 
+### Webhook auth (F33)
+
+```bash
+# Sign a body like GitHub would (fixture / curl)
+python3 scripts/webhook_auth.py sign --secret "$LUFFY_WEBHOOK_SECRET" --body payload.json
+# Authorize
+python3 scripts/webhook_auth.py authorize --secret "$LUFFY_WEBHOOK_SECRET" --body payload.json \
+  --header "X-Hub-Signature-256: sha256=…"
+```
+
+Set `LUFFY_WEBHOOK_SECRET` (GitHub) and/or `LUFFY_WEBHOOK_TOKEN` (Bearer) on the Modal function env. Neither → open doorbell (dev only).
+
 ## Common commands
 
 - Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).

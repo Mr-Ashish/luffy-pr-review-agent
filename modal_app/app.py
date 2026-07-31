@@ -21,6 +21,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -28,7 +29,7 @@ from typing import Any
 import modal
 
 APP_NAME = "luffy-pr-review"
-LUFFY_MODAL_VERSION = "0.4.0-cheap"
+LUFFY_MODAL_VERSION = "0.5.0-cheap"
 HERMES_PIN = "53559aaf86b84dadae83cd9bb605ca476f9a0606"
 # OpenRouter — keep Modal compute cheap AND LLM spend low
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
@@ -70,7 +71,18 @@ app = modal.App(APP_NAME, image=image)
 
 openrouter_secret = modal.Secret.from_name("luffy-openrouter")
 github_secret = modal.Secret.from_name("luffy-github")
+# Optional F33: put LUFFY_WEBHOOK_SECRET / LUFFY_WEBHOOK_TOKEN on this secret
+# (create empty-safe: operators may fold keys into luffy-github instead).
 trace_vol = modal.Volume.from_name("luffy-traces", create_if_missing=True)
+
+# Import pure webhook auth (local tree or Modal image /opt/luffy/scripts)
+for _p in (str(_REPO_ROOT / "scripts"), "/opt/luffy/scripts"):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+try:
+    from webhook_auth import authorize_webhook  # type: ignore
+except ImportError:  # pragma: no cover — image always has scripts mount
+    authorize_webhook = None  # type: ignore
 
 # Cheapest resource profile: Modal minimums (no cpu=/memory= reservation)
 # https://modal.com/docs/guide/resources — default 0.125 core; over-request bills higher
@@ -536,17 +548,78 @@ def enqueue_review(
 
 @app.function(secrets=[github_secret, openrouter_secret], timeout=60)
 @modal.fastapi_endpoint(method="POST")
-def review_webhook(item: dict) -> dict:
-    """HTTP doorbell: parse body → spawn review_pr (Hermes never runs in this handler).
+async def review_webhook(request: Any) -> dict:
+    """HTTP doorbell: auth (F33) → parse body → spawn review_pr.
 
-    Deploy: `modal deploy modal_app/app.py` then POST the endpoint URL.
-    Optional query-less body — see parse_enqueue_payload.
-    Set env LUFFY_WEBHOOK_DRY_RUN=1 on the app to plan-only (ops testing).
+    Hermes never runs in this handler. Deploy: `modal deploy modal_app/app.py`.
+
+    Auth (env on the function / secrets):
+      LUFFY_WEBHOOK_SECRET  → require X-Hub-Signature-256 (GitHub)
+      LUFFY_WEBHOOK_TOKEN   → require Authorization: Bearer … or X-Luffy-Token
+      neither set           → open (dev only; response.auth=open + warning)
+
+    LUFFY_WEBHOOK_DRY_RUN=1 → plan only (no spawn).
     """
+    # FastAPI Request (Modal fastapi_endpoint) — fall back if a plain dict is passed in tests
+    raw: bytes
+    headers: dict[str, str] = {}
+    if hasattr(request, "body") and callable(request.body):
+        raw = await request.body()
+        try:
+            headers = {k: v for k, v in request.headers.items()}
+        except Exception:  # noqa: BLE001
+            headers = {}
+    elif isinstance(request, dict):
+        raw = json.dumps(request).encode("utf-8")
+        headers = {}
+    else:
+        return {
+            "ok": False,
+            "bit": 4,
+            "version": LUFFY_MODAL_VERSION,
+            "error": "unsupported request type",
+            "auth": "denied",
+        }
+
+    if authorize_webhook is None:
+        auth = {
+            "ok": False,
+            "auth": "denied",
+            "error": "webhook_auth module missing on image",
+        }
+    else:
+        auth = authorize_webhook(raw, headers)
+
+    if not auth.get("ok"):
+        return {
+            "ok": False,
+            "bit": 4,
+            "version": LUFFY_MODAL_VERSION,
+            "auth": auth.get("auth", "denied"),
+            "error": auth.get("error", "unauthorized"),
+        }
+
+    try:
+        item = json.loads(raw.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return {
+            "ok": False,
+            "bit": 4,
+            "version": LUFFY_MODAL_VERSION,
+            "auth": auth.get("auth"),
+            "error": "body is not JSON",
+        }
+
     plan = parse_enqueue_payload(item if isinstance(item, dict) else {})
     if not plan.get("ok"):
         # skipped is still HTTP 200-ish for GitHub (avoid retries); surface ok=false
-        return {**plan, "bit": 4, "version": LUFFY_MODAL_VERSION}
+        return {
+            **plan,
+            "bit": 4,
+            "version": LUFFY_MODAL_VERSION,
+            "auth": auth.get("auth"),
+            "auth_warning": auth.get("warning"),
+        }
     dry = os.environ.get("LUFFY_WEBHOOK_DRY_RUN", "").strip() in ("1", "true", "yes")
     result = enqueue_review.local(
         plan["repo"],
@@ -557,6 +630,9 @@ def review_webhook(item: dict) -> dict:
     )
     result["source"] = plan.get("source")
     result["trigger"] = plan.get("trigger")
+    result["auth"] = auth.get("auth")
+    if auth.get("warning"):
+        result["auth_warning"] = auth["warning"]
     if plan.get("comment_id") is not None:
         result["comment_id"] = plan["comment_id"]
     return result
@@ -619,11 +695,45 @@ def main(
                     "repository": {"full_name": repo},
                 }
             ).get("skipped")
-        print(json.dumps(result, indent=2)[:2000])
+            # F33: pure auth self-check (no network)
+            if authorize_webhook is not None:
+                body = b'{"repo":"a/b","pr":1}'
+                open_auth = authorize_webhook(body, {}, secret="", token="")
+                result["auth_open_ok"] = open_auth.get("auth") == "open" and open_auth.get(
+                    "ok"
+                )
+                from webhook_auth import github_hmac_hex  # type: ignore
+
+                sec = "test-secret"
+                sig = f"sha256={github_hmac_hex(body, sec)}"
+                good = authorize_webhook(
+                    body, {"X-Hub-Signature-256": sig}, secret=sec, token=""
+                )
+                bad = authorize_webhook(
+                    body, {"X-Hub-Signature-256": "sha256=dead"}, secret=sec, token=""
+                )
+                tok = authorize_webhook(
+                    body,
+                    {"Authorization": "Bearer s3cr3t"},
+                    secret="",
+                    token="s3cr3t",
+                )
+                denied = authorize_webhook(body, {}, secret=sec, token="")
+                result["auth_hmac_ok"] = good.get("ok") is True
+                result["auth_hmac_bad"] = bad.get("ok") is False
+                result["auth_bearer_ok"] = tok.get("ok") is True
+                result["auth_denied_ok"] = denied.get("ok") is False
+        print(json.dumps(result, indent=2)[:2500])
         assert result.get("ok"), result
         if not spawn:
             assert result.get("parsed_ok") and result.get("github_parse_ok")
             assert result.get("github_skip") is True
+            if authorize_webhook is not None:
+                assert result.get("auth_open_ok")
+                assert result.get("auth_hmac_ok")
+                assert result.get("auth_hmac_bad")
+                assert result.get("auth_bearer_ok")
+                assert result.get("auth_denied_ok")
         print("BIT4_OK")
         return
     result = health.remote()

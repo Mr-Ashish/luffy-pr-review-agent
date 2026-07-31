@@ -161,7 +161,7 @@ function TriggerPanel({
         </div>
       ))}
       <div className="block" style={{ marginTop: "1rem" }}>
-        <h3>Webhook body (bit 4)</h3>
+        <h3>Webhook body (bit 4 + F33 auth)</h3>
         <pre className="scroll-code compact">
           {JSON.stringify(
             {
@@ -175,9 +175,12 @@ function TriggerPanel({
           )}
         </pre>
         <p className="hint">
-          GitHub <code className="inline-code">issue_comment</code> payloads with{" "}
-          <code className="inline-code">@luffy review</code> on a PR are also
-          accepted. Handler only <strong>spawns</strong> the worker.
+          Headers: <code className="inline-code">Authorization: Bearer $LUFFY_WEBHOOK_TOKEN</code>{" "}
+          or GitHub <code className="inline-code">X-Hub-Signature-256</code> with{" "}
+          <code className="inline-code">LUFFY_WEBHOOK_SECRET</code>.{" "}
+          <code className="inline-code">issue_comment</code> +{" "}
+          <code className="inline-code">@luffy review</code> on a PR also accepted.
+          Handler only <strong>spawns</strong> the worker.
         </p>
       </div>
     </div>

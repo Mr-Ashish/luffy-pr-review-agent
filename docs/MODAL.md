@@ -44,7 +44,7 @@ modal run modal_app/app.py --bit 4 --repo Mr-Ashish/odoo --pr 3 --spawn
 modal deploy modal_app/app.py
 ```
 
-### Webhook (bit 4)
+### Webhook (bit 4 + F33 auth)
 
 POST JSON (simple API):
 
@@ -52,9 +52,24 @@ POST JSON (simple API):
 {"repo": "Mr-Ashish/odoo", "pr": 3, "model": "openai/gpt-4.1-mini", "post_comment": true}
 ```
 
-Or a GitHub `issue_comment` event on a PR whose body matches `@luffy … review`.  
-Handler **only spawns** `review_pr` (set `LUFFY_WEBHOOK_DRY_RUN=1` to plan-only). Signature verification = later hardening.
+Headers when `LUFFY_WEBHOOK_TOKEN` is set:
 
+```bash
+curl -sS -X POST "$WEBHOOK_URL" \
+  -H "Authorization: Bearer $LUFFY_WEBHOOK_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"repo":"Mr-Ashish/odoo","pr":3,"model":"openai/gpt-4.1-mini"}'
+```
+
+GitHub webhook: set the same value as **Webhook secret** in GitHub and as Modal env `LUFFY_WEBHOOK_SECRET` (HMAC `X-Hub-Signature-256`). Accepts `issue_comment` on a PR whose body matches `@luffy … review`.
+
+| Env | Role |
+|-----|------|
+| `LUFFY_WEBHOOK_SECRET` | GitHub HMAC secret |
+| `LUFFY_WEBHOOK_TOKEN` | Bearer / `X-Luffy-Token` for simple API |
+| `LUFFY_WEBHOOK_DRY_RUN=1` | Plan only (no spawn) |
+
+Neither secret/token → `auth=open` (dev only; response includes warning). Production **must** set at least one (fold into Modal secret `luffy-github` or app env). Pure helper: `python3 scripts/webhook_auth.py sign|authorize`. Handler **only spawns** `review_pr`.
 ## Secrets
 
 ```bash

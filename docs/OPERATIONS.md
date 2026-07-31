@@ -41,6 +41,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 19 (F30):** memory health job summary + loud local-publish failure; README local-first
 - **Sprint 20 (F31):** every run auto-writes `run-bundle.json` for the Run Console (artifact + job summary); soft-fail
 - **Sprint 21 (F32):** `trigger-review.sh` + Modal bit4 enqueue/webhook + Run Console Run tab (spawn-only doorbell)
+- **Sprint 22 (F33):** webhook HMAC + bearer auth on Modal doorbell (`webhook_auth.py`)
 
 ## Repo-local memory (F28 default)
 
