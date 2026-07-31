@@ -13,6 +13,8 @@
 
 ## Design decisions
 
+- **F56 lens recipes / named packs:** `agent/packs/*.json` declare multi-lens recipes (default, security, docs, odoo, performance). `scripts/lens_recipes.py` loads + rewrites the Multi-lens pass/checklist in the assembled prompt. Active pack via `LUFFY_LENS_PACK` (F55 key `lens_pack`); opt-out `LUFFY_LENS_PACKS=0`. Judgment remains model-side; pack selection and checklist shape are code.
+
 - **F55 feature toggles:** `scripts/feature_toggles.py` is the single registry for product/quality/ops gates (`fixit_prompts`, `issue_context`, inline, labels, …). Precedence **env > `.luffy/toggles.json` (or `LUFFY_TOGGLES_FILE`) > default**. CLI `list|get|enabled|dump|product|shell` is the agent/operator tool surface; judgment stays out of the registry. New product flags add a `ToggleSpec` + tests, then wire consumers via `is_enabled()` / `get_value()`.
 
 - **F35 ops footer:** `ops_footer.py` appends a deep-link line on the posted PR comment (Actions run URL from `GITHUB_*` env + run-bundle Load tip; optional `LUFFY_CONSOLE_URL`). Wired in `post-review-comment.sh` before `gh pr comment`. Soft, opt-out `LUFFY_OPS_FOOTER=0`. Completes OpenUI 4b without requiring a hosted console.

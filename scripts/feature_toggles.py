@@ -163,6 +163,24 @@ REGISTRY: list[ToggleSpec] = [
         "Replace prior Luffy comments / dismiss prior PR reviews on re-run",
         "F24",
     ),
+    ToggleSpec(
+        "lens_packs",
+        "LUFFY_LENS_PACKS",
+        "bool",
+        True,
+        "product",
+        "Apply named multi-lens recipe pack into assembled prompt",
+        "F56",
+    ),
+    ToggleSpec(
+        "lens_pack",
+        "LUFFY_LENS_PACK",
+        "str",
+        "default",
+        "product",
+        "Active lens recipe pack id (default|security|docs|odoo|performance)",
+        "F56",
+    ),
     # --- quality / agent ---
     ToggleSpec(
         "soul_scan",
