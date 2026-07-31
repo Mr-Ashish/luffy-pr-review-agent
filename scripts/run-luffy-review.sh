@@ -65,6 +65,15 @@ if [[ $ORCH_RC -eq 0 ]]; then
   export PROMPT_PATH PR_NUMBER REPO
 fi
 
+# F68: prefer catalog active toolsets when LUFFY_TOOLSETS unset
+if [[ -z "${LUFFY_TOOLSETS:-}" && -f "$SCRIPTS/agent_tools_pipeline.py" ]]; then
+  _ts="$(python3 "$SCRIPTS/agent_tools_pipeline.py" toolsets 2>/dev/null || true)"
+  if [[ -n "${_ts:-}" ]]; then
+    export LUFFY_TOOLSETS="$_ts"
+    echo "::notice::F68 active toolsets: $LUFFY_TOOLSETS" >&2
+  fi
+fi
+
 if [[ $ORCH_RC -eq 0 ]]; then
   stage hermes "$SCRIPTS/run-hermes-review.sh" || ORCH_RC=$?
 fi
@@ -122,6 +131,32 @@ else
 fi
 
 stage save_trace "$SCRIPTS/save-trace.sh" || true
+
+# F69: package trajectory for self-evolution (soft; always ingest when loop exists)
+if [[ -f "$SCRIPTS/self_evolve.py" && -d "$OUT_DIR/agent-loop" ]]; then
+  stage evolve_ingest \
+    python3 "$SCRIPTS/self_evolve.py" ingest \
+      --out-dir "$OUT_DIR" \
+      --pr "${PR_NUMBER:-}" \
+      --repo "${REPO:-${GITHUB_REPOSITORY:-}}" || true
+  # Optional auto-propose when explicitly enabled
+  case "${LUFFY_SELF_EVOLVE:-0}" in
+    1|true|yes|on)
+      stage evolve_propose python3 "$SCRIPTS/self_evolve.py" propose --limit 3 || true
+      stage evolve_eval python3 "$SCRIPTS/self_evolve.py" eval --proposal all || true
+      ;;
+  esac
+fi
+
+# F68: research tool candidates from this tree's loops (soft; opt-in)
+case "${LUFFY_AGENT_TOOLS_RESEARCH:-0}" in
+  1|true|yes|on)
+    if [[ -f "$SCRIPTS/agent_tools_pipeline.py" ]]; then
+      stage tools_research \
+        python3 "$SCRIPTS/agent_tools_pipeline.py" research --runs "$OUT_DIR" || true
+    fi
+    ;;
+esac
 
 # Export TRACE_ID for hub payload if save-trace wrote latest dir
 if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then

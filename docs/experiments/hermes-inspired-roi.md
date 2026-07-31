@@ -10,14 +10,14 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 |----|------|--------|--------------------------|--------|
 | H1 | Cap `agent.max_turns` / `--max-turns` (Hermes default 500) | S | Stops runaway tool loops burning OpenRouter under F36 wall-clock | **Shipped F41** |
 | H2 | Surface agent-loop metrics (tool turns, messages) in run-bundle | S | Operators see thrash without opening agent-loop.md | **Shipped F41** (with H1) |
-| H3 | Skill-file evolution (GEPA/DSPy) for review-prompt / SOUL | L | Quality over time; needs eval harness + spend | backlog |
+| H3 | Skill-file evolution (GEPA/DSPy) for review-prompt / SOUL | L | Quality over time; needs eval harness + spend | **Shipped F69** (Luffy-native skills; not GEPA/DSPy) |
 | H4 | Context compressor / history budget for huge monorepos | M | Cuts tokens after F27 truncation | backlog |
-| H5 | Session/search memory over past PR traces (FTS5 pattern) | M | Better repo memory than append-only distill | backlog |
+| H5 | Session/search memory over past PR traces (FTS5 pattern) | M | Better repo memory than append-only distill | backlog (partial: F69 trajectories) |
 | H6 | Hard preflight spend estimate before Hermes | S | Refuse/force cheap model when diff huge + budget tight | **Shipped F43** |
 | H7 | Auto model tier by PR size (cheap first) | S | Cost without quality loss on docs/tiny PRs | **Shipped F42** |
 | H8 | Subagent fan-out for multi-file PRs | L | Parallel review streams; Modal cost + complexity | backlog |
-| H9 | Trajectory packaging for offline eval datasets | M | Quality regressions measurable | backlog (capture-hermes-loop partial) |
-| H10 | Soft skill nudge mid-loop (“prefer fewer tools”) | M | Hermes skill nudge pattern; needs hermes hooks | backlog |
+| H9 | Trajectory packaging for offline eval datasets | M | Quality regressions measurable | **Shipped F69** ingest |
+| H10 | Soft skill nudge mid-loop (“prefer fewer tools”) | M | Hermes skill nudge pattern; needs hermes hooks | **Shipped F69** soft nudge inject |
 | **H11** | **Strip hermes chat chrome + reject prompt-template echo in normalizer** | **S** | **F44 e2e: chat -q posted Query+template; contract false-positive** | **Shipped F44** |
 | **H12** | **Fail closed when tool_turns=0 on multi-file non-docs PR (COMMENT, not re-prompt)** | **S** | **#2 mini APPROVE missed known test gap; GHA/tools did not** | **Shipped F45** |
 | **H13** | **SOUL.md hermes prompt_injection false-positive workaround** | **S** | **F44 log: SOUL blocked — review discipline may not load** | **Shipped F46** |

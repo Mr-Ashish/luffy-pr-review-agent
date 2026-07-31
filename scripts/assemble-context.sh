@@ -268,6 +268,22 @@ except Exception as _lens_exc:
     lens_packs_on = "0"
     lens_pack_id = os.environ.get("LUFFY_LENS_PACK") or "default"
 
+# F69: inject adopted skills + soft H10 nudge into prompt (soft)
+skills_injected = "0"
+try:
+    import sys as _sys_sk
+    _sys_sk.path.insert(0, str(luffy_root / "scripts"))
+    from self_evolve import cmd_inject  # type: ignore
+    import argparse as _ap_sk
+
+    _inj = cmd_inject(
+        _ap_sk.Namespace(prompt=os.environ["PROMPT_PATH"], out="")
+    )
+    skills_injected = "1" if _inj == 0 else "0"
+    prompt = Path(os.environ["PROMPT_PATH"]).read_text(encoding="utf-8")
+except Exception:
+    skills_injected = "0"
+
 # F57: Mermaid architecture from changed files (soft)
 mermaid_on = "0"
 mermaid_nodes = "0"
@@ -421,6 +437,7 @@ meta = {
     "TESTPLAN_CASES": testplan_cases,
     "FP_RESOLVE": fp_resolve_on,
     "FP_RESOLVE_COUNT": fp_resolve_count,
+    "SELF_EVOLVE_SKILLS": skills_injected,
 }
 with open(os.environ["META_PATH"], "w") as fh:
     for k, v in meta.items():

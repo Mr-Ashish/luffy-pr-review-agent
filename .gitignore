@@ -19,3 +19,7 @@ ui/review-console/node_modules/
 ui/review-console/dist/
 
 ui/review-console/tsconfig.tsbuildinfo
+agent/tools/candidates/research-*.json
+# F69 trajectory blobs (ledger kept)
+memory/evolution/trajectories/**
+!memory/evolution/trajectories/.gitkeep
