@@ -27,8 +27,9 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | **H17** | **Scope SOUL/max-turns detect + agent.log capture to this-invocation log offset** | **S** | **H16: stale agent.log → false soul_blocked=1** | **Shipped F48** |
 | H18 | Hard tool nudge / require ≥1 workspace read on multi-file code PRs | S–M | First-pass still 0 tools on mini; F49 recovers — optional cost win | **P2 optional** (F49 live ok) |
 | H19 | Live F49 re-score #4 multi-module PERF | S | Confirm recovery + lift 31→38 on 7-file stock/mrp | **Done H19** (38/50; 0→9 tools) |
-| H20 | Severity calibration: missing tests → blocking when issue claims fix | S | F49 #2 APPROVE 95 vs GHA REQUEST CHANGES on alias tests | **P1 next** |
-| H21 | Source 5th complex odoo/odoo PR → luffy-eval corpus | S | Keep multi-PR evidence growing; prefer multi-module | **P0 next** |
+| H20 | Severity calibration: missing tests → blocking when issue claims fix | S | F49 #2 APPROVE 95 vs GHA REQUEST CHANGES on alias tests | backlog |
+| H22 | Live F49 mini e2e + score odoo#5 (POS ticket screen) | S | Fresh corpus member needs baseline dims | **P0 next** |
+| H21 | Source 5th complex odoo/odoo PR → luffy-eval corpus | S | Keep multi-PR evidence growing; prefer multi-module | **Done H21** (#5 odoo#279360) |
 
 ## Selection rule
 
@@ -59,3 +60,5 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 **H15 → F49** (2026-07-31): soft re-prompt once on zero-tool multi-file code PRs before F45. `reprompt-decide`/`reprompt-write` + second `hermes -z`; `tool-turns-reprompt.env` + chips. F45 still fail-closes if attempt-2 also 0 tools.
 
 **F49 live #2** (2026-07-31): `.luffy-out-e2e-pr2-f49` — recovered tool_turns **0→23**; score **36/50** (H16 was 30); F45 skipped; ~$0.063. H18 demoted; **H19** (#4 F49 re-run) is next.
+
+**H21 corpus #5** (2026-07-31): ported odoo#279360 → [Mr-Ashish/odoo#5](https://github.com/Mr-Ashish/odoo/pull/5) (6 files POS+restaurant). **Next: H22** live F49 mini + score #5.

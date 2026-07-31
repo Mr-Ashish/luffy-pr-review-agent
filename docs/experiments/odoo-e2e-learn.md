@@ -12,8 +12,9 @@ Luffy SoT: this repo only.
 | [#2](https://github.com/Mr-Ashish/odoo/pull/2) | luffy-eval: #276570+#275937 web getFieldsSpec + format:false | issues 276570, 275937 | 4 (JS+test) | +85/−9 | OPEN |
 | [#3](https://github.com/Mr-Ashish/odoo/pull/3) | luffy-eval: #271153 tools Unicode XML control-char strip | odoo#271153 | 3 (py+test) | +88/−18 | OPEN |
 | [#4](https://github.com/Mr-Ashish/odoo/pull/4) | luffy-eval: #279776 stock, mrp replenishment horizon PERF | odoo#279776 | 7 (py+test) | +234/−22 | OPEN |
+| [#5](https://github.com/Mr-Ashish/odoo/pull/5) | luffy-eval: #279360 point_of_sale ticket screen responsiveness | odoo#279360 | 6 (JS/XML/SCSS) | +109/−122 | OPEN |
 
-Corpus size: **4** open eval PRs (grew fire: ported odoo#279776).
+Corpus size: **5** open eval PRs (grew fire: ported odoo#279360).
 
 ## Runs
 
@@ -102,3 +103,9 @@ Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luff
 3. **Cheaper recovery than #2:** #4 attempt-2 ~$0.014 / 10 API / 58s vs #2 ~$0.063 / 24 API / 95s — recovery cost scales with tool thrash, not just file count.
 4. **H18 still optional:** First-pass zero tools is model choice; F49 is enough for corpus; hard nudge is cost-optional only.
 5. **Next:** Grow corpus (5th complex upstream) and/or H20 severity calibration on #2 GHA gap.
+
+## Introspect (corpus #5 / odoo#279360)
+
+1. **Port clean:** `gh pr diff 279360` applied with zero conflicts onto Mr-Ashish/odoo@19.0 (6 files point_of_sale + pos_restaurant).
+2. **Diversity:** multi-module POS frontend (JS/XML/SCSS) — complements web fields #2, tools #3, stock/mrp PERF #4.
+3. **Next:** live mini e2e with F49 on #5; score into benchmark.
