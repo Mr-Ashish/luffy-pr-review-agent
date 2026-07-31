@@ -8,6 +8,7 @@
 #   LUFFY_MODEL / OPENROUTER_MODEL  (default: DEFAULT_LUFFY_MODEL below — F26 SoT)
 #   LUFFY_TOOLSETS  (optional hermes -t value; default: terminal for workspace tools)
 #   LUFFY_HERMES_COMMIT  pin SHA (default in hermes-pin.sh); empty/latest/main = floating
+#   LUFFY_REVIEW_TIMEOUT_SECONDS  F36 wall-clock for hermes (default 1500; 0/off disables)
 #   PR_NUMBER
 set -euo pipefail
 
@@ -163,14 +164,35 @@ if [[ -f "$LOG_FILE" ]]; then
 fi
 echo "$LOG_OFFSET" >"$OUT_DIR/hermes-log-offset.txt"
 
-notice "Hermes review · model=$MODEL toolsets=$TOOLSETS workspace=$WORKSPACE_ROOT hermes_home=$HERMES_HOME"
+# F36: wall-clock timeout for Hermes (kill hung agent loops / runaway OpenRouter)
+TIMEOUT_HELPER="$LUFFY_ROOT/scripts/run-with-timeout.py"
+TIMEOUT_SECS="$(
+  python3 "$TIMEOUT_HELPER" resolve "${LUFFY_REVIEW_TIMEOUT_SECONDS-}" 2>/dev/null || echo 1500
+)"
+# normalize non-integer
+case "$TIMEOUT_SECS" in
+  ''|*[!0-9]*) TIMEOUT_SECS=1500 ;;
+esac
+printf '%s\n' "$TIMEOUT_SECS" >"$OUT_DIR/hermes-timeout-seconds.txt" || true
 
+_hermes_wrap() {
+  # Run hermes under F36 timeout when enabled; else bare exec.
+  if [[ "${TIMEOUT_SECS}" -gt 0 && -f "$TIMEOUT_HELPER" ]]; then
+    python3 "$TIMEOUT_HELPER" --seconds "$TIMEOUT_SECS" -- "$@"
+  else
+    "$@"
+  fi
+}
+
+notice "Hermes review · model=$MODEL toolsets=$TOOLSETS workspace=$WORKSPACE_ROOT hermes_home=$HERMES_HOME timeout=${TIMEOUT_SECS}s"
+
+TIMED_OUT=0
 set +e
 (
   cd "$WORKSPACE_ROOT"
   # --usage-file: tokens/cost/session_id for the agentic loop package
   # -t toolsets: allow terminal/file tools so the loop can inspect the workspace
-  hermes -z "$PROMPT" \
+  _hermes_wrap hermes -z "$PROMPT" \
     --provider openrouter \
     --model "$MODEL" \
     -t "$TOOLSETS" \
@@ -178,21 +200,55 @@ set +e
     >"$RAW_OUT" 2>"$STDERR_FILE"
 )
 RC=$?
-if [[ $RC -ne 0 || ! -s "$RAW_OUT" ]]; then
+if [[ $RC -eq 124 ]]; then
+  TIMED_OUT=1
+  notice "F36 hermes -z TIMED OUT after ${TIMEOUT_SECS}s (skip chat fallback to avoid double spend)"
+  # Drop partial model output — force the timeout failure stub below
+  : >"$RAW_OUT"
+  {
+    echo "timed_out=1"
+    echo "timeout_seconds=$TIMEOUT_SECS"
+    echo "stage=hermes-z"
+  } >"$OUT_DIR/hermes-timeout.env" || true
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    {
+      echo "### Luffy review timeout (F36)"
+      echo "- **Timed out** after \`${TIMEOUT_SECS}s\` wall-clock during \`hermes -z\`"
+      echo "- Chat fallback skipped (would double OpenRouter spend)"
+      echo "- Override: \`vars.LUFFY_REVIEW_TIMEOUT_SECONDS\` (\`0\`/\`off\` disables)"
+      echo
+    } >>"$GITHUB_STEP_SUMMARY" || true
+  fi
+fi
+if [[ $TIMED_OUT -eq 0 && ( $RC -ne 0 || ! -s "$RAW_OUT" ) ]]; then
   notice "hermes -z failed or empty (rc=$RC); trying hermes chat -q"
   (
     cd "$WORKSPACE_ROOT"
-    hermes chat -q "$PROMPT" \
+    _hermes_wrap hermes chat -q "$PROMPT" \
       --provider openrouter \
       --model "$MODEL" \
       >"$RAW_OUT" 2>>"$STDERR_FILE"
   )
   RC=$?
+  if [[ $RC -eq 124 ]]; then
+    TIMED_OUT=1
+    notice "F36 hermes chat TIMED OUT after ${TIMEOUT_SECS}s"
+    : >"$RAW_OUT"
+    {
+      echo "timed_out=1"
+      echo "timeout_seconds=$TIMEOUT_SECS"
+      echo "stage=hermes-chat"
+    } >"$OUT_DIR/hermes-timeout.env" || true
+  fi
 fi
 set -e
 
 if [[ $RC -ne 0 ]]; then
-  notice "hermes exit=$RC"
+  if [[ $TIMED_OUT -eq 1 ]]; then
+    notice "hermes exit=$RC (F36 wall-clock timeout ${TIMEOUT_SECS}s)"
+  else
+    notice "hermes exit=$RC"
+  fi
   [[ -s "$STDERR_FILE" ]] && tail -c 8000 "$STDERR_FILE" >&2 || true
 fi
 
@@ -218,6 +274,12 @@ chmod +x "$LUFFY_ROOT/scripts/capture-hermes-loop.py" 2>/dev/null || true
 python3 "$LUFFY_ROOT/scripts/capture-hermes-loop.py" || notice "capture-hermes-loop soft-failed"
 
 if [[ ! -s "$RAW_OUT" ]]; then
+  _fail_summary="Luffy failed to produce a review (hermes exit ${RC}). Check workflow logs, Hermes install, and OpenRouter credits/key."
+  _fail_blocking="Review agent run failed — re-trigger with \`@luffy review this pr\` after fixing CI/OpenRouter."
+  if [[ $TIMED_OUT -eq 1 ]]; then
+    _fail_summary="Luffy review **timed out** after ${TIMEOUT_SECS}s wall-clock (F36). Hermes was killed to stop runaway OpenRouter spend. Re-trigger with a cheaper model or raise \`LUFFY_REVIEW_TIMEOUT_SECONDS\`."
+    _fail_blocking="Agent loop exceeded \`LUFFY_REVIEW_TIMEOUT_SECONDS=${TIMEOUT_SECS}\` — increase the var, use a faster model (\`vars.LUFFY_MODEL\`), or re-run with a smaller PR diff."
+  fi
   cat >"$RAW_OUT" <<EOF
 ## 🏴‍☠️ Luffy Review — PR #${PR_NUMBER}
 
@@ -227,13 +289,13 @@ if [[ ! -s "$RAW_OUT" ]]; then
 **Review effort:** 1/5
 
 ### Summary
-Luffy failed to produce a review (hermes exit ${RC}). Check workflow logs, Hermes install, and OpenRouter credits/key.
+${_fail_summary}
 
 ### Walkthrough
 - Agent runner failure only
 
 ### Blocking
-- Review agent run failed — re-trigger with \`@luffy review this pr\` after fixing CI/OpenRouter.
+- ${_fail_blocking}
 
 ### Key findings
 None — runner failure.

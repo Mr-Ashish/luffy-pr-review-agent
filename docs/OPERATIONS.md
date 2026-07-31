@@ -46,6 +46,26 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 24 (F34):** Modal webhook fail-closed by default (`LUFFY_WEBHOOK_ALLOW_OPEN=1` for dev)
 - **Sprint 25 (F9b):** inline comments prefer `path:LINE` when that line is a changed `+` line
 - **Sprint 26 (F35):** PR comment ops footer with Actions run link + run-bundle tip
+- **Sprint 27 (F36):** Hermes wall-clock timeout (default 1500s; kill hung loops)
+
+## Review timeout (F36)
+
+Hung Hermes/OpenRouter loops are killed after a wall-clock limit so spend cannot
+run until the full GHA job cap (90m).
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_REVIEW_TIMEOUT_SECONDS` | `1500` | Wall seconds for `hermes -z` (and chat fallback). `0`/`off` disables |
+
+On timeout: exit 124, partial model output discarded, chat fallback **skipped**
+(would double spend), posted review is an honest COMMENT failure stub, job
+summary section **Luffy review timeout (F36)**. Trace: `hermes-timeout.env`,
+`hermes-timeout-seconds.txt`.
+
+```bash
+python3 scripts/run-with-timeout.py resolve          # effective seconds
+python3 scripts/run-with-timeout.py --seconds 2 -- sleep 10   # exits 124
+```
 
 ## Ops footer (F35)
 

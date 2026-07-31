@@ -50,7 +50,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 34 | **F34** | Webhook fail-closed by default (opt-in open for dev) | XS | 🔥 Trust — no open spend URL by default | **Shipped** (`LUFFY_WEBHOOK_ALLOW_OPEN`) |
 | 35 | **F9b** | Precise line anchors (`path:LINE` + nearest changed line) | S | 🔥 Product — inline comments land on the right line | **Shipped** (`post-inline-comments.py`, prompt) |
 | 36 | **F35** | PR comment ops deep-link (Actions run + run-bundle tip) | XS | 🔥 Ops — open the run without hunting logs | **Shipped** (`ops_footer.py`) |
-| 37 | F9c | Multi-line review threads / suggestion blocks | M | Product polish | Later |
+| 37 | **F36** | Hermes review wall-clock timeout (kill hung agent loops) | XS | 🔥 Cost — stop runaway OpenRouter until job/Modal cap | **Shipped** (`run-with-timeout.py`, default 1500s) |
+| 38 | F9c | Multi-line review threads / suggestion blocks | M | Product polish | Later |
 
 ### Sprint 1 (shipped)
 
@@ -155,6 +156,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 26 (shipped)
 
 **F35** ops deep-link footer: before posting the PR comment, `ops_footer.py` appends `*Ops (F35): [workflow run](…) · artifact run-bundle.json → ui/review-console*` (optional `LUFFY_CONSOLE_URL`). Job summary **Luffy ops links (F35)**. Opt-out `LUFFY_OPS_FOOTER=0`. Soft-fail; OpenUI phase 4b partial (no stream/hosted console required).
+
+### Sprint 27 (shipped)
+
+**F36** review wall-clock timeout: `scripts/run-with-timeout.py` wraps `hermes -z` / chat fallback as a process group; default **1500s** (aligned with Modal hard cap). On timeout (exit 124): clear partial output, skip chat fallback (no double spend), honest failure stub + job-summary **Luffy review timeout (F36)**. Override `vars.LUFFY_REVIEW_TIMEOUT_SECONDS` (`0`/`off` disables). Complements F29 (soft $ budget annotates after a finished run; F36 stops a hung loop).
 
 ### readme-kit (shipped)
 

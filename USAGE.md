@@ -22,6 +22,20 @@ modal run modal_app/app.py --bit 4 --repo owner/repo --pr 123   # dry enqueue pl
 
 Run Console **Run** tab copies the same commands + sample webhook JSON. Modal webhook (after `modal deploy`) accepts `{repo,pr,model,post_comment}` or GitHub `@luffy review` issue_comment on a PR — spawns only.
 
+### Review timeout (F36)
+
+```bash
+# Effective wall-clock seconds (default 1500; env or arg)
+python3 scripts/run-with-timeout.py resolve
+LUFFY_REVIEW_TIMEOUT_SECONDS=900 python3 scripts/run-with-timeout.py resolve
+
+# Repo var: vars.LUFFY_REVIEW_TIMEOUT_SECONDS  (0/off = disabled)
+```
+
+On timeout Hermes is process-group killed, chat fallback is skipped, and the
+posted review explains the limit. Complements F29 soft $ budget (annotation
+only after a finished run).
+
 ### Ops footer / deep-link (F35)
 
 ```bash

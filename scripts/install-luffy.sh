@@ -120,6 +120,7 @@ RUNTIME_SCRIPTS=(
   review-local.sh
   run-hermes-review.sh
   run-luffy-review.sh
+  run-with-timeout.py
   save-trace.sh
   review-to-openui.py
   sparse-pr-paths.sh
