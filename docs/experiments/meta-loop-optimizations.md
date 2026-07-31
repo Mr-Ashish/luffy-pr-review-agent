@@ -23,3 +23,11 @@ Log ≤5 concrete process deltas per fire. Prefer implementable Luffy/docs chang
 3. **Diversity metric:** prefer multi-lang/config PRs (#51962) after pure-Go (#51991) for multi-lens stress.
 4. **Stop idle:** progress (port+e2e) → streak 0; still need one more corpus PR for ≥3 target.
 5. **Next-fire default:** either #3 port OR F60 thread-reply if e2e signal plateaus.
+
+## 2026-07-31 — corpus ≥3 met → product pivot
+
+1. **Stop corpus-first:** n_eval=3 diversity ok (Go write / multi-lang config / credentials) — next fires prefer **F60 reply-on-thread** or testplan/FP-memory.
+2. **Cost ROI signal:** smaller focused PRs (#3) give higher D6/D7 without losing F49 recovery — mix sizes in corpus intentionally.
+3. **Security eval needs FP memory:** empty Key findings on credential PR → product gap for FP/resolve memory + severity on auth surfaces.
+4. **Multi-commit heads:** always score `git diff base...head` not tip commit message.
+5. **Idle:** progress → 0; product worktree budget free (0/3).

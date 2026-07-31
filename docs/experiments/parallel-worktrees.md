@@ -1,17 +1,18 @@
 # Parallel worktrees tracker
 
-Primary: `/Users/ashishmishra/Documents/experiments/pr-review-agent` (main).  
-Worktrees: `/Users/ashishmishra/Documents/experiments/pr-review-agent-wt/<slug>` (≤3).
+Primary: `/Users/ashishmishra/Documents/experiments/pr-review-agent`  
+Worktrees: `/Users/ashishmishra/Documents/experiments/pr-review-agent-wt/<slug>` (≤3)
 
-| Worktree | Branch | PR | Status |
-|----------|--------|-----|--------|
-| (none) | — | — | idle — next F60 reply-on-thread |
+| Worktree | Status |
+|----------|--------|
+| (none) | next: `f60-reply-on-thread` |
 
-## Eval corpus (Mr-Ashish/milvus)
+## Eval corpus (Mr-Ashish/milvus) LIVE
 
-| PR | Upstream | Status |
-|----|----------|--------|
-| [#1](https://github.com/Mr-Ashish/milvus/pull/1) | #51991 | OPEN e2e 36/50 |
-| [#2](https://github.com/Mr-Ashish/milvus/pull/2) | #51962 | OPEN e2e 37/50 |
+| PR | Upstream | Score |
+|----|----------|------:|
+| [#1](https://github.com/Mr-Ashish/milvus/pull/1) | #51991 | 36 |
+| [#2](https://github.com/Mr-Ashish/milvus/pull/2) | #51962 | 37 |
+| [#3](https://github.com/Mr-Ashish/milvus/pull/3) | #51995 | 39 |
 
-Updated: 2026-07-31 (milvus #2).
+Updated: 2026-07-31 corpus target met.
