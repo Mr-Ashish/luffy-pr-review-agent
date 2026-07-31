@@ -115,7 +115,7 @@ traces/pr{N}-run{RUN_ID}-a{ATTEMPT}/
   memory-after.md    # MEMORY.md after distill
 ```
 
-Secrets (`sk-or-…`, `OPENROUTER_API_KEY=…`) are redacted before packaging.
+Secrets (`sk-or-…`, `OPENROUTER_API_KEY=…`, common `ghp_`/`github_pat_` tokens) are redacted in **posted review bodies** (`normalize-review.py`, F18) and again before trace packaging / hub payload.
 
 ```bash
 # Download latest trace for a run

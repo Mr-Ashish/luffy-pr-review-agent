@@ -30,6 +30,27 @@ SOFT_SECTIONS = (
     "### What I checked",
 )
 
+# F18: scrub secrets before the body hits GitHub PR comments / distill.
+# Keep patterns aligned with scripts/save-trace.sh + build-hub-payload.py.
+_SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"sk-or-v1-[A-Za-z0-9_-]{10,}"), "[OPENROUTER_KEY_REDACTED]"),
+    (re.compile(r"(OPENROUTER_API_KEY=)\S+"), r"\1[REDACTED]"),
+    (
+        re.compile(r"(api[_-]?key[\"']?\s*[:=]\s*[\"']?)([^\"'\s]+)", re.I),
+        r"\1[REDACTED]",
+    ),
+    (re.compile(r"gh[pousr]_[A-Za-z0-9_]{20,}"), "[GITHUB_TOKEN_REDACTED]"),
+    (re.compile(r"github_pat_[A-Za-z0-9_]{20,}"), "[GITHUB_TOKEN_REDACTED]"),
+)
+
+
+def redact_secrets(text: str) -> str:
+    """Remove accidental API keys / tokens from model output before post."""
+    out = text
+    for rx, repl in _SECRET_PATTERNS:
+        out = rx.sub(repl, out)
+    return out
+
 
 def strip_outer_fence(text: str) -> str:
     t = text.strip()
@@ -125,7 +146,10 @@ def main(argv: list[str] | None = None) -> int:
 
     raw = args.input.read_text(errors="replace")
     cleaned = strip_outer_fence(raw)
+    # Redact before contract repair so fallback "raw agent output" is also scrubbed.
+    cleaned = redact_secrets(cleaned)
     final = ensure_contract(cleaned, str(args.pr))
+    final = redact_secrets(final)
     final = final.replace(
         f"<!-- luffy-review pr={args.pr} -->",
         f"<!-- luffy-review pr={args.pr} run={args.run_id} -->",

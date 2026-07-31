@@ -76,6 +76,37 @@ class NormalizeReviewTests(unittest.TestCase):
         self.assertIn("### Security audit", out)
         self.assertIn("looks fine ship it", out)
 
+    def test_redacts_openrouter_key_in_body(self):
+        # F18: posted PR comments must never carry sk-or keys the model echoed.
+        leak = "sk-or-v1-" + ("a" * 40)
+        raw = self._full_contract(summary=f"found key {leak} in logs")
+        out = self.run_norm(raw)
+        self.assertNotIn(leak, out)
+        self.assertIn("[OPENROUTER_KEY_REDACTED]", out)
+        self.assertIn("**Verdict:** APPROVE", out)
+
+    def test_redacts_openrouter_env_assignment(self):
+        raw = self._full_contract(summary="export OPENROUTER_API_KEY=sk-secret-value-xyz")
+        out = self.run_norm(raw)
+        self.assertNotIn("sk-secret-value-xyz", out)
+        self.assertIn("OPENROUTER_API_KEY=[REDACTED]", out)
+
+    def test_redacts_github_tokens(self):
+        ghp = "ghp_" + ("B" * 36)
+        pat = "github_pat_" + ("C" * 22)
+        raw = self._full_contract(summary=f"token {ghp} and {pat}")
+        out = self.run_norm(raw)
+        self.assertNotIn(ghp, out)
+        self.assertNotIn(pat, out)
+        self.assertIn("[GITHUB_TOKEN_REDACTED]", out)
+
+    def test_redacts_secrets_in_contract_fallback_raw(self):
+        leak = "sk-or-v1-" + ("d" * 40)
+        out = self.run_norm(f"broken output with {leak}")
+        self.assertNotIn(leak, out)
+        self.assertIn("[OPENROUTER_KEY_REDACTED]", out)
+        self.assertIn("### Raw agent output", out)
+
     def test_truncates_huge(self):
         raw = self._full_contract(summary="x" * 70_000)
         out = self.run_norm(raw)

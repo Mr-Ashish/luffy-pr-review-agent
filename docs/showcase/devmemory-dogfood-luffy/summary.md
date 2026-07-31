@@ -1,9 +1,9 @@
-# Run run-20260731T173741-9c863d
+# Run run-20260731T174058-4971db
 
-- session: `dogfood-luffy-session`
+- session: `file-dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
-- units: 7
-- summary: Session captured the durable design and operations of Luffy, a comment-triggered GitHub Actions PR review control plane (dual checkout, layered Hermes memory, normalize/distill/trace stages, cross-repo hub memory) plus its setup, trigger, cost-control and trace-debugging workflows. New knowledge covers root-level architecture/pitfalls, the agent contract under agent/, the hub memory layout under memory/, and operator commands — none of which exist in the current seeded DEV.md/USAGE.md.
-- at: 2026-07-31T12:08:41Z
-- timings: {"assemble_s": 0.069, "extract_s": 59.835, "normalize_s": 0.002}
+- units: 1
+- summary: The only genuinely new durable knowledge is the F18 implementation pattern: a single shared secret-redaction helper in normalize-review.py applied twice around contract repair, with patterns deliberately kept in sync with save-trace.sh and build-hub-payload.py so posted comments, traces, and hub payloads share one scrub policy. The trust-model consequence is already recorded in DEV.md#Pitfalls, so only the pattern/ordering detail is emitted.
+- at: 2026-07-31T12:11:26Z
+- timings: {"assemble_s": 0.076, "extract_s": 28.093, "normalize_s": 0.001}

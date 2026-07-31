@@ -1,4 +1,4 @@
-# Showcase · `run-20260731T173741-9c863d`
+# Showcase · `run-20260731T174058-4971db`
 
 Live dogfood run of **devmemory on itself**.
 
@@ -6,7 +6,7 @@ Live dogfood run of **devmemory on itself**.
 |-------|-------|
 | model | `anthropic/claude-opus-5` |
 | hermes_rc | 0 |
-| units | 7 |
+| units | 1 |
 
 ## Files
 

@@ -3,62 +3,8 @@
     "path": "DEV.md",
     "kind": "dev",
     "action": "merge",
-    "section": "Architecture",
-    "bytes": 1050,
-    "applied": true,
-    "unit_path": "."
-  },
-  {
-    "path": "DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Design decisions",
-    "bytes": 1771,
-    "applied": true,
-    "unit_path": "."
-  },
-  {
-    "path": "DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Pitfalls",
-    "bytes": 2702,
-    "applied": true,
-    "unit_path": "."
-  },
-  {
-    "path": "agent/DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Design decisions",
-    "bytes": 1109,
-    "applied": true,
-    "unit_path": "agent"
-  },
-  {
-    "path": "memory/DEV.md",
-    "kind": "dev",
-    "action": "merge",
-    "section": "Architecture",
-    "bytes": 935,
-    "applied": true,
-    "unit_path": "memory"
-  },
-  {
-    "path": "USAGE.md",
-    "kind": "usage",
-    "action": "merge",
-    "section": "Setup",
-    "bytes": 831,
-    "applied": true,
-    "unit_path": "."
-  },
-  {
-    "path": "USAGE.md",
-    "kind": "usage",
-    "action": "merge",
-    "section": "Debugging",
-    "bytes": 1863,
+    "section": "Patterns",
+    "bytes": 4151,
     "applied": true,
     "unit_path": "."
   }

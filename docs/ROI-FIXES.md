@@ -27,10 +27,13 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 11 | **F15** | Config error `pipeline_rc=1` (was 0 → false ✅ reaction) | XS | Honest UX | **Shipped** |
 | 12 | **F16** | Association deny → 😕 reaction (no OpenRouter spend) | XS | Visible deny | **Shipped** |
 | 13 | **F17** | Drop dead `RUNNER_TEMP` Hermes tree copy after cold install | XS | Faster cold path | **Shipped** |
-| 14 | F7 | Pin Hermes version string | S | Repro | Later |
-| 15 | F8 | Docker image with Hermes preinstalled | M | Fastest CI | Later |
-| 16 | F9 | Inline GitHub review comments | L | Product | Later |
-| 17 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
+| 14 | **F18** | Redact secrets in **posted** review (`normalize-review.py` choke-point) | XS | 🔥 Trust — no keys on PR comments | **Shipped** |
+| 15 | F7 | Pin Hermes version string (`--commit` / `LUFFY_HERMES_COMMIT`) | S | Repro | Next |
+| 16 | F19 | Per-PR re-trigger cooldown (skip paid run after recent success) | S | Cost/abuse | Later |
+| 17 | F20 | `scripts/install-luffy.sh` copy pack to target repo | S | Adoption | Later |
+| 18 | F8 | Docker image with Hermes preinstalled | M | Fastest CI | Later |
+| 19 | F9 | Inline GitHub review comments | L | Product | Later |
+| 20 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
 
 ### Sprint 1 (shipped)
 
@@ -43,6 +46,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 3 (shipped)
 
 **F13–F17** correctness + cache + reaction honesty.
+
+### Sprint 4 (shipped)
+
+**F18** secret redaction on normalize → PR comment path (aligned with trace/hub scrub patterns).
 
 ### readme-kit (shipped)
 
