@@ -12,6 +12,9 @@
 
 - The F36 default of **1500s** is chosen to sit just under Modal's `review_pr` hard cap (~25m) rather than under the GHA job cap (90m) — the tighter host sets the shared default, so the same number is safe on both. Changing `DEFAULT_SECONDS` in `scripts/run-with-timeout.py` without re-checking the Modal function timeout would let a Modal run be killed by the platform instead of by the helper (losing the honest 124 stub and job-summary section).
 
+- **F39:** `review_pr` must call the same pure gates as GHA rather than re-implementing them — `scripts/modal_parity.py` wraps F38 `path-skip-check` for preflight; post-review signals go through `report-verdict.sh` (not ad-hoc gh calls in app.py). Path-skip runs **before** sparse clone so a docs-only Modal run never pays for git fetch or Hermes.
+- On path-skip, Modal still posts a stub COMMENT + report-verdict labels when `post_comment=True`, so operators see an honest free skip instead of silence.
+
 ## Architecture
 
 - Bit 4 (F32) splits the enqueue path into four units in `modal_app/app.py`: `parse_enqueue_payload` (normalize an incoming request into repo/pr/model/post_comment), `plan_enqueue` (pure plan, no side effects), `enqueue_review` (the spawn call), and `review_webhook` (the HTTP entrypoint). Parsing/planning are separable from spawning so the parser can be self-checked without any OpenRouter spend.

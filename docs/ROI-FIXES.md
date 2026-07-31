@@ -54,6 +54,7 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 38 | **F37** | Verdict → PR labels (`luffy:approve` etc.) | XS | 🔥 Ops — boards/search/automation without parsing comments | **Shipped** (`apply-verdict-labels.py`) |
 | 39 | **F38** | Path-glob free skip (docs-only / filtered PRs) | XS | 🔥 Cost — no OpenRouter when every path matches skip globs | **Shipped** (`path-skip-check.py`, opt-in) |
 | 40 | **F9c** | Multi-line GitHub apply-suggestion blocks from Code suggestions | S | 🔥 Product — one-click apply on Files changed | **Shipped** (`post-inline-comments.py` suggestions) |
+| 41 | **F39** | Modal host parity (F38 path-skip + F22–F37/F9 report-verdict) | S | 🔥 Cost/trust — Modal no longer second-class kitchen | **Shipped** (`modal_parity.py`, `review_pr`) |
 
 ### Sprint 1 (shipped)
 
@@ -174,6 +175,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 30 (shipped)
 
 **F9c** GitHub apply-suggestion blocks: parse `### Code suggestions` (`#### title (`path`)` + ```diff```), map the suggestion’s `-` lines onto contiguous PR `+` lines, post multi-line inline comments with a ```suggestion``` fence (one-click apply in Files changed). Cap `vars.LUFFY_SUGGESTION_MAX` (default 3); opt-out `vars.LUFFY_INLINE_SUGGESTIONS=0`. Shares F9 soft-fail + fixture path.
+
+### Sprint 31 (shipped)
+
+**F39** Modal host parity: `review_pr` runs F38 path-skip **before** sparse clone (env `LUFFY_SKIP_PATH_GLOBS`); on skip posts stub COMMENT + report-verdict labels (no OpenRouter). After a paid run, calls `report-verdict.sh` for commit status / PR review / inline / labels. Sets `LUFFY_REVIEW_TIMEOUT_SECONDS` (F36). Helper `scripts/modal_parity.py`. App version `0.6.0-f39`.
 
 ### readme-kit (shipped)
 

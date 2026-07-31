@@ -50,6 +50,19 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 28 (F37):** Verdict → PR labels (`luffy:approve` / `request-changes` / `comment` / `error`)
 - **Sprint 29 (F38):** Path-glob free skip (opt-in docs-only / filtered PRs — no OpenRouter)
 - **Sprint 30 (F9c):** GitHub apply-suggestion blocks from `### Code suggestions`
+- **Sprint 31 (F39):** Modal host parity (path-skip + report-verdict on bit 3)
+
+## Modal host parity (F39)
+
+`modal_app` `review_pr` (bit 3) now mirrors GHA cost/trust gates:
+
+| Gate | Behaviour on Modal |
+|------|--------------------|
+| F38 path-skip | Before clone; env `LUFFY_SKIP_PATH_GLOBS`; force `LUFFY_SKIP_PATHS_FORCE=1` |
+| F36 timeout | `LUFFY_REVIEW_TIMEOUT_SECONDS` (default 1500) |
+| F22–F37 / F9 | `report-verdict.sh` after review (status, PR review, inline, labels) |
+
+Offline helper: `python3 scripts/modal_parity.py path-skip …`. App version `0.6.0-f39`.
 
 ## Apply-suggestion blocks (F9c)
 

@@ -15,9 +15,23 @@ python3 -m modal token new   # browser auth → ~/.modal.toml
 |-----|------|--------|
 | **1** | Skeleton app + health | `modal run modal_app/app.py` → `BIT1_OK` |
 | **2** | Image git/gh + secrets + clone | `modal run modal_app/app.py --bit 2` → `BIT2_OK` |
-| **3** | Manual review worker | `modal run … --bit 3 --repo … --pr …` → `BIT3_OK` |
+| **3** | Manual review worker (+ F39 parity) | `modal run … --bit 3 --repo … --pr …` → `BIT3_OK` |
 | **4** | Enqueue + webhook (F32) | `modal run … --bit 4` dry plan → `BIT4_OK`; deploy POST `review_webhook` |
 | 5 | E2E on Mr-Ashish/odoo | real PR (paid) |
+
+### F39 host parity (bit 3)
+
+Modal is no longer comment-only:
+
+1. **F38 path-skip** — if `LUFFY_SKIP_PATH_GLOBS` is set and every changed path matches, skip clone + Hermes; post stub + labels (`skipped_paid: true`).
+2. **F36 timeout** — `LUFFY_REVIEW_TIMEOUT_SECONDS` (default 1500) passed into the orchestrator.
+3. **F22–F37 / F9** — after a paid review, `report-verdict.sh` posts commit status, formal PR review, inline notes/suggestions, and verdict labels.
+
+```bash
+# Self-check path-skip offline
+python3 scripts/modal_parity.py path-skip --path README.md --globs docs   # exit 2
+# Modal secret/app env: LUFFY_SKIP_PATH_GLOBS=docs
+```
 
 ## Commands
 

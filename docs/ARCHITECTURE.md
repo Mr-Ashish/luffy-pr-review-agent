@@ -76,6 +76,16 @@ Vars: `LUFFY_MEMORY_MODE` (`local` default | `hub` | `both`), `LUFFY_MEMORY_PATH
 - Slim git history only — full hermes logs stay in artifacts, not git  
 
 
+## Modal host (F39)
+
+`modal_app.review_pr` is a first-class kitchen (not comment-only):
+
+1. List PR paths via API → optional F38 path-skip (no clone / no OpenRouter)
+2. Sparse checkout → `run-luffy-review.sh` (F36 timeout, F31 bundle)
+3. Post PR comment → `report-verdict.sh` (F22 status, F23 review, F9/F9c inline, F37 labels)
+
+Shared pure helper: `scripts/modal_parity.py`.
+
 ## Packaging (F10)
 
 | Mode | What lives on the target | Runtime source |

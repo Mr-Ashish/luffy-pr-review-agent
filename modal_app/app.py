@@ -29,7 +29,7 @@ from typing import Any
 import modal
 
 APP_NAME = "luffy-pr-review"
-LUFFY_MODAL_VERSION = "0.5.1-cheap"
+LUFFY_MODAL_VERSION = "0.6.0-f39"
 HERMES_PIN = "53559aaf86b84dadae83cd9bb605ca476f9a0606"
 # OpenRouter — keep Modal compute cheap AND LLM spend low
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
@@ -75,7 +75,7 @@ github_secret = modal.Secret.from_name("luffy-github")
 # (create empty-safe: operators may fold keys into luffy-github instead).
 trace_vol = modal.Volume.from_name("luffy-traces", create_if_missing=True)
 
-# Import pure webhook auth (local tree or Modal image /opt/luffy/scripts)
+# Import pure helpers (local tree or Modal image /opt/luffy/scripts)
 for _p in (str(_REPO_ROOT / "scripts"), "/opt/luffy/scripts"):
     if _p not in sys.path:
         sys.path.insert(0, _p)
@@ -83,6 +83,16 @@ try:
     from webhook_auth import authorize_webhook  # type: ignore
 except ImportError:  # pragma: no cover — image always has scripts mount
     authorize_webhook = None  # type: ignore
+try:
+    from modal_parity import (  # type: ignore
+        parse_paths_from_gh_filenames,
+        path_skip_preflight,
+        path_skip_stub_summary,
+    )
+except ImportError:  # pragma: no cover
+    parse_paths_from_gh_filenames = None  # type: ignore
+    path_skip_preflight = None  # type: ignore
+    path_skip_stub_summary = None  # type: ignore
 
 # Cheapest resource profile: Modal minimums (no cpu=/memory= reservation)
 # https://modal.com/docs/guide/resources — default 0.125 core; over-request bills higher
@@ -162,15 +172,14 @@ def probe_clone(repo: str = "Mr-Ashish/odoo") -> dict:
     }
 
 
-def _sparse_checkout_pr(repo: str, pr_number: int, workspace: Path, token: str) -> str:
-    """Shallow clone + sparse paths for changed files only (monorepo-cheap)."""
+def _list_pr_paths(repo: str, pr_number: int, token: str) -> list[str]:
+    """List changed file paths for a PR (no clone)."""
     env = {
         **os.environ,
         "GH_TOKEN": token,
         "GITHUB_TOKEN": token,
         "GIT_TERMINAL_PROMPT": "0",
     }
-    # List changed files (cap paths)
     files_p = _run(
         [
             "gh",
@@ -182,7 +191,28 @@ def _sparse_checkout_pr(repo: str, pr_number: int, workspace: Path, token: str) 
         ],
         env=env,
     )
-    paths = [ln.strip() for ln in (files_p.stdout or "").splitlines() if ln.strip()]
+    if parse_paths_from_gh_filenames is not None:
+        return parse_paths_from_gh_filenames(files_p.stdout or "")
+    paths = [ln.strip().lstrip("/") for ln in (files_p.stdout or "").splitlines() if ln.strip()]
+    # unique
+    seen: set[str] = set()
+    out: list[str] = []
+    for p in paths:
+        if p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
+
+
+def _sparse_checkout_pr(repo: str, pr_number: int, workspace: Path, token: str) -> str:
+    """Shallow clone + sparse paths for changed files only (monorepo-cheap)."""
+    env = {
+        **os.environ,
+        "GH_TOKEN": token,
+        "GITHUB_TOKEN": token,
+        "GIT_TERMINAL_PROMPT": "0",
+    }
+    paths = _list_pr_paths(repo, pr_number, token)
     # unique top-level dirs + files, cap 40
     sparse: list[str] = []
     for p in paths[:80]:
@@ -283,11 +313,6 @@ def review_pr(
         shutil.copy(seed, hermes_home / "memories" / "MEMORY.md")
     out_dir.mkdir(parents=True)
 
-    try:
-        head_sha = _sparse_checkout_pr(repo, pr_number, workspace, token)
-    except Exception as e:  # noqa: BLE001
-        return {"ok": False, "error": f"checkout: {e}", "elapsed_s": round(time.time() - t0, 1)}
-
     env = {
         **os.environ,
         "OPENROUTER_API_KEY": or_key,
@@ -311,15 +336,129 @@ def review_pr(
         "POST_COMMENT": "1" if post_comment else "0",
         "TRIGGER_COMMENT": "modal cheap e2e",
         "MAX_DIFF_BYTES": "200000",  # smaller context = fewer tokens
-        "LUFFY_TOOLSETS": "",  # empty may fall back; prefer terminal but costlier
+        "LUFFY_TOOLSETS": "terminal",
         "LUFFY_HOST": "modal",  # F31 Run Console host label
+        # F36: wall-clock (script default 1500s if unset)
+        "LUFFY_REVIEW_TIMEOUT_SECONDS": os.environ.get(
+            "LUFFY_REVIEW_TIMEOUT_SECONDS", "1500"
+        ),
         "PATH": os.environ.get(
             "PATH",
             "/root/.local/bin:/root/.hermes/bin:/usr/local/bin:/usr/bin:/bin",
         ),
     }
-    # Disable agent tools for cheapest LLM path (diff-only review)
-    env["LUFFY_TOOLSETS"] = "terminal"  # still needed for hermes; keep
+
+    # ------------------------------------------------------------------
+    # F39: path-skip preflight (F38) BEFORE clone / OpenRouter spend
+    # ------------------------------------------------------------------
+    path_skip_info: dict[str, Any] | None = None
+    try:
+        pr_paths = _list_pr_paths(repo, pr_number, token)
+    except Exception as e:  # noqa: BLE001
+        pr_paths = []
+        path_skip_info = {"skip": False, "reason": f"list_paths_error:{e}"}
+
+    force_skip = (os.environ.get("LUFFY_SKIP_PATHS_FORCE") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if path_skip_preflight is not None and pr_paths is not None:
+        path_skip_info = path_skip_preflight(
+            pr_paths,
+            globs_raw=os.environ.get("LUFFY_SKIP_PATH_GLOBS"),
+            force=force_skip,
+        )
+
+    if path_skip_info and path_skip_info.get("skip"):
+        summary, blocking = (
+            path_skip_stub_summary(
+                str(path_skip_info.get("sample") or ""),
+                str(path_skip_info.get("globs") or ""),
+            )
+            if path_skip_stub_summary
+            else (
+                "Path-skip: all paths matched globs (F39 Modal).",
+                "None — free skip.",
+            )
+        )
+        stub_script = pack / "scripts" / "write-failure-review.sh"
+        review_path: Path | None = None
+        if stub_script.is_file():
+            _run(
+                [
+                    "bash",
+                    str(stub_script),
+                    str(pr_number),
+                    str(out_dir),
+                    summary,
+                    blocking,
+                ],
+                env=env,
+            )
+            cands = [
+                p
+                for p in sorted(out_dir.glob("review-*.md"))
+                if ".raw." not in p.name
+            ]
+            review_path = cands[0] if cands else None
+        post_rc = None
+        verdict_rc = None
+        if post_comment and review_path and review_path.is_file():
+            post = _run(
+                [
+                    "bash",
+                    str(pack / "scripts" / "post-review-comment.sh"),
+                    str(review_path),
+                    str(pr_number),
+                ],
+                env=env,
+            )
+            post_rc = post.returncode
+            # F39: labels/status even on free skip (COMMENT)
+            if (pack / "scripts" / "report-verdict.sh").is_file():
+                v = _run(
+                    [
+                        "bash",
+                        str(pack / "scripts" / "report-verdict.sh"),
+                        str(review_path),
+                        "0",
+                    ],
+                    env={
+                        **env,
+                        "LUFFY_INLINE_COMMENTS": "0",
+                        "PIPELINE_RC": "0",
+                    },
+                )
+                verdict_rc = v.returncode
+        return {
+            "ok": True,
+            "bit": 3,
+            "profile": "cheap",
+            "version": LUFFY_MODAL_VERSION,
+            "repo": repo,
+            "pr_number": pr_number,
+            "model": model,
+            "path_skip": path_skip_info,
+            "skipped_paid": True,
+            "orch_rc": 0,
+            "post_rc": post_rc,
+            "verdict_rc": verdict_rc,
+            "review_path": str(review_path) if review_path else None,
+            "elapsed_s": round(time.time() - t0, 1),
+            "note": "F39 path-skip: no OpenRouter / no clone",
+        }
+
+    try:
+        head_sha = _sparse_checkout_pr(repo, pr_number, workspace, token)
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": f"checkout: {e}", "elapsed_s": round(time.time() - t0, 1)}
+
+    # Full SHA for F22 commit status + F9 inline
+    head_full_p = _run(["git", "rev-parse", "HEAD"], cwd=str(workspace))
+    head_full = (head_full_p.stdout or "").strip() or head_sha
+    env["HEAD_SHA"] = head_full
+    env["WORKSPACE_ROOT"] = str(workspace)
 
     orch = pack / "scripts" / "run-luffy-review.sh"
     proc = _run(["bash", str(orch)], env=env)
@@ -344,6 +483,29 @@ def review_pr(
             env=env,
         )
         post_rc = post.returncode
+
+    # ------------------------------------------------------------------
+    # F39: GHA-parity signals — commit status, PR review, inline, labels
+    # ------------------------------------------------------------------
+    verdict_rc = None
+    if review_path and review_path.is_file() and (pack / "scripts" / "report-verdict.sh").is_file():
+        # Copy pr.diff next to review if assemble put it in OUT_DIR (already)
+        v_env = {
+            **env,
+            "HEAD_SHA": head_full,
+            "PIPELINE_RC": str(orch_rc),
+            "LUFFY_INLINE_DIFF": str(out_dir / "pr.diff"),
+        }
+        v = _run(
+            [
+                "bash",
+                str(pack / "scripts" / "report-verdict.sh"),
+                str(review_path),
+                str(orch_rc),
+            ],
+            env=v_env,
+        )
+        verdict_rc = v.returncode
 
     run_id = f"{repo.replace('/', '--')}-pr{pr_number}-{int(t0)}"
     vol_dest = Path("/traces") / run_id
@@ -397,6 +559,9 @@ def review_pr(
         "model": model,
         "orch_rc": orch_rc,
         "post_rc": post_rc,
+        "verdict_rc": verdict_rc,
+        "path_skip": path_skip_info,
+        "skipped_paid": False,
         "review_path": str(review_path) if review_path else None,
         "run_bundle": str(run_bundle) if run_bundle.is_file() else None,
         "review_preview": preview,

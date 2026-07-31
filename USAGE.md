@@ -22,6 +22,17 @@ modal run modal_app/app.py --bit 4 --repo owner/repo --pr 123   # dry enqueue pl
 
 Run Console **Run** tab copies the same commands + sample webhook JSON. Modal webhook (after `modal deploy`) accepts `{repo,pr,model,post_comment}` or GitHub `@luffy review` issue_comment on a PR — spawns only.
 
+### Modal host parity (F39)
+
+Bit 3 `review_pr` now runs F38 path-skip before clone and `report-verdict.sh` after
+a paid review (status / PR review / inline / labels). App version `0.6.0-f39`.
+
+```bash
+python3 scripts/modal_parity.py path-skip --path README.md --globs docs  # exit 2 = skip
+# Set on Modal secret/app env: LUFFY_SKIP_PATH_GLOBS=docs
+modal run modal_app/app.py --bit 3 --repo owner/repo --pr N --model openai/gpt-4.1-mini
+```
+
 ### Path-glob free skip (F38)
 
 ```bash
