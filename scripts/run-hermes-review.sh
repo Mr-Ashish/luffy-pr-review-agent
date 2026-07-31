@@ -5,7 +5,7 @@
 #   OPENROUTER_API_KEY
 #   LUFFY_ROOT, HERMES_HOME, WORKSPACE_ROOT
 #   OUT_DIR, PROMPT_PATH (or meta.env)
-#   LUFFY_MODEL / OPENROUTER_MODEL  (default: anthropic/claude-opus-5)
+#   LUFFY_MODEL / OPENROUTER_MODEL  (default: DEFAULT_LUFFY_MODEL below — F26 SoT)
 #   LUFFY_TOOLSETS  (optional hermes -t value; default: terminal for workspace tools)
 #   LUFFY_HERMES_COMMIT  pin SHA (default in hermes-pin.sh); empty/latest/main = floating
 #   PR_NUMBER
@@ -17,15 +17,22 @@ die() { echo "::error::$*" >&2; exit 1; }
 
 : "${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is required}"
 
+# F26: single source of truth for the unpaid-default model id.
+# OPERATIONS.md / USAGE.md / README / .env.example must match this string.
+# Override per-repo with vars.LUFFY_MODEL (e.g. openai/gpt-5-mini) to cut cost.
+DEFAULT_LUFFY_MODEL="anthropic/claude-opus-5"
+
 LUFFY_ROOT="${LUFFY_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 OUT_DIR="${OUT_DIR:-$LUFFY_ROOT/.luffy-out}"
 HERMES_HOME="${HERMES_HOME:-$LUFFY_ROOT/.luffy-hermes-home}"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$LUFFY_ROOT}"
-MODEL="${LUFFY_MODEL:-${OPENROUTER_MODEL:-anthropic/claude-opus-5}}"
+MODEL="${LUFFY_MODEL:-${OPENROUTER_MODEL:-$DEFAULT_LUFFY_MODEL}}"
 TOOLSETS="${LUFFY_TOOLSETS:-terminal}"
 PIN_HELPER="$LUFFY_ROOT/scripts/hermes-pin.sh"
 
 mkdir -p "$OUT_DIR" "$HERMES_HOME/memories" "$HERMES_HOME/logs"
+# Trace/debug: record effective model (override or default)
+printf '%s\n' "$MODEL" >"$OUT_DIR/luffy-model.txt" || true
 
 if [[ -f "$OUT_DIR/meta.env" ]]; then
   # shellcheck disable=SC1091

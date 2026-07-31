@@ -38,7 +38,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 22 | **F23** | Formal GitHub PR Review event from verdict (Reviews panel) | XS | 🔥 Trust UX — APPROVE/REQUEST_CHANGES/COMMENT as real PR reviews | **Shipped** (`review_event` + `report-verdict.sh`) |
 | 23 | **F24** | Dismiss prior Luffy PR reviews on re-run (Reviews hygiene) | XS | 🔥 Trust UX — re-@luffy no longer stacks APPROVE/REQUEST_CHANGES | **Shipped** (`dismiss-prior-pr-reviews.sh`) |
 | 24 | **F25** | Hermes pin single source of truth (no workflow hardcoded SHA) | XS | 🔥 Ops/repro — bump pin in one place | **Shipped** (workflows call `hermes-pin.sh default`) |
-| 25 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 25 | **F26** | Align default model docs + code (`anthropic/claude-opus-5` SoT) | XS | 🔥 Trust/cost — ops docs no longer understate spend | **Shipped** (`DEFAULT_LUFFY_MODEL`) |
+| 26 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -95,6 +96,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 14 (shipped)
 
 **F25** Hermes pin single source of truth: remove hardcoded `DEFAULT_HERMES_COMMIT` from workflow `env:` fallbacks. Empty/unset `vars.LUFFY_HERMES_COMMIT` → after pack checkout, write pin from `scripts/hermes-pin.sh default` into `$GITHUB_ENV`. Explicit `latest`/`main`/`floating` still float. Same for `build-luffy-runner.yml`. Bump pin only in `hermes-pin.sh` (Dockerfile ARG may lag for standalone builds).
+
+### Sprint 15 (shipped)
+
+**F26** default model alignment: `DEFAULT_LUFFY_MODEL=anthropic/claude-opus-5` in `run-hermes-review.sh` is SoT; OPERATIONS/USAGE/.env.example no longer claim `gpt-5-mini` as the script default. Workflow leaves empty `vars.LUFFY_MODEL` unset so the script default applies (no second hardcoded fallback). Effective model → `.luffy-out/luffy-model.txt`.
 
 ### readme-kit (shipped)
 

@@ -30,7 +30,7 @@ devmemory extract --fixture sample-auth-module --apply
 - Install on each target repo's **default branch** (workflow only runs from default branch):
   - **Pack:** `./scripts/install-luffy.sh /path/to/target-repo` — `agent/`, runtime `scripts/`, thin caller + local reusable.
 - Required secret: `OPENROUTER_API_KEY`. For cross-repo hub memory also add `LUFFY_HUB_TOKEN` (PAT with contents write on the hub).
-- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_RUNNER_IMAGE` (optional prebaked Hermes container image, F8), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
+- Optional repo variables: `LUFFY_MODEL` (script default `anthropic/claude-opus-5` — F26 SoT in `run-hermes-review.sh`; override e.g. `openai/gpt-5-mini` for cheaper runs), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_RUNNER_IMAGE` (optional prebaked Hermes container image, F8), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
 - Trigger a review by commenting `@luffy review this pr` (or `@luffy review`) on the PR.
 
 ## Debugging

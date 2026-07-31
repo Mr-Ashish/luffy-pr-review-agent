@@ -399,8 +399,11 @@ jobs:
           fi
           export LUFFY_HUB_REPO="${LUFFY_HUB_REPO:-Mr-Ashish/luffy-pr-review-agent}"
           export LUFFY_HUB_PUBLISH="${LUFFY_HUB_PUBLISH:-1}"
-          # Default showcase model: Claude Opus 5 via OpenRouter
-          export LUFFY_MODEL="${LUFFY_MODEL:-anthropic/claude-opus-5}"
+          # F26: empty vars.LUFFY_MODEL → run-hermes-review.sh DEFAULT_LUFFY_MODEL (SoT)
+          # Do not hardcode a second default here; leave unset when var empty.
+          if [[ -z "${LUFFY_MODEL:-}" ]]; then
+            unset LUFFY_MODEL || true
+          fi
           export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
           chmod +x "$LUFFY_ROOT/scripts/"*.sh "$LUFFY_ROOT/scripts/"*.py 2>/dev/null || true
           chmod +x "$LUFFY_ROOT/scripts/"*.sh
