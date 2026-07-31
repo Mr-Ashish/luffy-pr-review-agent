@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
-# F20: copy the Luffy runtime pack into a target repository.
+# F20/F10: install Luffy into a target repository.
 #
-# Pack (what target repos need on their *default* branch):
-#   agent/                              SOUL, prompts, config, memory seed
-#   scripts/                            orchestration (runtime helpers)
-#   .github/workflows/luffy-pr-review.yml
+# Modes:
+#   pack (default)  Copy agent/, runtime scripts/, thin caller + reusable workflow
+#                   so the target is self-contained (scripts live on its default branch).
+#   --caller        F10 hub-managed: only copy pack/luffy-pr-review-caller.yml
+#                   (runtime checked out from hub each run — free upgrades).
 #
 # Usage:
 #   ./scripts/install-luffy.sh /path/to/target-repo
+#   ./scripts/install-luffy.sh --caller /path/to/target-repo
 #   ./scripts/install-luffy.sh --dest /path/to/target-repo --dry-run
 #   ./scripts/install-luffy.sh --dest . --force   # re-install over existing
 #
 # Options:
 #   --dest DIR          Target repo root (required unless positional DIR)
+#   --caller            Hub-managed thin workflow only (no agent/scripts copy)
 #   --dry-run           Print actions; do not write
 #   --force             Overwrite existing files without prompting
-#   --with-hub-ingest   Also copy ingest-luffy-run.yml (hub repo only)
+#   --with-hub-ingest   Also copy ingest-luffy-run.yml (hub repo only; pack mode)
 #   --with-runner-build Also copy build-luffy-runner.yml + docker/luffy-runner/
 #   --source DIR        Luffy source root (default: parent of scripts/)
 #   -h | --help
@@ -29,12 +32,14 @@ DRY_RUN=0
 FORCE=0
 WITH_INGEST=0
 WITH_RUNNER=0
+CALLER_MODE=0
 
 log() { printf '%s\n' "$*" >&2; }
 die() { log "ERROR: $*"; exit 1; }
 
 usage() {
-  sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
+  # Header comment only (stop before set -euo pipefail)
+  sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -50,6 +55,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --dry-run) DRY_RUN=1; shift ;;
     --force) FORCE=1; shift ;;
+    --caller) CALLER_MODE=1; shift ;;
     --with-hub-ingest) WITH_INGEST=1; shift ;;
     --with-runner-build) WITH_RUNNER=1; shift ;;
     -h | --help) usage 0 ;;
@@ -79,6 +85,8 @@ SRC="$(cd "$SRC" && pwd)"
 [[ -d "$SRC/agent" ]] || die "source missing agent/: $SRC"
 [[ -d "$SRC/scripts" ]] || die "source missing scripts/: $SRC"
 [[ -f "$SRC/.github/workflows/luffy-pr-review.yml" ]] || die "source missing luffy-pr-review.yml"
+[[ -f "$SRC/.github/workflows/luffy-review-reusable.yml" ]] || die "source missing luffy-review-reusable.yml (F10)"
+[[ -f "$SRC/pack/luffy-pr-review-caller.yml" ]] || die "source missing pack/luffy-pr-review-caller.yml (F10)"
 
 # Refuse installing pack into itself unless forced (avoids half-copies)
 if [[ "$SRC" == "$DEST" && "$FORCE" != "1" ]]; then
@@ -145,9 +153,57 @@ copy_tree_files() {
   done
 }
 
-log "Luffy install · source=$SRC"
-log "               dest=$DEST dry_run=$DRY_RUN force=$FORCE"
+write_stamp() {
+  local mode="$1"
+  local STAMP="$DEST/.luffy-install-stamp"
+  local VERSION
+  VERSION="$(git -C "$SRC" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "DRY  would write $STAMP (mode=$mode source_sha=$VERSION)"
+    return 0
+  fi
+  {
+    echo "installed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "source_sha=$VERSION"
+    echo "source_path=$SRC"
+    echo "mode=$mode"
+    if [[ "$mode" == "caller" ]]; then
+      echo "pack=luffy-pr-review-caller.yml (hub-managed F10)"
+    else
+      echo "pack=agent,scripts(runtime),luffy-pr-review.yml,luffy-review-reusable.yml"
+    fi
+  } >"$STAMP"
+  log "OK   $STAMP"
+}
 
+log "Luffy install · source=$SRC"
+log "               dest=$DEST dry_run=$DRY_RUN force=$FORCE caller=$CALLER_MODE"
+
+# ---------------------------------------------------------------------------
+# F10: hub-managed caller only
+# ---------------------------------------------------------------------------
+if [[ "$CALLER_MODE" == "1" ]]; then
+  if [[ "$WITH_INGEST" == "1" || "$WITH_RUNNER" == "1" ]]; then
+    log "WARN --with-hub-ingest / --with-runner-build ignored in --caller mode"
+  fi
+  copy_file \
+    "$SRC/pack/luffy-pr-review-caller.yml" \
+    "$DEST/.github/workflows/luffy-pr-review.yml"
+  write_stamp "caller"
+  log ""
+  log "Next steps (hub-managed / F10 caller):"
+  log "  1. Commit .github/workflows/luffy-pr-review.yml and push to the default branch."
+  log "  2. Add secret OPENROUTER_API_KEY (and optional LUFFY_HUB_TOKEN)."
+  log "  3. Optional vars: LUFFY_MODEL, LUFFY_HERMES_COMMIT, LUFFY_COOLDOWN_SECONDS, LUFFY_RUNNER_IMAGE."
+  log "  4. On a PR, comment: @luffy review this pr"
+  log "  Runtime agent/scripts are fetched from Mr-Ashish/luffy-pr-review-agent@main each run."
+  log "Done."
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Default pack mode (self-contained target)
+# ---------------------------------------------------------------------------
 # agent/*
 AGENT_FILES=()
 while IFS= read -r -d '' f; do
@@ -159,10 +215,13 @@ copy_tree_files "agent" "${AGENT_FILES[@]}"
 # runtime scripts
 copy_tree_files "scripts" "${RUNTIME_SCRIPTS[@]}"
 
-# main workflow
+# F10: thin caller + reusable implementation (target keeps a copy of reusable for offline pin)
 copy_file \
   "$SRC/.github/workflows/luffy-pr-review.yml" \
   "$DEST/.github/workflows/luffy-pr-review.yml"
+copy_file \
+  "$SRC/.github/workflows/luffy-review-reusable.yml" \
+  "$DEST/.github/workflows/luffy-review-reusable.yml"
 
 if [[ "$WITH_INGEST" == "1" ]]; then
   copy_file \
@@ -189,20 +248,7 @@ if [[ "$WITH_RUNNER" == "1" ]]; then
   done
 fi
 
-# Stamp for operators (not secret)
-STAMP="$DEST/.luffy-install-stamp"
-VERSION="$(git -C "$SRC" rev-parse --short HEAD 2>/dev/null || echo unknown)"
-if [[ "$DRY_RUN" == "1" ]]; then
-  log "DRY  would write $STAMP (source_sha=$VERSION)"
-else
-  {
-    echo "installed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "source_sha=$VERSION"
-    echo "source_path=$SRC"
-    echo "pack=agent,scripts(runtime),luffy-pr-review.yml"
-  } >"$STAMP"
-  log "OK   $STAMP"
-fi
+write_stamp "pack"
 
 log ""
 log "Next steps on the target repo (default branch):"
@@ -210,4 +256,5 @@ log "  1. Commit the installed pack and push to the default branch."
 log "  2. Add secret OPENROUTER_API_KEY."
 log "  3. Optional: LUFFY_HUB_TOKEN, vars LUFFY_MODEL / LUFFY_HERMES_COMMIT / LUFFY_COOLDOWN_SECONDS / LUFFY_RUNNER_IMAGE."
 log "  4. On a PR, comment: @luffy review this pr"
+log "  Tip: for hub-managed installs (no local scripts), re-run with --caller."
 log "Done."

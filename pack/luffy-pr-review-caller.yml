@@ -1,8 +1,11 @@
-# Luffy — comment-triggered PR review (thin caller, F10)
+# Luffy — hub-managed thin caller (F10)
 #
-# Triggers live here; implementation is .github/workflows/luffy-review-reusable.yml
-# Pack install (default): uses this repo as luffy_repository (agent/scripts on default branch).
-# For hub-managed multi-repo installs see pack/luffy-pr-review-caller.yml (--caller).
+# Install with: ./scripts/install-luffy.sh --caller /path/to/target-repo
+# No agent/ or scripts/ copy required; runtime is checked out from the hub on each run.
+#
+# Required secret on this repo: OPENROUTER_API_KEY
+# Optional: LUFFY_HUB_TOKEN, vars LUFFY_MODEL / LUFFY_HERMES_COMMIT / LUFFY_COOLDOWN_SECONDS / LUFFY_RUNNER_IMAGE
+# Trigger: @luffy review this pr
 
 name: Luffy PR Review
 
@@ -38,9 +41,8 @@ jobs:
           contains(github.event.comment.body, '@luffy review')
         )
       )
-    uses: ./.github/workflows/luffy-review-reusable.yml
+    uses: Mr-Ashish/luffy-pr-review-agent/.github/workflows/luffy-review-reusable.yml@main
     secrets: inherit
     with:
-      # Pack / self: load agent+scripts from the repo that owns this workflow file
-      luffy_repository: ${{ github.repository }}
-      luffy_ref: ${{ github.event.repository.default_branch }}
+      luffy_repository: Mr-Ashish/luffy-pr-review-agent
+      luffy_ref: main

@@ -33,8 +33,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 17 | **F20** | `scripts/install-luffy.sh` copy pack to target repo | S | 🔥 Adoption | **Shipped** |
 | 18 | **F8** | Prebaked Hermes runner image + startup benchmark | M | 🔥 Fast CI startup | **Shipped** (docker/ + build workflow + benchmark script) |
 | 19 | **F21** | Surface OpenRouter cost/tokens on PR comment + job summary | XS | 🔥 Cost visibility | **Shipped** (`usage-summary.py`) |
-| 20 | F9 | Inline GitHub review comments | L | Product | Later |
-| 21 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
+| 20 | **F10** | Reusable `workflow_call` + thin hub caller | M | 🔥 Multi-repo DX | **Shipped** (`luffy-review-reusable.yml`, `--caller`) |
+| 21 | F9 | Inline GitHub review comments | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -71,6 +71,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 9 (shipped)
 
 **F21** cost/usage visibility: `scripts/usage-summary.py` appends a `*Cost / usage: …*` line to the posted review from `hermes-usage.json` and writes a job-summary section (model, estimated USD, tokens, API calls, stage timings). Soft no-op when usage is missing.
+
+### Sprint 10 (shipped)
+
+**F10** reusable packaging: `luffy-review-reusable.yml` holds the full review job (`workflow_call` + `luffy_repository` / `luffy_ref` inputs). Thin `luffy-pr-review.yml` triggers and calls it. `install-luffy.sh --caller` installs only `pack/luffy-pr-review-caller.yml` pointing at hub `@main` (no agent/scripts copy — free upgrades). Default pack mode still copies agent/scripts + both workflow files for self-contained targets.
 
 ### readme-kit (shipped)
 

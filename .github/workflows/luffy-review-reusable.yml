@@ -1,0 +1,506 @@
+# Luffy reusable review job (F10)
+#
+# Called by thin trigger workflows in this repo or any target repo.
+# Does not listen to events itself — caller owns issue_comment / workflow_dispatch.
+#
+# Inputs:
+#   luffy_repository — where agent/ + scripts/ live (hub or target pack)
+#   luffy_ref        — git ref for that pack (empty = default branch of luffy_repository)
+#
+# Secrets (caller passes via secrets: inherit or explicit map):
+#   OPENROUTER_API_KEY (required for paid runs)
+#   LUFFY_HUB_TOKEN (optional; falls back to GITHUB_TOKEN)
+#
+# Caller must grant: contents, pull-requests, issues, actions (write as needed).
+
+name: Luffy review (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      luffy_repository:
+        description: "Repo that provides agent/ + scripts/ (hub or installed pack)"
+        type: string
+        required: false
+        default: "Mr-Ashish/luffy-pr-review-agent"
+      luffy_ref:
+        description: "Git ref for luffy_repository (branch/tag/SHA)"
+        type: string
+        required: false
+        default: "main"
+    # Prefer caller `secrets: inherit` so OPENROUTER_API_KEY / LUFFY_HUB_TOKEN flow through.
+    secrets:
+      OPENROUTER_API_KEY:
+        required: false
+      LUFFY_HUB_TOKEN:
+        required: false
+
+# Permissions come from the caller workflow/job.
+
+jobs:
+  luffy-review:
+    name: Luffy review
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.issue.pull_request &&
+        (
+          contains(github.event.comment.body, '@luffy review this pr') ||
+          contains(github.event.comment.body, '@luffy review')
+        )
+      )
+    runs-on: ubuntu-latest
+    # F8: optional prebaked container (null when var unset/empty → host runner + Hermes cache)
+    container: ${{ vars.LUFFY_RUNNER_IMAGE != '' && vars.LUFFY_RUNNER_IMAGE || null }}
+    timeout-minutes: 90
+    # F7: pin Hermes for repro; vars.LUFFY_HERMES_COMMIT overrides (latest|main = floating)
+    # F8: prebaked image (LUFFY_RUNNER_IMAGE) or self-hosted with /root/.hermes-pin + hermes on PATH.
+    # Default: ubuntu-latest + Actions cache of ~/.local+~/.hermes (F2/F14).
+    env:
+      LUFFY_HERMES_COMMIT: ${{ vars.LUFFY_HERMES_COMMIT || '53559aaf86b84dadae83cd9bb605ca476f9a0606' }}
+
+    steps:
+      - name: Resolve PR number & gate
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          IS_PR: ${{ github.event.issue.pull_request != null }}
+          INPUT_PR: ${{ github.event.inputs.pr_number }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          # F11 cost control: who may trigger paid OpenRouter reviews
+          AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+          # Comma list; override via repo var LUFFY_ALLOWED_ASSOCIATIONS if needed
+          ALLOWED_ASSOCIATIONS: ${{ vars.LUFFY_ALLOWED_ASSOCIATIONS || 'OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR' }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "matched=true" >> "$GITHUB_OUTPUT"
+            echo "pr_number=${INPUT_PR}" >> "$GITHUB_OUTPUT"
+            echo "trigger_comment=workflow_dispatch" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "denied=false" >> "$GITHUB_OUTPUT"
+          if [[ "${IS_PR}" != "true" ]]; then
+            echo "matched=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! printf '%s' "${COMMENT_BODY:-}" | grep -Eiq '@luffy[[:space:]]+review([[:space:]]+this[[:space:]]+pr)?\b'; then
+            echo "matched=false" >> "$GITHUB_OUTPUT"
+            echo "Comment did not match @luffy review pattern; skipping."
+            exit 0
+          fi
+          # Author association allowlist (case-insensitive). Empty ALLOWED = no gate.
+          assoc="$(printf '%s' "${AUTHOR_ASSOCIATION:-NONE}" | tr '[:lower:]' '[:upper:]')"
+          allowed="$(printf '%s' "${ALLOWED_ASSOCIATIONS:-}" | tr '[:lower:]' '[:upper:]' | tr -d ' ')"
+          if [[ -n "$allowed" ]]; then
+            ok=false
+            IFS=',' read -ra parts <<<"$allowed"
+            for a in "${parts[@]}"; do
+              [[ -n "$a" && "$a" == "$assoc" ]] && ok=true && break
+            done
+            if [[ "$ok" != "true" ]]; then
+              echo "matched=false" >> "$GITHUB_OUTPUT"
+              echo "denied=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::Skipping Luffy: author_association=$assoc not in allowlist ($allowed)"
+              exit 0
+            fi
+          fi
+          echo "matched=true" >> "$GITHUB_OUTPUT"
+          echo "pr_number=${ISSUE_NUMBER}" >> "$GITHUB_OUTPUT"
+          {
+            echo "trigger_comment<<EOF"
+            printf '%s\n' "${COMMENT_BODY:-}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # F11 deny UX: visible signal without spending OpenRouter tokens
+      - name: React denied (association)
+        if: steps.gate.outputs.denied == 'true' && github.event_name == 'issue_comment'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content='confused' || true
+
+      # F10: Luffy pack source — hub (caller mode) or target pack (local scripts)
+      - name: Checkout Luffy system (agent + scripts)
+        if: steps.gate.outputs.matched == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.luffy_repository }}
+          ref: ${{ inputs.luffy_ref }}
+          path: luffy
+          fetch-depth: 1
+          sparse-checkout: |
+            agent
+            scripts
+          sparse-checkout-cone-mode: true
+
+      # F19: skip paid OpenRouter run if a successful Luffy review landed recently on this PR
+      - name: Cooldown gate
+        if: steps.gate.outputs.matched == 'true'
+        id: cooldown
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+          LUFFY_ROOT: ${{ github.workspace }}/luffy
+          LUFFY_COOLDOWN_SECONDS: ${{ vars.LUFFY_COOLDOWN_SECONDS || '900' }}
+          EVENT_NAME: ${{ github.event_name }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          # Defaults: allow (fail-open if anything unexpected)
+          echo "allowed=true" >> "$GITHUB_OUTPUT"
+          echo "reason=default" >> "$GITHUB_OUTPUT"
+          echo "remaining_s=0" >> "$GITHUB_OUTPUT"
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "reason=workflow_dispatch" >> "$GITHUB_OUTPUT"
+            echo "::notice::F19 cooldown: bypassed (workflow_dispatch)"
+            exit 0
+          fi
+          # Force: @luffy review force | @luffy review this pr force | body contains "force"
+          if printf '%s' "${COMMENT_BODY:-}" | grep -Eiq '@luffy[[:space:]]+review([[:space:]]+this[[:space:]]+pr)?[[:space:]]+force\b|[[:space:]]force[[:space:]]*$'; then
+            echo "reason=force_comment" >> "$GITHUB_OUTPUT"
+            echo "::notice::F19 cooldown: bypassed (@luffy … force)"
+            exit 0
+          fi
+
+          SCRIPT="$LUFFY_ROOT/scripts/cooldown-check.sh"
+          if [[ ! -x "$SCRIPT" ]]; then
+            chmod +x "$SCRIPT" 2>/dev/null || true
+          fi
+          if [[ ! -f "$SCRIPT" ]]; then
+            echo "::warning::F19 cooldown-check.sh missing; allowing run"
+            echo "reason=missing_script" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          set +e
+          OUT="$(bash "$SCRIPT" "$PR_NUMBER" 2>/tmp/luffy-cooldown.err)"
+          RC=$?
+          set -e
+          if [[ -s /tmp/luffy-cooldown.err ]]; then
+            cat /tmp/luffy-cooldown.err >&2 || true
+          fi
+          # Parse key=value from script stdout into GITHUB_OUTPUT (last write wins for allowed/reason)
+          while IFS= read -r line; do
+            [[ -z "$line" || "$line" != *=* ]] && continue
+            echo "$line" >> "$GITHUB_OUTPUT"
+          done <<<"$OUT"
+
+          if [[ $RC -eq 2 ]]; then
+            # Ensure allowed=false is set even if parse missed
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+            REM="$(printf '%s\n' "$OUT" | awk -F= '/^remaining_s=/{print $2}' | tail -1)"
+            echo "::notice::F19 cooldown active — skipping paid review (retry in ~${REM:-?}s, or comment '@luffy review force')"
+            {
+              echo "### Luffy cooldown (F19)"
+              echo "- Skipped paid OpenRouter review: recent successful Luffy comment on PR #${PR_NUMBER}"
+              echo "- Remaining: ~${REM:-?}s (override: \`vars.LUFFY_COOLDOWN_SECONDS\`, or \`@luffy review force\`)"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [[ $RC -ne 0 ]]; then
+            echo "::warning::F19 cooldown check failed (rc=$RC); fail-open allow"
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+            echo "reason=check_error" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::notice::F19 cooldown: allow ($(printf '%s\n' "$OUT" | awk -F= '/^reason=/{print $2}' | tail -1))"
+
+      - name: React cooldown skip
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'false' && github.event_name == 'issue_comment'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # No hourglass reaction on GitHub — "eyes" would imply work started; use laugh? better: rocket = acknowledged
+          gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content='rocket' || true
+
+      # List changed files via API BEFORE cloning the monorepo (no checkout needed)
+      - name: Resolve PR sparse paths
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true'
+        id: sparse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+          LUFFY_ROOT: ${{ github.workspace }}/luffy
+        run: |
+          set -euo pipefail
+          PATHS_FILE="${{ github.workspace }}/pr-paths.txt"
+          # Prefer shared script (leading slash for git sparse --no-cone)
+          if [[ -x "$LUFFY_ROOT/scripts/sparse-pr-paths.sh" ]]; then
+            "$LUFFY_ROOT/scripts/sparse-pr-paths.sh" > "$PATHS_FILE" || true
+          else
+            gh pr view "$PR_NUMBER" --repo "$REPO" --json files \
+              --jq '.files[].path' | head -200 | sed 's|^|/|' > "$PATHS_FILE" || true
+          fi
+          # F13: never use `grep -c || echo 0` — grep -c prints 0 AND exits 1 on empty,
+          # which produces "0\n0" and breaks integer compare / forces full monorepo clone.
+          COUNT="$(grep -c . "$PATHS_FILE" 2>/dev/null || true)"
+          COUNT="${COUNT:-0}"
+          echo "PR changed files: $COUNT"
+          if [[ "$COUNT" -ge 1 && "$COUNT" -le 200 ]]; then
+            {
+              echo "sparse<<EOF"
+              cat "$PATHS_FILE"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "use_sparse=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "use_sparse=false" >> "$GITHUB_OUTPUT"
+            echo "sparse=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # F1: shallow PR head + sparse from the start (avoid downloading whole monorepo)
+      - name: Checkout PR head (sparse shallow)
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.sparse.outputs.use_sparse == 'true'
+        uses: actions/checkout@v4
+        with:
+          path: workspace
+          fetch-depth: 1
+          ref: refs/pull/${{ steps.gate.outputs.pr_number }}/head
+          sparse-checkout: ${{ steps.sparse.outputs.sparse }}
+          sparse-checkout-cone-mode: false
+
+      - name: Checkout PR head (full shallow fallback)
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.sparse.outputs.use_sparse != 'true'
+        uses: actions/checkout@v4
+        with:
+          path: workspace
+          fetch-depth: 1
+          ref: refs/pull/${{ steps.gate.outputs.pr_number }}/head
+
+      # F8: skip Hermes install cache when runner image already has hermes
+      - name: Detect prebaked Hermes
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true'
+        id: prebaked
+        run: |
+          set -euo pipefail
+          export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
+          if { [[ "${LUFFY_HERMES_PREBAKED:-}" == "1" ]] || [[ -f /root/.hermes-pin ]] || [[ -f "${HOME}/.hermes-pin" ]]; } \
+            && command -v hermes >/dev/null 2>&1; then
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::F8 prebaked Hermes detected ($(command -v hermes)); skipping install cache"
+            hermes --version 2>/dev/null || true
+          else
+            echo "yes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # F2/F14/F7: cache Hermes install keyed by pin (save only on miss)
+      - name: Resolve Hermes cache suffix
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.prebaked.outputs.yes != 'true'
+        id: hermes_pin
+        run: |
+          set -euo pipefail
+          # Prefer pack helper when luffy/ is checked out; else mirror hermes-pin.sh
+          if [[ -x luffy/scripts/hermes-pin.sh ]]; then
+            SUF="$(LUFFY_HERMES_COMMIT="${LUFFY_HERMES_COMMIT:-}" luffy/scripts/hermes-pin.sh cache-suffix | tr -d '\n')"
+          else
+            RAW="${LUFFY_HERMES_COMMIT:-}"
+            if [[ -z "$RAW" || "$RAW" == "latest" || "$RAW" == "main" || "$RAW" == "floating" ]]; then
+              SUF="latest"
+            else
+              SUF="${RAW:0:12}"
+            fi
+          fi
+          echo "suffix=$SUF" >> "$GITHUB_OUTPUT"
+          echo "::notice::Hermes cache pin suffix=$SUF commit=${LUFFY_HERMES_COMMIT:-default}"
+
+      - name: Restore Hermes install cache
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.prebaked.outputs.yes != 'true'
+        id: hermes_cache
+        uses: actions/cache@v4
+        continue-on-error: true
+        with:
+          path: |
+            ~/.local
+            ~/.hermes
+          key: luffy-hermes-bin-${{ runner.os }}-v4-${{ steps.hermes_pin.outputs.suffix }}
+          restore-keys: |
+            luffy-hermes-bin-${{ runner.os }}-v4-
+            luffy-hermes-bin-${{ runner.os }}-
+
+      - name: React eyes
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && github.event_name == 'issue_comment'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content='eyes' || true
+
+      - name: Run Luffy pipeline
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true'
+        id: review
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+          TRIGGER_COMMENT: ${{ steps.gate.outputs.trigger_comment }}
+          LUFFY_MODEL: ${{ vars.LUFFY_MODEL }}
+          LUFFY_ROOT: ${{ github.workspace }}/luffy
+          WORKSPACE_ROOT: ${{ github.workspace }}/workspace
+          HERMES_HOME: ${{ github.workspace }}/.luffy-hermes-home
+          OUT_DIR: ${{ github.workspace }}/luffy/.luffy-out
+          TRACE_ROOT: ${{ github.workspace }}/luffy/.luffy-out/traces
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          LUFFY_HUB_TOKEN: ${{ secrets.LUFFY_HUB_TOKEN }}
+          LUFFY_HUB_REPO: ${{ vars.LUFFY_HUB_REPO }}
+          LUFFY_HUB_PUBLISH: ${{ vars.LUFFY_HUB_PUBLISH }}
+          # F7: job-level env already sets default; re-export for pipeline scripts
+          LUFFY_HERMES_COMMIT: ${{ env.LUFFY_HERMES_COMMIT }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${LUFFY_HUB_TOKEN:-}" ]]; then
+            export LUFFY_HUB_TOKEN="${GITHUB_TOKEN}"
+          fi
+          export LUFFY_HUB_REPO="${LUFFY_HUB_REPO:-Mr-Ashish/luffy-pr-review-agent}"
+          export LUFFY_HUB_PUBLISH="${LUFFY_HUB_PUBLISH:-1}"
+          # Default showcase model: Claude Opus 5 via OpenRouter
+          export LUFFY_MODEL="${LUFFY_MODEL:-anthropic/claude-opus-5}"
+          export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
+          chmod +x "$LUFFY_ROOT/scripts/"*.sh "$LUFFY_ROOT/scripts/"*.py 2>/dev/null || true
+          chmod +x "$LUFFY_ROOT/scripts/"*.sh
+          if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
+            echo "::error::Secret OPENROUTER_API_KEY is not set"
+            "$LUFFY_ROOT/scripts/write-failure-review.sh" "$PR_NUMBER" "$OUT_DIR" \
+              "Configuration error: OPENROUTER_API_KEY secret is missing." \
+              "Add repository secret OPENROUTER_API_KEY and re-run."
+            export LUFFY_STATUS=config_error
+            export LUFFY_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            "$LUFFY_ROOT/scripts/save-trace.sh" || true
+            "$LUFFY_ROOT/scripts/publish-run-to-hub.sh" || true
+            # F15: non-zero so React result shows ❌ not ✅
+            echo "pipeline_rc=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          set +e
+          "$LUFFY_ROOT/scripts/run-luffy-review.sh"
+          RC=$?
+          echo "pipeline_rc=$RC" >> "$GITHUB_OUTPUT"
+          set -e
+
+      - name: Post review comment (always if matched)
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+          OUT_DIR: ${{ github.workspace }}/luffy/.luffy-out
+          LUFFY_ROOT: ${{ github.workspace }}/luffy
+        run: |
+          set -euo pipefail
+          chmod +x "$LUFFY_ROOT/scripts/"*.sh
+          mkdir -p "$OUT_DIR"
+          REVIEW_FILE="$(ls -t "$OUT_DIR"/review-*.md 2>/dev/null | grep -v '\.raw\.md$' | head -1 || true)"
+          if [[ -z "${REVIEW_FILE:-}" || ! -f "$REVIEW_FILE" ]]; then
+            REVIEW_FILE="$("$LUFFY_ROOT/scripts/write-failure-review.sh" "$PR_NUMBER" "$OUT_DIR" \
+              "Luffy job ended without a review artifact. Check Actions logs." \
+              "Re-run after fixing the workflow failure.")"
+            export LUFFY_STATUS=missing_review
+            export LUFFY_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            export TRACE_ROOT="$OUT_DIR/traces"
+            "$LUFFY_ROOT/scripts/save-trace.sh" || true
+          fi
+          "$LUFFY_ROOT/scripts/post-review-comment.sh" "$REVIEW_FILE" "$PR_NUMBER"
+
+      - name: React result
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && github.event_name == 'issue_comment' && always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PIPELINE_RC: ${{ steps.review.outputs.pipeline_rc }}
+        run: |
+          CONTENT="+1"
+          if [[ "${PIPELINE_RC:-1}" != "0" ]]; then
+            CONTENT="-1"
+          fi
+          gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -f content="$CONTENT" || true
+
+      - name: Ensure trace package exists
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && always()
+        env:
+          LUFFY_ROOT: ${{ github.workspace }}/luffy
+          OUT_DIR: ${{ github.workspace }}/luffy/.luffy-out
+          HERMES_HOME: ${{ github.workspace }}/.luffy-hermes-home
+          TRACE_ROOT: ${{ github.workspace }}/luffy/.luffy-out/traces
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+          LUFFY_MODEL: ${{ vars.LUFFY_MODEL }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          chmod +x "$LUFFY_ROOT/scripts/save-trace.sh"
+          export LUFFY_STATUS="${LUFFY_STATUS:-complete}"
+          export LUFFY_STARTED_AT="${LUFFY_STARTED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+          "$LUFFY_ROOT/scripts/save-trace.sh"
+          # F21: cost/token summary before trace meta (ops visibility without artifact download)
+          if [[ -f "$LUFFY_ROOT/scripts/usage-summary.py" ]]; then
+            python3 "$LUFFY_ROOT/scripts/usage-summary.py" step-summary \
+              --usage "$OUT_DIR/hermes-usage.json" \
+              --timings "$OUT_DIR/timings.json" >> "$GITHUB_STEP_SUMMARY" || true
+          fi
+          echo "### Luffy trace" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f "$OUT_DIR/latest-trace-dir.txt" ]]; then
+            TRACE_DIR="$(cat "$OUT_DIR/latest-trace-dir.txt")"
+            echo "- **trace dir:** \`$TRACE_DIR\`" >> "$GITHUB_STEP_SUMMARY"
+            if [[ -f "$TRACE_DIR/meta.json" ]]; then
+              echo '```json' >> "$GITHUB_STEP_SUMMARY"
+              head -c 4000 "$TRACE_DIR/meta.json" >> "$GITHUB_STEP_SUMMARY"
+              echo >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      - name: Upload run trace artifact
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: luffy-trace-pr${{ steps.gate.outputs.pr_number }}-run${{ github.run_id }}
+          path: luffy/.luffy-out/traces/
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Upload full out bundle (debug)
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: luffy-out-pr${{ steps.gate.outputs.pr_number }}-run${{ github.run_id }}
+          path: |
+            luffy/.luffy-out/
+            .luffy-hermes-home/memories/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # F14/F7: only write cache on miss (pin-keyed). Exact hits skip save.
+      - name: Save Hermes install cache
+        if: >
+          steps.gate.outputs.matched == 'true' &&
+          steps.cooldown.outputs.allowed == 'true' &&
+          steps.prebaked.outputs.yes != 'true' &&
+          always() &&
+          steps.hermes_cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.local
+            ~/.hermes
+          key: luffy-hermes-bin-${{ runner.os }}-v4-${{ steps.hermes_pin.outputs.suffix }}

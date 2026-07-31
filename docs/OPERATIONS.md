@@ -2,12 +2,15 @@
 
 ## Required setup
 
-1. Install the pack onto the **default branch** of a GitHub repo:
+1. Install onto the **default branch** of a GitHub repo:
    ```bash
+   # Hub-managed (F10, recommended for multi-repo): thin workflow only
+   ./scripts/install-luffy.sh --caller /path/to/target-repo
+
+   # Self-contained pack (agent + scripts + reusable workflow on the target)
    ./scripts/install-luffy.sh /path/to/target-repo
-   # or: --force to overwrite, --with-hub-ingest for hub dispatch workflow
+   # optional: --force, --with-hub-ingest, --with-runner-build
    ```
-   (Equivalent manual copy: `agent/`, runtime `scripts/`, `.github/workflows/luffy-pr-review.yml`.)
 2. Repository secret: `OPENROUTER_API_KEY`
 3. Optional variable: `LUFFY_MODEL` (default in scripts: `openai/gpt-5-mini`)
 4. Optional variable: `LUFFY_HERMES_COMMIT` — pin Hermes to a git SHA (default baked into workflow + `scripts/hermes-pin.sh`); set `latest` or `main` to float on install.sh tip
@@ -26,6 +29,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 7 (F8):** prebaked Hermes runner image (`docker/luffy-runner/`, `vars.LUFFY_RUNNER_IMAGE`)
 - **Sprint 8 (F20):** `scripts/install-luffy.sh` one-command pack install into target repos
 - **Sprint 9 (F21):** cost/usage line on PR comments + job summary from `hermes-usage.json`
+- **Sprint 10 (F10):** reusable `workflow_call` job + `install-luffy.sh --caller` hub-managed thin install
 
 ## Central hub memory (cross-repo)
 

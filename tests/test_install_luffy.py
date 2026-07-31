@@ -26,7 +26,10 @@ class InstallLuffyTests(unittest.TestCase):
     def test_help(self):
         r = _run(["--help"])
         self.assertEqual(r.returncode, 0)
-        self.assertIn("copy the Luffy runtime pack", r.stdout + r.stderr)
+        out = r.stdout + r.stderr
+        self.assertIn("install Luffy into a target repository", out)
+        self.assertIn("--caller", out)
+        self.assertNotIn("set -euo pipefail", out)
 
     def test_missing_dest(self):
         r = _run([])
@@ -63,13 +66,42 @@ class InstallLuffyTests(unittest.TestCase):
             self.assertTrue(
                 (dest / ".github" / "workflows" / "luffy-pr-review.yml").is_file()
             )
-            self.assertTrue((dest / ".luffy-install-stamp").is_file())
+            # F10: pack mode also ships the reusable implementation
+            self.assertTrue(
+                (dest / ".github" / "workflows" / "luffy-review-reusable.yml").is_file()
+            )
+            stamp = (dest / ".luffy-install-stamp").read_text()
+            self.assertIn("mode=pack", stamp)
+            self.assertIn("uses: ./.github/workflows/luffy-review-reusable.yml",
+                          (dest / ".github" / "workflows" / "luffy-pr-review.yml").read_text())
             # image build scripts not in default pack
             self.assertFalse((dest / "scripts" / "build-luffy-runner-image.sh").exists())
             self.assertFalse((dest / "docker").exists())
             # executable bit preserved on shell scripts
             self.assertTrue(os.access(dest / "scripts" / "run-luffy-review.sh", os.X_OK))
 
+    def test_caller_mode_thin_only(self):
+        """F10: --caller installs hub-managed workflow without agent/scripts."""
+        with tempfile.TemporaryDirectory() as td:
+            dest = Path(td)
+            r = _run(["--dest", str(dest), "--force", "--caller"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            wf = dest / ".github" / "workflows" / "luffy-pr-review.yml"
+            self.assertTrue(wf.is_file())
+            body = wf.read_text()
+            self.assertIn(
+                "Mr-Ashish/luffy-pr-review-agent/.github/workflows/luffy-review-reusable.yml@main",
+                body,
+            )
+            self.assertIn("secrets: inherit", body)
+            self.assertFalse((dest / "agent").exists())
+            self.assertFalse((dest / "scripts").exists())
+            self.assertFalse(
+                (dest / ".github" / "workflows" / "luffy-review-reusable.yml").exists()
+            )
+            stamp = (dest / ".luffy-install-stamp").read_text()
+            self.assertIn("mode=caller", stamp)
+            self.assertIn("hub-managed", stamp)
     def test_skip_existing_without_force(self):
         with tempfile.TemporaryDirectory() as td:
             dest = Path(td)

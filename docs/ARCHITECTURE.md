@@ -52,6 +52,11 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 - Secrets only via env / Hermes `.env` (mode 0600)  
 - No formal GitHub “request changes” review API in v1 (comment only)  
 
-## Packaging (future)
+## Packaging (F10)
 
-Reusable `workflow_call` so app repos only need a thin caller.
+| Mode | What lives on the target | Runtime source |
+|------|--------------------------|----------------|
+| **Caller** (`install-luffy.sh --caller`) | Thin `.github/workflows/luffy-pr-review.yml` only | Hub `agent/`+`scripts/` via `luffy-review-reusable.yml@main` |
+| **Pack** (default install) | `agent/`, runtime `scripts/`, thin caller + local copy of reusable | Target default branch |
+
+Hub implementation file: `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`, inputs `luffy_repository` + `luffy_ref`).
