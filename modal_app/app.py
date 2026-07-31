@@ -29,7 +29,7 @@ from typing import Any
 import modal
 
 APP_NAME = "luffy-pr-review"
-LUFFY_MODAL_VERSION = "0.5.0-cheap"
+LUFFY_MODAL_VERSION = "0.5.1-cheap"
 HERMES_PIN = "53559aaf86b84dadae83cd9bb605ca476f9a0606"
 # OpenRouter — keep Modal compute cheap AND LLM spend low
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
@@ -553,10 +553,10 @@ async def review_webhook(request: Any) -> dict:
 
     Hermes never runs in this handler. Deploy: `modal deploy modal_app/app.py`.
 
-    Auth (env on the function / secrets):
+    Auth (env on the function / secrets) — F34 fail-closed:
       LUFFY_WEBHOOK_SECRET  → require X-Hub-Signature-256 (GitHub)
       LUFFY_WEBHOOK_TOKEN   → require Authorization: Bearer … or X-Luffy-Token
-      neither set           → open (dev only; response.auth=open + warning)
+      neither set           → denied unless LUFFY_WEBHOOK_ALLOW_OPEN=1 (dev)
 
     LUFFY_WEBHOOK_DRY_RUN=1 → plan only (no spawn).
     """
@@ -695,10 +695,19 @@ def main(
                     "repository": {"full_name": repo},
                 }
             ).get("skipped")
-            # F33: pure auth self-check (no network)
+            # F33/F34: pure auth self-check (no network)
             if authorize_webhook is not None:
                 body = b'{"repo":"a/b","pr":1}'
-                open_auth = authorize_webhook(body, {}, secret="", token="")
+                # F34: default fail-closed when no creds
+                closed = authorize_webhook(
+                    body, {}, secret="", token="", allow_open=False
+                )
+                result["auth_fail_closed_ok"] = (
+                    closed.get("ok") is False and closed.get("auth") == "denied"
+                )
+                open_auth = authorize_webhook(
+                    body, {}, secret="", token="", allow_open=True
+                )
                 result["auth_open_ok"] = open_auth.get("auth") == "open" and open_auth.get(
                     "ok"
                 )
@@ -729,6 +738,7 @@ def main(
             assert result.get("parsed_ok") and result.get("github_parse_ok")
             assert result.get("github_skip") is True
             if authorize_webhook is not None:
+                assert result.get("auth_fail_closed_ok")
                 assert result.get("auth_open_ok")
                 assert result.get("auth_hmac_ok")
                 assert result.get("auth_hmac_bad")

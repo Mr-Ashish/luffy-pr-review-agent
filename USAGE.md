@@ -37,7 +37,7 @@ python3 scripts/post-inline-comments.py post \
 
 Opt-out: `vars.LUFFY_INLINE_COMMENTS=0`. Severity/max: `LUFFY_INLINE_SEVERITY`, `LUFFY_INLINE_MAX`.
 
-### Webhook auth (F33)
+### Webhook auth (F33/F34)
 
 ```bash
 # Sign a body like GitHub would (fixture / curl)
@@ -45,10 +45,11 @@ python3 scripts/webhook_auth.py sign --secret "$LUFFY_WEBHOOK_SECRET" --body pay
 # Authorize
 python3 scripts/webhook_auth.py authorize --secret "$LUFFY_WEBHOOK_SECRET" --body payload.json \
   --header "X-Hub-Signature-256: sha256=…"
+# Dev open (not for production)
+python3 scripts/webhook_auth.py authorize --allow-open --body payload.json
 ```
 
-Set `LUFFY_WEBHOOK_SECRET` (GitHub) and/or `LUFFY_WEBHOOK_TOKEN` (Bearer) on the Modal function env. Neither → open doorbell (dev only).
-
+Set `LUFFY_WEBHOOK_SECRET` (GitHub) and/or `LUFFY_WEBHOOK_TOKEN` (Bearer) on the Modal function env. **F34:** neither → denied (fail-closed). Local smoke only: `LUFFY_WEBHOOK_ALLOW_OPEN=1`.
 ## Common commands
 
 - Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).

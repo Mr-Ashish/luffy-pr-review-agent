@@ -67,10 +67,10 @@ GitHub webhook: set the same value as **Webhook secret** in GitHub and as Modal 
 |-----|------|
 | `LUFFY_WEBHOOK_SECRET` | GitHub HMAC secret |
 | `LUFFY_WEBHOOK_TOKEN` | Bearer / `X-Luffy-Token` for simple API |
+| `LUFFY_WEBHOOK_ALLOW_OPEN=1` | **Dev only** — permit unauthenticated when neither secret/token set |
 | `LUFFY_WEBHOOK_DRY_RUN=1` | Plan only (no spawn) |
 
-Neither secret/token → `auth=open` (dev only; response includes warning). Production **must** set at least one (fold into Modal secret `luffy-github` or app env). Pure helper: `python3 scripts/webhook_auth.py sign|authorize`. Handler **only spawns** `review_pr`.
-## Secrets
+**F34 fail-closed:** neither secret nor token → `auth=denied` unless `LUFFY_WEBHOOK_ALLOW_OPEN=1`. Production **must** set at least one (fold into Modal secret `luffy-github` or app env). Pure helper: `python3 scripts/webhook_auth.py sign|authorize [--allow-open]`. Handler **only spawns** `review_pr`.## Secrets
 
 ```bash
 # OpenRouter (from Luffy .env)

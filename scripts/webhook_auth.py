@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
-"""F33: authorize Modal/GitHub webhook doorbells (HMAC + bearer token).
+"""F33/F34: authorize Modal/GitHub webhook doorbells (HMAC + bearer token).
 
 Pure stdlib — no Modal/FastAPI import so unit tests stay offline.
 
-Env (production):
-  LUFFY_WEBHOOK_SECRET  GitHub webhook secret → X-Hub-Signature-256
-  LUFFY_WEBHOOK_TOKEN   Shared token for simple API → Authorization: Bearer …
-                        or X-Luffy-Token: …
+Env:
+  LUFFY_WEBHOOK_SECRET     GitHub webhook secret → X-Hub-Signature-256
+  LUFFY_WEBHOOK_TOKEN      Shared token for simple API → Authorization: Bearer …
+                           or X-Luffy-Token: …
+  LUFFY_WEBHOOK_ALLOW_OPEN=1  Dev escape hatch: permit unauthenticated when
+                              neither SECRET nor TOKEN is set (F34 default is
+                              **fail-closed**).
 
-Policy:
-  - If neither secret nor token is configured → auth_mode=open (dev only; warn).
+Policy (F34 fail-closed):
+  - If neither secret nor token is configured:
+      · allow_open / LUFFY_WEBHOOK_ALLOW_OPEN → auth=open + warning (dev only)
+      · else → denied (production-safe default)
   - If GitHub signature header present → verify HMAC with secret (required).
   - Else if token configured → require matching Bearer / X-Luffy-Token.
-  - Else if only secret configured and no signature → reject (not a signed GitHub delivery).
+  - Else if only secret configured and no signature → reject.
 """
 
 from __future__ import annotations
@@ -24,6 +29,10 @@ import json
 import os
 import sys
 from typing import Any, Mapping
+
+
+def _truthy(val: str | None) -> bool:
+    return (val or "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _norm_headers(headers: Mapping[str, str] | None) -> dict[str, str]:
@@ -66,27 +75,48 @@ def bearer_valid(headers: Mapping[str, str], token: str) -> bool:
     return hmac.compare_digest(got, token)
 
 
+def allow_open_from_env() -> bool:
+    return _truthy(os.environ.get("LUFFY_WEBHOOK_ALLOW_OPEN"))
+
+
 def authorize_webhook(
     body: bytes,
     headers: Mapping[str, str] | None = None,
     *,
     secret: str | None = None,
     token: str | None = None,
+    allow_open: bool | None = None,
 ) -> dict[str, Any]:
     """Return {ok, auth, error?} for a webhook request.
 
     auth values: open | github_hmac | bearer | denied
+
+    F34: default fail-closed when no credentials (allow_open / env escape hatch).
     """
     secret = (secret if secret is not None else os.environ.get("LUFFY_WEBHOOK_SECRET") or "").strip()
     token = (token if token is not None else os.environ.get("LUFFY_WEBHOOK_TOKEN") or "").strip()
+    if allow_open is None:
+        allow_open = allow_open_from_env()
     h = _norm_headers(headers)
     sig = (h.get("x-hub-signature-256") or h.get("x-hub-signature") or "").strip()
 
     if not secret and not token:
+        if allow_open:
+            return {
+                "ok": True,
+                "auth": "open",
+                "warning": (
+                    "LUFFY_WEBHOOK_ALLOW_OPEN=1 and no SECRET/TOKEN — "
+                    "doorbell is unauthenticated (dev only)"
+                ),
+            }
         return {
-            "ok": True,
-            "auth": "open",
-            "warning": "no LUFFY_WEBHOOK_SECRET/TOKEN — doorbell is unauthenticated (dev only)",
+            "ok": False,
+            "auth": "denied",
+            "error": (
+                "webhook auth required (F34 fail-closed): set LUFFY_WEBHOOK_SECRET "
+                "and/or LUFFY_WEBHOOK_TOKEN, or LUFFY_WEBHOOK_ALLOW_OPEN=1 for local dev"
+            ),
         }
 
     # Prefer GitHub HMAC when signature header is present
@@ -130,6 +160,11 @@ def main(argv: list[str] | None = None) -> int:
     p_auth = sub.add_parser("authorize", help="Authorize body+headers JSON")
     p_auth.add_argument("--secret", default="")
     p_auth.add_argument("--token", default="")
+    p_auth.add_argument(
+        "--allow-open",
+        action="store_true",
+        help="Permit unauthenticated when no secret/token (dev)",
+    )
     p_auth.add_argument("--body", default="-", help="Raw body path or -")
     p_auth.add_argument(
         "--header",
@@ -169,6 +204,7 @@ def main(argv: list[str] | None = None) -> int:
             headers,
             secret=args.secret or None,
             token=args.token or None,
+            allow_open=True if args.allow_open else None,
         )
         print(json.dumps(result, indent=2))
         return 0 if result.get("ok") else 1

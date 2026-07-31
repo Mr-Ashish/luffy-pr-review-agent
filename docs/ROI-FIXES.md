@@ -47,7 +47,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 31 | **F32** | Unified trigger (CLI + Modal bit4 webhook + Run Console Run tab) | S | 🔥 Ops — start reviews without hunting docs; webhook spawns only | **Shipped** (`trigger-review.sh`, `enqueue_review`) |
 | 32 | **F33** | Webhook auth (GitHub HMAC + bearer token) on Modal doorbell | XS | 🔥 Trust — stop open spend URL | **Shipped** (`webhook_auth.py`, `review_webhook`) |
 | 33 | **F9** | Inline GitHub review comments (path-anchored, first changed line) | S | 🔥 Product — findings in Files changed | **Shipped** (`post-inline-comments.py`, report-verdict) |
-| 34 | F9b | Precise line anchors from model / multi-line threads | M | Product polish | Later |
+| 34 | **F34** | Webhook fail-closed by default (opt-in open for dev) | XS | 🔥 Trust — no open spend URL by default | **Shipped** (`LUFFY_WEBHOOK_ALLOW_OPEN`) |
+| 35 | F9b | Precise line anchors from model / multi-line threads | M | Product polish | Later |
 
 ### Sprint 1 (shipped)
 
@@ -140,6 +141,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 23 (shipped)
 
 **F9** path-anchored inline comments: `scripts/post-inline-comments.py` maps Key findings + Blocking bullets onto the **first added line** per file in `pr.diff`, submits a COMMENT PR review with inline notes (`<!-- luffy-inline -->`). Default severities `critical,high,blocking`, max 6; opt-out `vars.LUFFY_INLINE_COMMENTS=0`. Soft-fail; `report-verdict.sh` runs after F23; job summary **Luffy inline comments (F9)**. Fixture tests via `LUFFY_INLINE_FIXTURE`. Precise line numbers / multi-line threads = F9b later.
+
+### Sprint 24 (shipped)
+
+**F34** webhook fail-closed: when neither `LUFFY_WEBHOOK_SECRET` nor `LUFFY_WEBHOOK_TOKEN` is set, `authorize_webhook` **denies** by default (F33 left open+warn). Dev escape: `LUFFY_WEBHOOK_ALLOW_OPEN=1` or `authorize(..., allow_open=True)` / CLI `--allow-open`. Bit 4 dry plan checks `auth_fail_closed_ok`. Production Modal deploys must set secret and/or token.
 
 ### readme-kit (shipped)
 

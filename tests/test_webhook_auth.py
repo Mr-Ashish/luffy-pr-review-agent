@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""F33: webhook HMAC + bearer authorization."""
+"""F33/F34: webhook HMAC + bearer authorization (fail-closed default)."""
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import unittest
@@ -21,11 +22,30 @@ from webhook_auth import (  # noqa: E402
 
 
 class WebhookAuthTests(unittest.TestCase):
-    def test_open_when_no_secrets(self):
-        r = authorize_webhook(b"{}", {}, secret="", token="")
+    def test_fail_closed_when_no_secrets(self):
+        r = authorize_webhook(b"{}", {}, secret="", token="", allow_open=False)
+        self.assertFalse(r["ok"])
+        self.assertEqual(r["auth"], "denied")
+        self.assertIn("fail-closed", r.get("error", ""))
+
+    def test_open_when_allow_open(self):
+        r = authorize_webhook(b"{}", {}, secret="", token="", allow_open=True)
         self.assertTrue(r["ok"])
         self.assertEqual(r["auth"], "open")
         self.assertIn("warning", r)
+
+    def test_open_via_env(self):
+        old = os.environ.get("LUFFY_WEBHOOK_ALLOW_OPEN")
+        try:
+            os.environ["LUFFY_WEBHOOK_ALLOW_OPEN"] = "1"
+            r = authorize_webhook(b"{}", {}, secret="", token="")
+            self.assertTrue(r["ok"])
+            self.assertEqual(r["auth"], "open")
+        finally:
+            if old is None:
+                os.environ.pop("LUFFY_WEBHOOK_ALLOW_OPEN", None)
+            else:
+                os.environ["LUFFY_WEBHOOK_ALLOW_OPEN"] = old
 
     def test_hmac_good_and_bad(self):
         body = b'{"repo":"a/b","pr":1}'
@@ -98,6 +118,23 @@ class WebhookAuthTests(unittest.TestCase):
         data = json.loads(auth.stdout.decode())
         self.assertTrue(data["ok"])
         self.assertEqual(data["auth"], "github_hmac")
+
+    def test_cli_fail_closed_no_creds(self):
+        body = b"{}"
+        env = {**os.environ}
+        env.pop("LUFFY_WEBHOOK_ALLOW_OPEN", None)
+        env.pop("LUFFY_WEBHOOK_SECRET", None)
+        env.pop("LUFFY_WEBHOOK_TOKEN", None)
+        auth = subprocess.run(
+            [sys.executable, str(SCRIPT), "authorize", "--body", "-"],
+            input=body,
+            capture_output=True,
+            check=False,
+            env=env,
+        )
+        self.assertNotEqual(auth.returncode, 0)
+        data = json.loads(auth.stdout.decode())
+        self.assertFalse(data["ok"])
 
 
 if __name__ == "__main__":
