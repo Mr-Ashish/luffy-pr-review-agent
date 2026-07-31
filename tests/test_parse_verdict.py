@@ -53,6 +53,7 @@ class ParseVerdictTests(unittest.TestCase):
         self.assertEqual(kv["reaction"], "+1")
         self.assertEqual(kv["status_state"], "success")
         self.assertIn("APPROVE", kv["status_desc"])
+        self.assertEqual(kv["review_event"], "APPROVE")
         self.assertEqual(kv["pipeline_ok"], "true")
 
     def test_request_changes_maps_minus_one_failure(self):
@@ -63,12 +64,14 @@ class ParseVerdictTests(unittest.TestCase):
         self.assertEqual(kv["reaction"], "-1")
         self.assertEqual(kv["status_state"], "failure")
         self.assertIn("REQUEST CHANGES", kv["status_desc"])
+        self.assertEqual(kv["review_event"], "REQUEST_CHANGES")
 
     def test_comment_maps_eyes_success(self):
         kv = self.parse_kv("--text", _contract("COMMENT"), "--pipeline-rc", "0")
         self.assertEqual(kv["verdict"], "COMMENT")
         self.assertEqual(kv["reaction"], "eyes")
         self.assertEqual(kv["status_state"], "success")
+        self.assertEqual(kv["review_event"], "COMMENT")
 
     def test_pipeline_fail_overrides_to_error(self):
         kv = self.parse_kv("--text", _contract("APPROVE"), "--pipeline-rc", "1")
@@ -76,6 +79,8 @@ class ParseVerdictTests(unittest.TestCase):
         self.assertEqual(kv["pipeline_ok"], "false")
         self.assertEqual(kv["reaction"], "-1")
         self.assertEqual(kv["status_state"], "error")
+        # F23: infra failure must not REQUEST_CHANGES
+        self.assertEqual(kv["review_event"], "COMMENT")
 
     def test_aliases(self):
         for raw, canon in (
@@ -94,6 +99,7 @@ class ParseVerdictTests(unittest.TestCase):
         self.assertEqual(kv["verdict"], "UNKNOWN")
         self.assertEqual(kv["reaction"], "eyes")
         self.assertEqual(kv["status_state"], "success")
+        self.assertEqual(kv["review_event"], "COMMENT")
 
     def test_file_input(self):
         with tempfile.TemporaryDirectory() as td:
@@ -103,14 +109,16 @@ class ParseVerdictTests(unittest.TestCase):
             self.assertEqual(kv["verdict"], "REQUEST_CHANGES")
             self.assertEqual(kv["score"], "40")
             self.assertEqual(kv["confidence"], "medium")
+            self.assertEqual(kv["review_event"], "REQUEST_CHANGES")
 
     def test_summary_format(self):
         cp = self.run_cli(
             "--text", _contract("APPROVE"), "--pipeline-rc", "0", "--format", "summary"
         )
-        self.assertIn("### Luffy verdict (F22)", cp.stdout)
+        self.assertIn("### Luffy verdict (F22/F23)", cp.stdout)
         self.assertIn("APPROVE", cp.stdout)
         self.assertIn("success", cp.stdout)
+        self.assertIn("PR review event", cp.stdout)
 
     def test_json_format(self):
         cp = self.run_cli(
@@ -119,6 +127,7 @@ class ParseVerdictTests(unittest.TestCase):
         data = json.loads(cp.stdout)
         self.assertEqual(data["verdict"], "COMMENT")
         self.assertEqual(data["reaction"], "eyes")
+        self.assertEqual(data["review_event"], "COMMENT")
 
 
 if __name__ == "__main__":

@@ -59,20 +59,22 @@ devmemory extract --fixture sample-auth-module --apply
 
 - To make Luffy gate merges, add `luffy/review` as a required status check — `REQUEST CHANGES` reports `failure` while `APPROVE`/`COMMENT` report `success`, and any pipeline failure (`pipeline_rc != 0`) reports `error` with 👎 regardless of the parsed verdict.
 
-## F22 verdict signals
+## F22/F23 verdict signals
 
 After each run Luffy derives a **verdict signal** from the posted review body:
 
-| Verdict | Trigger reaction | Commit status `luffy/review` |
-|---------|------------------|------------------------------|
-| APPROVE | `+1` | `success` |
-| REQUEST CHANGES | `-1` | `failure` |
-| COMMENT | `eyes` | `success` |
-| Pipeline failed | `-1` | `error` |
+| Verdict | Trigger reaction | Commit status `luffy/review` | PR review event (F23) |
+|---------|------------------|------------------------------|------------------------|
+| APPROVE | `+1` | `success` | `APPROVE` (fallback `COMMENT`) |
+| REQUEST CHANGES | `-1` | `failure` | `REQUEST_CHANGES` |
+| COMMENT | `eyes` | `success` | `COMMENT` |
+| Pipeline failed | `-1` | `error` | `COMMENT` (not REQUEST_CHANGES) |
 
-- CLI: `python3 scripts/parse-verdict.py review.md --pipeline-rc 0` (kv lines)
+- CLI: `python3 scripts/parse-verdict.py review.md --pipeline-rc 0` (kv lines; includes `review_event=`)
 - Summary: `… --format summary` (Markdown for job summary)
-- Wrapper: `scripts/report-verdict.sh review.md [pipeline_rc]` (reaction + status + summary)
+- Wrapper: `scripts/report-verdict.sh review.md [pipeline_rc]` (reaction + status + formal PR review + summary)
 - Disable commit status: repo var `LUFFY_COMMIT_STATUS=0`
+- Disable formal PR review: repo var `LUFFY_PR_REVIEW=0`
 - Status context override: `LUFFY_STATUS_CONTEXT` (default `luffy/review`)
 - Branch protection can require status check context **`luffy/review`** so REQUEST CHANGES blocks merge when configured.
+- Full Markdown stays on the **issue comment** (F12 replace). F23 posts a short Reviews-panel review with marker `<!-- luffy-pr-review pr=N`.

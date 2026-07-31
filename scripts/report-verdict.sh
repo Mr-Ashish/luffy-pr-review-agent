@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# F22: Apply verdict-aware done signals after a Luffy run.
+# F22/F23: Apply verdict-aware done signals after a Luffy run.
 #
 # - Parses review.md via parse-verdict.py
 # - Writes key=value to GITHUB_OUTPUT (when set)
 # - Appends job-summary section (when GITHUB_STEP_SUMMARY set)
 # - Optionally reacts to the trigger comment (REACTION_COMMENT_ID)
 # - Optionally posts a commit status on the PR head SHA (LUFFY_COMMIT_STATUS)
+# - F23: Optionally submits a formal PR Review event (LUFFY_PR_REVIEW)
 #
 # Usage:
 #   ./scripts/report-verdict.sh [review.md] [pipeline_rc]
@@ -18,6 +19,7 @@
 #   REACTION_COMMENT_ID — issue comment id to react on (issue_comment runs)
 #   LUFFY_COMMIT_STATUS — 1 (default) to post status; 0/off to skip
 #   LUFFY_STATUS_CONTEXT — default "luffy/review"
+#   LUFFY_PR_REVIEW — 1 (default) to submit formal PR review; 0/off to skip
 #   HEAD_SHA — optional; resolved via gh pr view when empty
 #   OUT_DIR — fallback locate review-*.md
 set -euo pipefail
@@ -36,6 +38,7 @@ PR_NUMBER="${PR_NUMBER:-}"
 TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
 STATUS_ON="${LUFFY_COMMIT_STATUS:-1}"
 CONTEXT="${LUFFY_STATUS_CONTEXT:-luffy/review}"
+PR_REVIEW_ON="${LUFFY_PR_REVIEW:-1}"
 COMMENT_ID="${REACTION_COMMENT_ID:-}"
 
 if [[ -z "$REVIEW_FILE" ]]; then
@@ -52,6 +55,7 @@ if [[ -z "${REVIEW_FILE:-}" || ! -f "$REVIEW_FILE" ]]; then
   REACTION="-1"
   STATUS_STATE=error
   STATUS_DESC="Luffy: no review artifact"
+  REVIEW_EVENT=COMMENT
   PIPELINE_OK=false
 else
   VERDICT=UNKNOWN
@@ -60,6 +64,7 @@ else
   REACTION=eyes
   STATUS_STATE=success
   STATUS_DESC="Luffy: review complete"
+  REVIEW_EVENT=COMMENT
   PIPELINE_OK=true
   # bash 3.2-safe (no mapfile): parse kv lines from parse-verdict.py
   while IFS= read -r line || [[ -n "$line" ]]; do
@@ -70,12 +75,13 @@ else
       reaction=*) REACTION="${line#reaction=}" ;;
       status_state=*) STATUS_STATE="${line#status_state=}" ;;
       status_desc=*) STATUS_DESC="${line#status_desc=}" ;;
+      review_event=*) REVIEW_EVENT="${line#review_event=}" ;;
       pipeline_ok=*) PIPELINE_OK="${line#pipeline_ok=}" ;;
     esac
   done < <(python3 "$PARSE" "$REVIEW_FILE" --pipeline-rc "$PIPELINE_RC" --format kv)
 fi
 
-notice "F22 verdict=$VERDICT reaction=$REACTION status=$STATUS_STATE pipeline_ok=$PIPELINE_OK"
+notice "F22/F23 verdict=$VERDICT reaction=$REACTION status=$STATUS_STATE review_event=$REVIEW_EVENT pipeline_ok=$PIPELINE_OK"
 
 # GITHUB_OUTPUT
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
@@ -86,6 +92,7 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     echo "reaction=$REACTION"
     echo "status_state=$STATUS_STATE"
     echo "status_desc=$STATUS_DESC"
+    echo "review_event=$REVIEW_EVENT"
     echo "pipeline_ok=$PIPELINE_OK"
   } >>"$GITHUB_OUTPUT"
 fi
@@ -97,11 +104,12 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
       >>"$GITHUB_STEP_SUMMARY" || true
   else
     {
-      echo "### Luffy verdict (F22)"
+      echo "### Luffy verdict (F22/F23)"
       echo "- **Verdict:** \`$VERDICT\`"
       echo "- **Pipeline ok:** $PIPELINE_OK"
       echo "- **Reaction:** \`$REACTION\`"
       echo "- **Commit status:** \`$STATUS_STATE\` — $STATUS_DESC"
+      echo "- **PR review event (F23):** \`$REVIEW_EVENT\`"
       echo
     } >>"$GITHUB_STEP_SUMMARY"
   fi
@@ -151,6 +159,78 @@ if [[ "$STATUS_ON" == "1" && -n "$REPO" && -n "$TOKEN" ]]; then
   fi
 fi
 
+# ---------------------------------------------------------------------------
+# F23: Formal Pull Request Review (Reviews panel event)
+# Soft; disable with LUFFY_PR_REVIEW=0. Full Markdown stays on the issue comment
+# (F12 replace path); this is a short verdict signal + merge UX.
+# APPROVE can be rejected by GitHub (self-review / org policy) → fall back to COMMENT.
+# ---------------------------------------------------------------------------
+case "${PR_REVIEW_ON}" in
+  0|false|FALSE|off|OFF|no|NO) PR_REVIEW_ON=0 ;;
+  *) PR_REVIEW_ON=1 ;;
+esac
+
+if [[ "$PR_REVIEW_ON" == "1" && -n "$REPO" && -n "${PR_NUMBER:-}" && -n "$TOKEN" ]] \
+  && command -v gh >/dev/null 2>&1; then
+  export GH_TOKEN="$TOKEN"
+  HEAD_SHA="${HEAD_SHA:-}"
+  if [[ -z "$HEAD_SHA" ]]; then
+    HEAD_SHA="$(
+      gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid' 2>/dev/null || true
+    )"
+  fi
+
+  # Short body: full review lives on the issue comment (marker <!-- luffy-review pr=N)
+  BODY_LINES="## 🏴‍☠️ Luffy — ${VERDICT}"$'\n'
+  if [[ -n "${SCORE:-}" ]]; then
+    BODY_LINES+="**Score:** ${SCORE}/100"
+    [[ -n "${CONFIDENCE:-}" ]] && BODY_LINES+=" · **Confidence:** ${CONFIDENCE}"
+    BODY_LINES+=$'\n'
+  elif [[ -n "${CONFIDENCE:-}" ]]; then
+    BODY_LINES+="**Confidence:** ${CONFIDENCE}"$'\n'
+  fi
+  BODY_LINES+=$'\n'"${STATUS_DESC}"$'\n\n'
+  BODY_LINES+="_Full review is the PR comment with marker \`<!-- luffy-review pr=${PR_NUMBER}\`._"$'\n'
+  BODY_LINES+="<!-- luffy-pr-review pr=${PR_NUMBER} run=${GITHUB_RUN_ID:-local} -->"
+
+  submit_pr_review() {
+    local event="$1"
+    local args=(
+      --method POST
+      -H "Accept: application/vnd.github+json"
+      "/repos/${REPO}/pulls/${PR_NUMBER}/reviews"
+      -f event="$event"
+      -f body="$BODY_LINES"
+    )
+    if [[ -n "${HEAD_SHA:-}" ]]; then
+      args+=(-f commit_id="$HEAD_SHA")
+    fi
+    gh api "${args[@]}" >/dev/null 2>&1
+  }
+
+  EVENT="$REVIEW_EVENT"
+  case "$EVENT" in
+    APPROVE|REQUEST_CHANGES|COMMENT) ;;
+    *) EVENT=COMMENT ;;
+  esac
+
+  if submit_pr_review "$EVENT"; then
+    log "F23 PR review event=$EVENT on #$PR_NUMBER"
+  elif [[ "$EVENT" == "APPROVE" ]]; then
+    # Common: cannot approve own PR / org forbids bot approve → COMMENT still lands in Reviews
+    if submit_pr_review "COMMENT"; then
+      log "F23 PR review: APPROVE rejected; fell back to COMMENT on #$PR_NUMBER"
+      REVIEW_EVENT=COMMENT
+    else
+      log "warn: F23 PR review failed (event=APPROVE then COMMENT) on #$PR_NUMBER"
+    fi
+  else
+    log "warn: F23 PR review failed (event=$EVENT) on #$PR_NUMBER"
+  fi
+else
+  log "Skip F23 PR review (disabled or missing REPO/PR_NUMBER/gh)"
+fi
+
 # Always print kv on stdout for local/debug consumers
 cat <<EOF
 verdict=$VERDICT
@@ -159,5 +239,6 @@ confidence=$CONFIDENCE
 reaction=$REACTION
 status_state=$STATUS_STATE
 status_desc=$STATUS_DESC
+review_event=$REVIEW_EVENT
 pipeline_ok=$PIPELINE_OK
 EOF

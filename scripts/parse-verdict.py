@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""F22: Parse Luffy review Markdown for verdict signals (reaction + commit status).
+"""F22/F23: Parse Luffy review Markdown for verdict signals.
 
 Reads a normalized review body and emits key=value lines suitable for
 GitHub Actions $GITHUB_OUTPUT / shell eval:
@@ -10,16 +10,21 @@ GitHub Actions $GITHUB_OUTPUT / shell eval:
   reaction=+1|-1|eyes
   status_state=success|failure|error
   status_desc=<short description>
+  review_event=APPROVE|REQUEST_CHANGES|COMMENT
   pipeline_ok=true|false
 
 Mapping (when pipeline_rc is 0 / pipeline_ok=true):
-  APPROVE          → reaction +1,  status success
-  REQUEST CHANGES  → reaction -1,  status failure  (blocks required-status checks)
-  COMMENT          → reaction eyes, status success (review completed, neutral)
-  UNKNOWN          → reaction eyes, status success
+  APPROVE          → reaction +1,  status success, review_event APPROVE
+  REQUEST CHANGES  → reaction -1,  status failure, review_event REQUEST_CHANGES
+  COMMENT          → reaction eyes, status success, review_event COMMENT
+  UNKNOWN          → reaction eyes, status success, review_event COMMENT
 
 When pipeline_ok=false (Hermes/config/crash):
-  reaction -1, status error, verdict kept from body if present else UNKNOWN.
+  reaction -1, status error, review_event COMMENT (do not REQUEST_CHANGES on infra fail),
+  verdict kept from body if present else UNKNOWN.
+
+F23: review_event drives a formal GitHub Pull Request Review (Reviews panel),
+separate from the full issue comment + commit status.
 """
 
 from __future__ import annotations
@@ -92,12 +97,14 @@ def parse_review(text: str) -> dict[str, str]:
 
 
 def signal_for(verdict: str, *, pipeline_ok: bool) -> dict[str, str]:
-    """Map verdict + pipeline health → reaction and commit-status fields."""
+    """Map verdict + pipeline health → reaction, commit-status, PR review event."""
     if not pipeline_ok:
         return {
             "reaction": "-1",
             "status_state": "error",
             "status_desc": f"Luffy pipeline failed (verdict={verdict})",
+            # Infra failure must not look like product REQUEST CHANGES
+            "review_event": "COMMENT",
         }
 
     if verdict == "APPROVE":
@@ -105,29 +112,33 @@ def signal_for(verdict: str, *, pipeline_ok: bool) -> dict[str, str]:
             "reaction": "+1",
             "status_state": "success",
             "status_desc": "Luffy: APPROVE",
+            "review_event": "APPROVE",
         }
     if verdict == "REQUEST_CHANGES":
         return {
             "reaction": "-1",
             "status_state": "failure",
             "status_desc": "Luffy: REQUEST CHANGES",
+            "review_event": "REQUEST_CHANGES",
         }
     if verdict == "COMMENT":
         return {
             "reaction": "eyes",
             "status_state": "success",
             "status_desc": "Luffy: COMMENT",
+            "review_event": "COMMENT",
         }
     return {
         "reaction": "eyes",
         "status_state": "success",
         "status_desc": f"Luffy: review complete ({verdict})",
+        "review_event": "COMMENT",
     }
 
 
 def step_summary_md(fields: dict[str, str]) -> str:
     lines = [
-        "### Luffy verdict (F22)",
+        "### Luffy verdict (F22/F23)",
         f"- **Verdict:** `{fields['verdict']}`",
     ]
     if fields.get("score"):
@@ -139,6 +150,8 @@ def step_summary_md(fields: dict[str, str]) -> str:
     lines.append(
         f"- **Commit status:** `{fields.get('status_state', '')}` — {fields.get('status_desc', '')}"
     )
+    if fields.get("review_event"):
+        lines.append(f"- **PR review event (F23):** `{fields['review_event']}`")
     lines.append("")
     return "\n".join(lines)
 
@@ -203,6 +216,7 @@ def main(argv: list[str] | None = None) -> int:
         "reaction",
         "status_state",
         "status_desc",
+        "review_event",
         "pipeline_ok",
     ):
         v = fields.get(k, "")

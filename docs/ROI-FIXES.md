@@ -35,7 +35,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 19 | **F21** | Surface OpenRouter cost/tokens on PR comment + job summary | XS | 🔥 Cost visibility | **Shipped** (`usage-summary.py`) |
 | 20 | **F10** | Reusable `workflow_call` + thin hub caller | M | 🔥 Multi-repo DX | **Shipped** (`luffy-review-reusable.yml`, `--caller`) |
 | 21 | **F22** | Verdict-aware done signal (reaction + commit status + job summary) | XS | 🔥 Trust UX — REQUEST CHANGES no longer looks like ✅ | **Shipped** (`parse-verdict.py`, `report-verdict.sh`) |
-| 22 | F9 | Inline GitHub review comments | L | Product | Later |
+| 22 | **F23** | Formal GitHub PR Review event from verdict (Reviews panel) | XS | 🔥 Trust UX — APPROVE/REQUEST_CHANGES/COMMENT as real PR reviews | **Shipped** (`review_event` + `report-verdict.sh`) |
+| 23 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -80,6 +81,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 11 (shipped)
 
 **F22** verdict-aware done signal: parse `**Verdict:**` from the posted review → trigger-comment reaction (`+1` / `-1` / `eyes`) and PR-head commit status `luffy/review` (`success` / `failure` / `error`). Pipeline failures stay `error`+`-1`. Job summary gets a **Luffy verdict (F22)** section. Opt-out: `vars.LUFFY_COMMIT_STATUS=0`. Required-status checks can require context `luffy/review`.
+
+### Sprint 12 (shipped)
+
+**F23** formal PR Review: same verdict map emits `review_event` (`APPROVE` / `REQUEST_CHANGES` / `COMMENT`) and `report-verdict.sh` posts a short GitHub Pull Request Review so the Reviews panel matches the reaction/status. Full Markdown stays on the issue comment (F12). Pipeline failures use `COMMENT` (not REQUEST_CHANGES). APPROVE soft-falls back to COMMENT when GitHub rejects self/bot approve. Opt-out: `vars.LUFFY_PR_REVIEW=0`.
 
 ### readme-kit (shipped)
 
