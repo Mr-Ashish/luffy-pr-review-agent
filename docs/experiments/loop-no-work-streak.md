@@ -6,5 +6,5 @@ Track consecutive scheduled fires that found **no P0/P1** Luffy product work
 | Field | Value |
 |-------|------:|
 | streak | **0** |
-| last_fire | 2026-07-31 (F9b precise inline anchors shipped) |
-| note | P1 product work found and shipped → streak stays 0. |
+| last_fire | 2026-07-31 (F35 ops deep-link footer shipped) |
+| note | P1 ops work found and shipped → streak stays 0. |

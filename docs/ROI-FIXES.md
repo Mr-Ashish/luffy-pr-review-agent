@@ -49,7 +49,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 33 | **F9** | Inline GitHub review comments (path-anchored, first changed line) | S | 🔥 Product — findings in Files changed | **Shipped** (`post-inline-comments.py`, report-verdict) |
 | 34 | **F34** | Webhook fail-closed by default (opt-in open for dev) | XS | 🔥 Trust — no open spend URL by default | **Shipped** (`LUFFY_WEBHOOK_ALLOW_OPEN`) |
 | 35 | **F9b** | Precise line anchors (`path:LINE` + nearest changed line) | S | 🔥 Product — inline comments land on the right line | **Shipped** (`post-inline-comments.py`, prompt) |
-| 36 | F9c | Multi-line review threads / suggestion blocks | M | Product polish | Later |
+| 36 | **F35** | PR comment ops deep-link (Actions run + run-bundle tip) | XS | 🔥 Ops — open the run without hunting logs | **Shipped** (`ops_footer.py`) |
+| 37 | F9c | Multi-line review threads / suggestion blocks | M | Product polish | Later |
 
 ### Sprint 1 (shipped)
 
@@ -150,6 +151,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 25 (shipped)
 
 **F9b** precise inline anchors: parse `` `path:LINE` `` / `#L` / `line N` / optional Line column from findings; pin to that line when it is a changed `+` line in `pr.diff`, else **nearest** changed line, else first (F9). Review prompt + SOUL ask for `path:LINE` only when seen in the diff. Plan JSON includes `line_hint` + `anchor` (`exact|nearest|first`).
+
+### Sprint 26 (shipped)
+
+**F35** ops deep-link footer: before posting the PR comment, `ops_footer.py` appends `*Ops (F35): [workflow run](…) · artifact run-bundle.json → ui/review-console*` (optional `LUFFY_CONSOLE_URL`). Job summary **Luffy ops links (F35)**. Opt-out `LUFFY_OPS_FOOTER=0`. Soft-fail; OpenUI phase 4b partial (no stream/hosted console required).
 
 ### readme-kit (shipped)
 

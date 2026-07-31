@@ -22,6 +22,17 @@ modal run modal_app/app.py --bit 4 --repo owner/repo --pr 123   # dry enqueue pl
 
 Run Console **Run** tab copies the same commands + sample webhook JSON. Modal webhook (after `modal deploy`) accepts `{repo,pr,model,post_comment}` or GitHub `@luffy review` issue_comment on a PR — spawns only.
 
+### Ops footer / deep-link (F35)
+
+```bash
+# Preview line (needs GITHUB_REPOSITORY + GITHUB_RUN_ID in env for the Actions link)
+GITHUB_REPOSITORY=owner/repo GITHUB_RUN_ID=123 python3 scripts/ops_footer.py line
+# Inject into a review before post
+python3 scripts/ops_footer.py append --review .luffy-out/review-3.md
+```
+
+Optional hosted console: `LUFFY_CONSOLE_URL=https://…`. Opt-out: `LUFFY_OPS_FOOTER=0`.
+
 ### Inline comments (F9 / F9b)
 
 ```bash

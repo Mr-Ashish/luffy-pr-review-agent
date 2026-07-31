@@ -45,6 +45,20 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 23 (F9):** path-anchored inline PR comments on first changed line (`post-inline-comments.py`)
 - **Sprint 24 (F34):** Modal webhook fail-closed by default (`LUFFY_WEBHOOK_ALLOW_OPEN=1` for dev)
 - **Sprint 25 (F9b):** inline comments prefer `path:LINE` when that line is a changed `+` line
+- **Sprint 26 (F35):** PR comment ops footer with Actions run link + run-bundle tip
+
+## Ops footer (F35)
+
+Posted review gets an italic ops line (after cost footer when present):
+
+```text
+*Ops (F35): [workflow run](…) · artifact `run-bundle.json` → `ui/review-console` Load bundle*
+```
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_OPS_FOOTER` | `1` | `0` disables |
+| `LUFFY_CONSOLE_URL` | empty | Optional hosted Run Console base URL |
 
 ## Inline comments (F9 / F9b)
 

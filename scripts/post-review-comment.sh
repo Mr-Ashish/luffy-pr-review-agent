@@ -10,10 +10,12 @@
 #   REPO / GITHUB_REPOSITORY
 #   GH_TOKEN / GITHUB_TOKEN
 #   LUFFY_REPLACE_PREVIOUS=1 (default) — delete prior marker comments before post
+#   LUFFY_OPS_FOOTER=1 (default) — F35 append Actions run + run-bundle tip
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT/.luffy-out}"
+OPS_FOOTER="$ROOT/scripts/ops_footer.py"
 
 log() { echo "$*" >&2; }
 die() { echo "::error::$*" >&2; exit 1; }
@@ -72,6 +74,20 @@ if [[ "$REPLACE" == "1" || "$REPLACE" == "true" ]]; then
     done <<<"$ids"
   else
     log "No prior Luffy comments to replace"
+  fi
+  set -e
+fi
+
+# ---------------------------------------------------------------------------
+# F35: ops deep-link footer (Actions run + run-bundle / console tip) — soft
+# ---------------------------------------------------------------------------
+if [[ -f "$OPS_FOOTER" ]]; then
+  set +e
+  python3 "$OPS_FOOTER" append --review "$REVIEW_FILE" 2>/dev/null \
+    || log "warn: F35 ops-footer soft-failed"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    python3 "$OPS_FOOTER" step-summary >>"$GITHUB_STEP_SUMMARY" 2>/dev/null \
+      || true
   fi
   set -e
 fi

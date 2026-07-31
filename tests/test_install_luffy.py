@@ -72,6 +72,7 @@ class InstallLuffyTests(unittest.TestCase):
             self.assertTrue((dest / "scripts" / "trigger-review.sh").is_file())
             self.assertTrue((dest / "scripts" / "webhook_auth.py").is_file())
             self.assertTrue((dest / "scripts" / "post-inline-comments.py").is_file())
+            self.assertTrue((dest / "scripts" / "ops_footer.py").is_file())
             # F28: seed repo-local memory
             self.assertTrue((dest / ".luffy" / "MEMORY.md").is_file())
             self.assertTrue(
