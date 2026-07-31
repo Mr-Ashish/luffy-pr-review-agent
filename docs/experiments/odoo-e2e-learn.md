@@ -11,8 +11,9 @@ Luffy SoT: this repo only.
 | [#1](https://github.com/Mr-Ashish/odoo/pull/1) | luffy-eval: #273306 website_cf_turnstile form callback guards | odoo#273306 / PR ~279479 | 1 JS | +12/−5 | OPEN |
 | [#2](https://github.com/Mr-Ashish/odoo/pull/2) | luffy-eval: #276570+#275937 web getFieldsSpec + format:false | issues 276570, 275937 | 4 (JS+test) | +85/−9 | OPEN |
 | [#3](https://github.com/Mr-Ashish/odoo/pull/3) | luffy-eval: #271153 tools Unicode XML control-char strip | odoo#271153 | 3 (py+test) | +88/−18 | OPEN |
+| [#4](https://github.com/Mr-Ashish/odoo/pull/4) | luffy-eval: #279776 stock, mrp replenishment horizon PERF | odoo#279776 | 7 (py+test) | +234/−22 | OPEN |
 
-Corpus size: **3** open eval PRs (retitled F44 fire).
+Corpus size: **4** open eval PRs (grew fire: ported odoo#279776).
 
 ## Runs
 
@@ -24,8 +25,9 @@ Corpus size: **3** open eval PRs (retitled F44 fire).
 | **2026-07-31 F44** | **#2** | **local / pr2-runlocal-a1** | **openai/gpt-4.1-mini** | local | hermes -z failed → chat -q; tool_turns=0; SOUL.md blocked as prompt_injection; raw polluted with Query+template; **F44 normalizer** extracts real body → APPROVE 90 (weaker than GHA: missed missing alias tests) |
 | **2026-07-31 F45** | **#2** | **offline gate on F44 body** | n/a (post-process) | local | **H12/F45** re-apply: tool_turns=0 + 4 files → **APPROVE→COMMENT**, score 55, F45 banner; no new Hermes spend |
 | **2026-07-31 H16** | **#2** | **local / pr2-runlocal-a1** (`.luffy-out-e2e-pr2-h16`) | **openai/gpt-4.1-mini** | local | **F47 verify:** hermes `-z` rc=0 (no argv reject, no chat fallback); tool_turns=**0** (model text stop); F45→COMMENT/55; SOUL preflight clean; false `soul_blocked` from stale log → **F48** |
+| **2026-07-31 corpus+4** | **#4** | **local / pr4-runlocal-a1** (`.luffy-out-e2e-pr4-h16`) | **openai/gpt-4.1-mini** | local | Port odoo#279776; hermes `-z` ok; tool_turns=**0**; F45 APPROVE→COMMENT/55; **F48 soul_blocked=0** (clean); score **31/50** |
 
-Artifacts: `.luffy-out-e2e-pr2-f44/` (review, raw, run-bundle, traces/pr2-runlocal-a1); F45 offline: `/tmp/f45-pr2-review-gated.md`; H16: `.luffy-out-e2e-pr2-h16/`.
+Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`.
 
 ## Introspect (F46)
 
@@ -61,8 +63,15 @@ Artifacts: `.luffy-out-e2e-pr2-f44/` (review, raw, run-bundle, traces/pr2-runloc
 3. **SOUL preflight true-clean; runtime soul_blocked was FP:** this-invocation `hermes-run.log` has no block line; full `HERMES_HOME/logs/agent.log` still contains older `SOUL.md blocked` from session `213006`. F48 scopes capture+detect to `HERMES_LOG_OFFSET`.
 4. **Next P0:** H15 soft re-prompt or H18 hard tool nudge so multi-file cheap runs actually explore (restore D1 toward GHA).
 
+## Introspect (corpus #4 / odoo#279776)
+
+1. **Port clean:** `gh pr diff 279776` applied with zero conflicts onto Mr-Ashish/odoo@19.0 (7 files stock/mrp/purchase_mrp).
+2. **Same cheap-path shape as #2 H16:** `-z` ok, F48 `soul_blocked=0`, still `tool_turns=0` → F45 COMMENT/55, soft rename nit only — multi-module PERF needs tools for real cache/correctness review.
+3. **Corpus diversity win:** first multi-module backend PERF PR (vs web JS #1/#2 and pure tools #3).
+4. **Reinforces H15/H18 P0:** second independent PR confirms tool skip is systemic on gpt-4.1-mini, not #2-specific.
+
 ## Next learn targets
 
-- H15 / H18: recover tool use on cheap multi-file path after F45 annotate.
-- Corpus maintain ≥3; optional 4th complex upstream PR when idle.
+- **H15 / H18 (P0):** recover tool use on cheap multi-file path (now evidenced on #2 and #4).
+- Maintain corpus ≥4; optional 5th when H15 ships or idle.
 - Re-score D1/D8 after next mini that achieves tool_turns>0.
