@@ -1,9 +1,9 @@
-# Run run-20260731T214138-549886
+# Run run-20260731T215022-bf1de0
 
 - session: `dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
-- units: 5
-- summary: Session F44/F45 adds durable knowledge about the normalizer as a trust boundary when Hermes falls back from `hermes -z` to `hermes chat -q` (chrome stripping, prompt-template echo rejection, unbolded heading promotion), the new fail-closed tool_turns=0 quality gate for multi-file code PRs, and the operational pitfall that agent/SOUL.md can be silently blocked by Hermes' prompt_injection scanner.
-- at: 2026-07-31T16:12:20Z
-- timings: {"assemble_s": 0.886, "extract_s": 41.247, "normalize_s": 0.002}
+- units: 4
+- summary: Session adds durable knowledge about the F44 review normalizer acting as a trust boundary against Hermes chat-mode chrome and prompt-template echo, the empirical rationale for the F45 fail-closed tool_turns=0 gate, and the F46 discovery that agent/SOUL.md can be refused by Hermes' prompt_injection scanner (with the soul_context_scan workaround). Commands for verifying both are new operator knowledge.
+- at: 2026-07-31T16:21:07Z
+- timings: {"assemble_s": 1.092, "extract_s": 44.055, "normalize_s": 0.002}

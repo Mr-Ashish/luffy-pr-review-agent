@@ -1,23 +1,12 @@
-diff --git a/DEV.md b/DEV.md
---- a/DEV.md
-+++ b/DEV.md
-@@ -73,6 +73,9 @@
- - Bare `───` horizontal rules are deliberately **not** treated as TUI chrome (models use them between findings); only explicit chrome lines (`Query:`, `Initializing agent`, `Session:`, `Duration:`, `Messages:`, `╭…╮`/`╰…╯` boxes, `⚕ Hermes`, `⚠ tirith`) are dropped, and the session footer truncates the slice.
- - Contract-repair fallback truncates the preserved raw body to 4000 chars (`_(raw truncated by normalizer)_`) so a rejected prompt echo can never be re-posted in full to GitHub.
+diff --git a/USAGE.md b/USAGE.md
+--- a/USAGE.md
++++ b/USAGE.md
+@@ -297,6 +297,8 @@
  
-+- **F44 normalize (chat-chrome):** `scripts/normalize-review.py` no longer assumes the review step ran through `hermes -z`; it extracts the real review out of `hermes chat -q` TUI chrome, because the review path can degrade to the chat fallback and would otherwise publish raw wrapper output.
-+- F44 **promotes unbolded `Verdict:` / `Summary` headings** to the bold contract form so downstream `parse-verdict.py` and the contract checks keep matching when the model drops the bold markers.
+ - Multi-PR e2e corpus for scoring review quality: `Mr-Ashish/odoo` PRs #1–#3 (PRs titled `luffy-eval …`); per-run output for the F44 investigation was kept under `.luffy-out-e2e-pr2-f44/` with the write-up in `docs/experiments/odoo-e2e-benchmark.md` / `odoo-e2e-learn.md`.
+ 
++- If a posted review looks like the review prompt itself, the run took the `hermes chat -q` fallback (`hermes -z` failed) and normalization was bypassed/stale. Re-run `python3 scripts/normalize-review.py` over `review.raw.md`: a placeholder verdict line (`**Verdict:** < APPROVE | … >`) means prompt echo and must be rejected, not published.
 +
- ## Pitfalls
+ ## Troubleshooting
  
- - `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403), so the hub publish default is `mode=direct` (clone hub → ingest → push `main`); the dispatch path needs a classic PAT on the target repo.
-@@ -120,6 +123,9 @@
- - `hermes -z` is not reliable: an observed `-z` rc=2 on odoo PR #2 forced the `hermes chat -q` path, which is exactly the polluted-output case F44 scrubs. Anything that assumes one-shot mode always wins will regress (tracked as H14).
- - `tool_turns=0` on a multi-file PR is a quality smell for an *agentic* review product, not a cheap win: the no-tool mini run on PR #2 returned APPROVE while an earlier GHA tool-using review caught the real gap (missing `format:false` tests). **F45/H12** fail-closes: `scripts/tool_turns_gate.py` downgrades APPROVE→COMMENT, caps score at 55, injects an F45 banner, writes `tool-turns-gate.env` (chip `tool-turns-gate`). Docs-only / single-file exempt; `LUFFY_TOOL_TURNS_GATE=off` disables.
- 
-+- The normalizer is a **trust boundary**, not a formatter: never accept a body as a valid review contract just because expected snippets/headings appear in it — prompt echo contains all of them. Contract checks must assert the placeholder-free form.
-+- `hermes -z` can fail at runtime and fall back to `hermes chat -q` (observed on a cheap run over Mr-Ashish/odoo PR #2); pre-F44 that path would have posted the **entire prompt** as the PR review comment.
-+
- ## Patterns
- 
- - **F27 truncation banner** is mechanical (not model-dependent): `assemble-context` sets `DIFF_TRUNCATED` in `meta.env` → `run-hermes-review.sh` passes `--diff-truncated` → `inject_diff_truncated_banner()` inserts a blockquote before `**Verdict:**`. Idempotent if the model already wrote a similar note. Raising `MAX_DIFF_BYTES` is the operator control; the banner is honesty, not a skip.
+ - Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` (`mode=pack|caller`, `source_sha`) and compare with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`. For `mode=caller`, runtime tracks hub `main`, not the stamp alone.

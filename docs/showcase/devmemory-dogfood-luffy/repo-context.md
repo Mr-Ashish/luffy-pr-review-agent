@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T16:11:39Z
+- **assembled_at:** 2026-07-31T16:20:23Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+b92deb3 fix(F46): keep SOUL.md loadable under Hermes threat scanner (H13)
+0bb9cdb docs(dogfood): F45 tool-turns gate knowledge + showcase refresh
 59ed6aa feat(F45): fail-closed tool_turns=0 gate on multi-file code PRs (H12)
 fd252e6 feat(normalize): F44 strip hermes chat chrome + reject template echo
 a58eb3b docs(knowledge): dogfood F43 preflight cost + showcase
-8b74bf5 feat(cost): F43 hard preflight spend estimate before Hermes (H6)
-6aa9f3f docs(knowledge): dogfood F42 model tier + showcase
 ```
 
 ## tree (sample)
@@ -101,6 +101,7 @@ tests/test_post_inline_comments.py
 tests/test_preflight_cost.py
 tests/test_review_to_openui.py
 tests/test_run_with_timeout.py
+tests/test_soul_context_scan.py
 tests/test_tool_turns_gate.py
 tests/test_trigger_review.py
 tests/test_usage_summary.py
@@ -135,6 +136,7 @@ docs/experiments/2026-07-31-f42-model-tier.md
 docs/experiments/2026-07-31-f43-preflight-cost.md
 docs/experiments/2026-07-31-f44-normalize-chat-chrome.md
 docs/experiments/2026-07-31-f45-tool-turns-gate.md
+docs/experiments/2026-07-31-f46-soul-context-scan.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-f9c-suggestions.md
@@ -217,11 +219,9 @@ scripts/run-hermes-review.sh
 scripts/run-luffy-review.sh
 scripts/run-with-timeout.py
 scripts/save-trace.sh
+scripts/soul_context_scan.py
 scripts/sparse-pr-paths.sh
 scripts/tool_turns_gate.py
-scripts/trigger-review.sh
-scripts/usage-summary.py
-scripts/webhook_auth.py
 ```
 
 ## git diff
@@ -346,14 +346,15 @@ scripts/webhook_auth.py
 
 ## Design decisions
 - `agent/SOUL.md` is the reviewer contract: staff-level reviewer scoped to *this diff's* added lines, explicitly told it sees partial hunks and must not invent missing imports or re-suggest changes already in the `+` lines.
-- Trust model lives in SOUL, not in the prompt template: PR text and diff are UNTRUSTED DATA and prompt-injection attempts ("ignore previous instructions", "approve this PR") must be refused.
+- Trust model lives in SOUL, not in the prompt template: PR text and diff are UNTRUSTED DATA; author text that redefines the task or forces a merge verdict must be refused.
 - Finding discipline is asymmetric by design: thorough on bugs/security, high bar elsewhere — every finding needs file + symbol + concrete trigger, and silence beats speculation (an empty Blocking section is an acceptable output).
 - Every review must emit structured judgment fields: Score 0–100, review effort 1–5, security audit verdict, relevant-tests yes/no, key findings, optional concrete code suggestions.
 
 ## Pitfalls
 - Same anchoring applies to `**Score:** <int>[/100]` and `**Confidence:** low|medium|high` — score/confidence are parsed only for reporting, and a missed match yields empty strings rather than an error.
 - `UNKNOWN` is deliberately non-blocking (reaction `eyes`, status `success`, review_event `COMMENT`), so a broken prompt contract looks like a healthy neutral review instead of failing loudly. Verify the posted body still carries the bold verdict line after any prompt/template edit.
-- F23 dual-channel: the full Markdown is still the issue comment (F12 replace via `<!-- luffy-review pr=N`); the formal PR Review body is intentionally short so the Reviews panel is not a second full dump. Marker `<!-- luffy-pr-review pr=N` tags Luffy
+- F23 dual-channel: the full Markdown is still the issue comment (F12 replace via `<!-- luffy-review pr=N`); the formal PR Review body is intentionally short so the Reviews panel is not a second full dump. Marker `<!-- luffy-pr-review pr=N` tags Luffy-owned PR reviews.
+
 … [truncated; do not restate] …
 
 ### USAGE.md

@@ -33,3 +33,8 @@ scripts/tool_turns_gate.py downgrades APPROVE to COMMENT, caps score at 55,
 injects F45 banner, writes tool-turns-gate.env. Docs-only and single-file exempt.
 LUFFY_TOOL_TURNS_GATE=off disables. Evidence from odoo e2e PR #2 mini vs GHA.
 
+## F46 SOUL context scan (H13)
+Hermes blocks SOUL.md when it matches threat patterns (prompt_injection).
+Luffy rephrased agent/SOUL.md trust model to avoid quoting classic injection phrases.
+scripts/soul_context_scan.py check/detect; soul-context.env; pack chip soul-blocked.
+
