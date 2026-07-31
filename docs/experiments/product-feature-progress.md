@@ -1,6 +1,6 @@
 # Product feature progress
 
-**Updated:** 2026-07-31 (F55 feature toggles)  
+**Updated:** 2026-07-31 (F56 lens recipes)  
 **Loop:** 019fb948dbe8 orchestrator
 
 ## SHIPPED
@@ -17,24 +17,25 @@
 | F52 | Multi-lens | product | PR #2 merged |
 | F53 | Linked issue context | product | PR #3 merged |
 | F54 | Fix-it prompt per inline comment | product | PR #4 merged |
-| F55 | Feature toggle system | product | **MERGED** PR #5 — `feature_toggles.py` |
+| F55 | Feature toggle system | product | PR #5 merged |
+| F56 | Lens recipes + named packs | product | **this fire** — agent/packs + lens_recipes.py |
 
 ## IN_PROGRESS
 
 | ID | Feature | Notes |
 |----|---------|-------|
-| — | Review lens recipes / named packs | multi-lens base in F52; recipes backlog |
-| — | Live e2e issue-ctx + fixit quality | measure Actionability/Inline after F54 |
-| — | Toggle migration (remaining scripts) | F55 merged; gradual consumer adopt |
+| — | Live e2e issue-ctx + fixit + lens depth | measure Actionability/Inline/D10 |
+| — | Auto pack select from paths | optional follow-up |
+| — | Toggle migration (remaining scripts) | gradual |
 
 ## LEFT (priority product backlog)
 
-1. ~~FEATURE TOGGLE SYSTEM (unified registry)~~ → **F55**
-2. ~~FIX-IT PROMPT PER INLINE COMMENT~~ → **F54**
-3. REVIEW LENS RECIPES + NAMED PROMPT PACKS
-4. REVIEW LENSES multi-dim (extend F52)
+1. ~~FEATURE TOGGLE SYSTEM~~ → **F55**
+2. ~~FIX-IT PROMPT~~ → **F54**
+3. ~~REVIEW LENS RECIPES + NAMED PROMPT PACKS~~ → **F56**
+4. REVIEW LENSES multi-dim (extend F52/F56 — auto-select)
 5. PR DESCRIPTION FILLER
-6. LINKED ISSUE CONTEXT — extend/test live (F53 shipped)
+6. LINKED ISSUE CONTEXT — live e2e (F53 shipped)
 7. MERMAID ARCHITECTURE in PR comments
 8. INCREMENTAL REVIEW
 9. REPLY ON THREAD
@@ -47,14 +48,14 @@
 
 ## Counts
 
-- **features_built_count:** 12 (F44–F55)
-- **types_built:** agent_quality, product (actionability, multi-lens, issue-ctx, fixit, toggles)
-- **left_count:** 12 (items 3–15; 1–2 done)
-- **progress_pct:** ~53% of 15-item product backlog (8 product-ish of 15 ≈ 53)
-- **eta:** 5–9 more productive fires for top remaining (recipes, filler, mermaid, incremental, federated)
-- **active_worktrees:** none (F55 merged)
-- **federated_memory_note:** still deferred; registry now has `hub_publish`/`local_publish` keys for gated compound learning
+- **features_built_count:** 13 (F44–F56)
+- **types_built:** agent_quality, product (multi-lens, issue-ctx, fixit, toggles, recipes)
+- **left_count:** 11 (items 4–15; 1–3 done)
+- **progress_pct:** ~60% of 15-item product backlog (9 product-ish of 15 ≈ 60)
+- **eta:** 4–8 more productive fires
+- **active_worktrees:** f56-lens-recipes
+- **federated_memory_note:** deferred; toggle keys exist
 
 ## Status line
 
-`features_built_count=12 types_built=agent_quality,product left_count=12 progress_pct=53 eta=5-9fires active_worktrees=0 federated_memory_note=keys_registered_deferred`
+`features_built_count=13 types_built=agent_quality,product left_count=11 progress_pct=60 eta=4-8fires active_worktrees=1 federated_memory_note=deferred`

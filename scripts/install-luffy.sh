@@ -107,6 +107,7 @@ RUNTIME_SCRIPTS=(
   feature_toggles.py
   hermes-pin.sh
   linked_issue_context.py
+  lens_recipes.py
   hub-ingest-run.py
   install-luffy.sh
   memory-health.sh
@@ -236,6 +237,25 @@ while IFS= read -r -d '' f; do
 done < <(find "$SRC/agent" -maxdepth 1 -type f -print0 | sort -z)
 
 copy_tree_files "agent" "${AGENT_FILES[@]}"
+
+# F56: named lens recipe packs (agent/packs/*.json)
+if [[ -d "$SRC/agent/packs" ]]; then
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "dry-run: would copy agent/packs/"
+  else
+    mkdir -p "$DEST/agent/packs"
+    for f in "$SRC/agent/packs"/*.json; do
+      [[ -f "$f" ]] || continue
+      base="$(basename "$f")"
+      if [[ -e "$DEST/agent/packs/$base" && "$FORCE" != "1" ]]; then
+        log "exists (skip, use --force): agent/packs/$base"
+      else
+        cp -f "$f" "$DEST/agent/packs/$base"
+        log "copied agent/packs/$base"
+      fi
+    done
+  fi
+fi
 
 # runtime scripts
 copy_tree_files "scripts" "${RUNTIME_SCRIPTS[@]}"

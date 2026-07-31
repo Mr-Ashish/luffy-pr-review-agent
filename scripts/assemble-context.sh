@@ -177,6 +177,28 @@ for k, v in replacements.items():
     prompt = prompt.replace(k, v)
 Path(os.environ["PROMPT_PATH"]).write_text(prompt)
 
+# F56: apply named lens recipe pack to multi-lens sections (soft)
+lens_pack_id = "default"
+lens_packs_on = "1"
+try:
+    import sys as _sys
+    _sys.path.insert(0, str(luffy_root / "scripts"))
+    from lens_recipes import apply_file, active_pack_id, packs_enabled  # type: ignore
+
+    if packs_enabled():
+        info = apply_file(Path(os.environ["PROMPT_PATH"]))
+        lens_pack_id = str(info.get("pack") or active_pack_id())
+        lens_packs_on = "1"
+        # rewrite prompt var if needed (file already updated)
+        prompt = Path(os.environ["PROMPT_PATH"]).read_text(encoding="utf-8")
+    else:
+        lens_packs_on = "0"
+        lens_pack_id = active_pack_id()
+except Exception as _lens_exc:
+    # soft-fail: keep template multi-lens
+    lens_packs_on = "0"
+    lens_pack_id = os.environ.get("LUFFY_LENS_PACK") or "default"
+
 # Shell-safe meta for later steps
 meta = {
     "REPO": repo,
@@ -196,6 +218,8 @@ meta = {
     "CONTEXT_PATH": os.environ["CONTEXT_PATH"],
     "PR_JSON_PATH": os.environ["PR_JSON_PATH"],
     "LINKED_ISSUES_MD": str(linked_path),
+    "LENS_PACK": lens_pack_id,
+    "LENS_PACKS": lens_packs_on,
 }
 with open(os.environ["META_PATH"], "w") as fh:
     for k, v in meta.items():
@@ -214,4 +238,9 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   } >>"$GITHUB_OUTPUT"
 fi
 
-log "Context ready: $PROMPT_PATH (diff_truncated=$DIFF_TRUNCATED)"
+# shellcheck source=/dev/null
+if [[ -f "$META_PATH" ]]; then
+  # pick LENS_PACK for log only
+  LENS_PACK_LOG="$(grep -E '^LENS_PACK=' "$META_PATH" | head -1 | cut -d= -f2- | tr -d "'\"")" || true
+fi
+log "Context ready: $PROMPT_PATH (diff_truncated=$DIFF_TRUNCATED lens_pack=${LENS_PACK_LOG:-default})"
