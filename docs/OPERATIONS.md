@@ -47,6 +47,32 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 25 (F9b):** inline comments prefer `path:LINE` when that line is a changed `+` line
 - **Sprint 26 (F35):** PR comment ops footer with Actions run link + run-bundle tip
 - **Sprint 27 (F36):** Hermes wall-clock timeout (default 1500s; kill hung loops)
+- **Sprint 28 (F37):** Verdict → PR labels (`luffy:approve` / `request-changes` / `comment` / `error`)
+
+## Verdict PR labels (F37)
+
+After each run Luffy applies **one** managed label on the PR (creates labels if missing)
+and removes the other managed labels from a prior run:
+
+| Verdict / state | Label |
+|-----------------|-------|
+| APPROVE | `luffy:approve` |
+| REQUEST CHANGES | `luffy:request-changes` |
+| COMMENT | `luffy:comment` |
+| Pipeline fail / UNKNOWN | `luffy:error` |
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_PR_LABELS` | `1` | `0`/`off` disables |
+| `LUFFY_LABEL_PREFIX` | `luffy` | Prefix before `:` |
+
+```bash
+python3 scripts/apply-verdict-labels.py plan --verdict REQUEST_CHANGES
+python3 scripts/apply-verdict-labels.py apply --repo owner/name --pr 3 \
+  --verdict APPROVE --pipeline-ok true
+```
+
+Needs `issues: write` (already on the workflow). Soft-fail only.
 
 ## Review timeout (F36)
 

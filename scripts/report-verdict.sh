@@ -9,6 +9,7 @@
 # - F23: Optionally submits a formal PR Review event (LUFFY_PR_REVIEW)
 # - F24: Dismisses prior Luffy PR reviews (same marker) before posting a new one
 # - F9:  Path-anchored inline comments on first changed lines (LUFFY_INLINE_COMMENTS)
+# - F37: Verdict-aware PR labels (luffy:approve|request-changes|comment|error)
 #
 # Usage:
 #   ./scripts/report-verdict.sh [review.md] [pipeline_rc]
@@ -24,6 +25,8 @@
 #   LUFFY_PR_REVIEW — 1 (default) to submit formal PR review; 0/off to skip
 #   LUFFY_REPLACE_PREVIOUS — 1 (default) also dismisses prior F23 PR reviews
 #   LUFFY_INLINE_COMMENTS — 1 (default) post F9 inline notes; 0/off to skip
+#   LUFFY_PR_LABELS — 1 (default) apply F37 labels; 0/off to skip
+#   LUFFY_LABEL_PREFIX — default "luffy" → labels luffy:approve etc.
 #   HEAD_SHA — optional; resolved via gh pr view when empty
 #   OUT_DIR — fallback locate review-*.md
 set -euo pipefail
@@ -33,6 +36,7 @@ OUT_DIR="${OUT_DIR:-$ROOT/.luffy-out}"
 PARSE="$ROOT/scripts/parse-verdict.py"
 DISMISS="$ROOT/scripts/dismiss-prior-pr-reviews.sh"
 INLINE="$ROOT/scripts/post-inline-comments.py"
+LABELS="$ROOT/scripts/apply-verdict-labels.py"
 
 log() { echo "$*" >&2; }
 notice() { echo "::notice::$*" >&2; log "$*"; }
@@ -311,6 +315,49 @@ else
   log "Skip F9 inline comments (disabled or missing inputs)"
 fi
 
+# ---------------------------------------------------------------------------
+# F37: verdict-aware PR labels (soft; default on)
+# ---------------------------------------------------------------------------
+LABEL_ADDED=
+LABELS_ON="${LUFFY_PR_LABELS:-1}"
+if [[ "$LABELS_ON" != "0" && "$LABELS_ON" != "off" && "$LABELS_ON" != "false" ]] \
+  && [[ -f "$LABELS" ]] \
+  && [[ -n "$REPO" && -n "${PR_NUMBER:-}" ]]; then
+  set +e
+  LABEL_JSON="$(
+    python3 "$LABELS" apply \
+      --repo "$REPO" \
+      --pr "$PR_NUMBER" \
+      --verdict "$VERDICT" \
+      --pipeline-ok "$PIPELINE_OK" \
+      2>/dev/null
+  )"
+  LABEL_RC=$?
+  set -e
+  if [[ $LABEL_RC -eq 0 && -n "$LABEL_JSON" ]]; then
+    LABEL_ADDED="$(
+      python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(d.get("add") or d.get("plan",{}).get("add") or "")' \
+        "$LABEL_JSON" 2>/dev/null || true
+    )"
+    log "F37 PR labels add=${LABEL_ADDED:-?} json_ok=1"
+    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+      {
+        echo "### Luffy PR labels (F37)"
+        echo ""
+        echo "- **label:** \`${LABEL_ADDED:-n/a}\`"
+        echo "- **verdict:** $VERDICT"
+        echo "- **pipeline_ok:** $PIPELINE_OK"
+        echo "- Opt-out: \`vars.LUFFY_PR_LABELS=0\`"
+        echo ""
+      } >>"$GITHUB_STEP_SUMMARY"
+    fi
+  else
+    log "warn: F37 PR labels soft-failed"
+  fi
+else
+  log "Skip F37 PR labels (disabled or missing REPO/PR)"
+fi
+
 # Always print kv on stdout for local/debug consumers
 cat <<EOF
 verdict=$VERDICT
@@ -322,4 +369,5 @@ status_desc=$STATUS_DESC
 review_event=$REVIEW_EVENT
 pipeline_ok=$PIPELINE_OK
 inline_posted=$INLINE_POSTED
+label=$LABEL_ADDED
 EOF

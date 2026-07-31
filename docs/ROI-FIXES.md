@@ -51,7 +51,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 35 | **F9b** | Precise line anchors (`path:LINE` + nearest changed line) | S | 🔥 Product — inline comments land on the right line | **Shipped** (`post-inline-comments.py`, prompt) |
 | 36 | **F35** | PR comment ops deep-link (Actions run + run-bundle tip) | XS | 🔥 Ops — open the run without hunting logs | **Shipped** (`ops_footer.py`) |
 | 37 | **F36** | Hermes review wall-clock timeout (kill hung agent loops) | XS | 🔥 Cost — stop runaway OpenRouter until job/Modal cap | **Shipped** (`run-with-timeout.py`, default 1500s) |
-| 38 | F9c | Multi-line review threads / suggestion blocks | M | Product polish | Later |
+| 38 | **F37** | Verdict → PR labels (`luffy:approve` etc.) | XS | 🔥 Ops — boards/search/automation without parsing comments | **Shipped** (`apply-verdict-labels.py`) |
+| 39 | F9c | Multi-line review threads / suggestion blocks | M | Product polish | Later |
 
 ### Sprint 1 (shipped)
 
@@ -160,6 +161,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 27 (shipped)
 
 **F36** review wall-clock timeout: `scripts/run-with-timeout.py` wraps `hermes -z` / chat fallback as a process group; default **1500s** (aligned with Modal hard cap). On timeout (exit 124): clear partial output, skip chat fallback (no double spend), honest failure stub + job-summary **Luffy review timeout (F36)**. Override `vars.LUFFY_REVIEW_TIMEOUT_SECONDS` (`0`/`off` disables). Complements F29 (soft $ budget annotates after a finished run; F36 stops a hung loop).
+
+### Sprint 28 (shipped)
+
+**F37** verdict PR labels: after F22/F23 signals, `apply-verdict-labels.py` ensures and applies one managed label — `luffy:approve` / `luffy:request-changes` / `luffy:comment` / `luffy:error` — and removes the other three. Pipeline failures always get `error` (never green-wash). Soft-fail; opt-out `vars.LUFFY_PR_LABELS=0`; prefix override `vars.LUFFY_LABEL_PREFIX`. Job summary **Luffy PR labels (F37)**. Completes trust/ops signal stack for boards and search.
 
 ### readme-kit (shipped)
 

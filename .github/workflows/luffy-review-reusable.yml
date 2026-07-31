@@ -497,12 +497,16 @@ jobs:
           LUFFY_INLINE_SEVERITY: ${{ vars.LUFFY_INLINE_SEVERITY || 'critical,high,blocking' }}
           LUFFY_INLINE_MAX: ${{ vars.LUFFY_INLINE_MAX || '6' }}
           LUFFY_INLINE_DIFF: ${{ github.workspace }}/luffy/.luffy-out/pr.diff
+          # F37: verdict PR labels (luffy:approve|request-changes|comment|error)
+          LUFFY_PR_LABELS: ${{ vars.LUFFY_PR_LABELS || '1' }}
+          LUFFY_LABEL_PREFIX: ${{ vars.LUFFY_LABEL_PREFIX || 'luffy' }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
         run: |
           set -euo pipefail
           chmod +x "$LUFFY_ROOT/scripts/report-verdict.sh" 2>/dev/null || true
           chmod +x "$LUFFY_ROOT/scripts/"*.sh 2>/dev/null || true
+          chmod +x "$LUFFY_ROOT/scripts/apply-verdict-labels.py" 2>/dev/null || true
           REVIEW_FILE="$(ls -t "$OUT_DIR"/review-*.md 2>/dev/null | grep -v '\.raw\.md$' | head -1 || true)"
           bash "$LUFFY_ROOT/scripts/report-verdict.sh" "${REVIEW_FILE:-}" "${PIPELINE_RC:-1}"
 

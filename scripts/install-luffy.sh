@@ -96,6 +96,7 @@ fi
 # Runtime script allowlist — exclude image build / bench from target packs by default
 # (still available when --with-runner-build copies docker tooling separately).
 RUNTIME_SCRIPTS=(
+  apply-verdict-labels.py
   assemble-context.sh
   association-allowed.sh
   build-hub-payload.py

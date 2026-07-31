@@ -22,6 +22,20 @@ modal run modal_app/app.py --bit 4 --repo owner/repo --pr 123   # dry enqueue pl
 
 Run Console **Run** tab copies the same commands + sample webhook JSON. Modal webhook (after `modal deploy`) accepts `{repo,pr,model,post_comment}` or GitHub `@luffy review` issue_comment on a PR — spawns only.
 
+### Verdict PR labels (F37)
+
+```bash
+# Plan only (offline)
+python3 scripts/apply-verdict-labels.py plan --verdict REQUEST_CHANGES --pipeline-ok true
+# → {"add":"luffy:request-changes","remove":["luffy:approve",...],...}
+
+# Opt-out: vars.LUFFY_PR_LABELS=0
+# Prefix: vars.LUFFY_LABEL_PREFIX=luffy  → labels luffy:approve|request-changes|comment|error
+```
+
+Pipeline failures always map to `luffy:error` even if the body says APPROVE.
+Filter boards with `label:luffy:request-changes`.
+
 ### Review timeout (F36)
 
 ```bash
