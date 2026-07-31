@@ -118,6 +118,7 @@ RUNTIME_SCRIPTS=(
   parse-verdict.py
   path-skip-check.py
   post-inline-comments.py
+  reply_on_thread.py
   post-review-comment.sh
   preload-hub-memory.sh
   publish-run-local.sh

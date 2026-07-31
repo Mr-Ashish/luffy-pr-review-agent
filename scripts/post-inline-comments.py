@@ -8,6 +8,7 @@ Maps Key findings (+ Blocking bullets) onto lines in pr.diff:
   F9c — ### Code suggestions → GitHub ```suggestion``` apply blocks
         (multi-line when the suggestion's `-` lines match PR `+` lines)
   F54 — per finding: copy-pasteable Fix-it agent prompt (Claude Code ready)
+  F60 — re-review: reply in existing Luffy inline threads (in_reply_to)
 
 Usage:
   python3 scripts/post-inline-comments.py plan \\
@@ -916,6 +917,71 @@ def main(argv: list[str] | None = None) -> int:
     if not comments:
         print(json.dumps({"ok": True, "posted": 0, "skipped": "no mappable findings"}))
         return 0
+
+    # F60: split into thread replies vs new top-level inlines
+    reply_posted = 0
+    reply_meta: dict[str, Any] = {"enabled": False, "matched": 0}
+    try:
+        from reply_on_thread import (  # type: ignore
+            enabled as _reply_enabled,
+            fetch_review_comments,
+            plan_replies,
+            post_replies,
+        )
+    except ImportError:
+        _reply_enabled = None  # type: ignore
+        fetch_review_comments = None  # type: ignore
+        plan_replies = None  # type: ignore
+        post_replies = None  # type: ignore
+
+    if (
+        _reply_enabled is not None
+        and plan_replies is not None
+        and post_replies is not None
+        and _reply_enabled()
+    ):
+        existing_path = (os.environ.get("LUFFY_REPLY_EXISTING") or "").strip()
+        if existing_path and Path(existing_path).is_file():
+            try:
+                existing = json.loads(Path(existing_path).read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                existing = []
+        elif (os.environ.get("LUFFY_INLINE_FIXTURE") or "").strip():
+            # Offline fixture runs: no network fetch unless LUFFY_REPLY_EXISTING set
+            existing = []
+        else:
+            existing = fetch_review_comments(args.repo, args.pr) if fetch_review_comments else []
+        if existing:
+            split = plan_replies(comments, existing)
+            reply_meta = {
+                "enabled": True,
+                "matched": split.get("matched", 0),
+                "roots_indexed": split.get("roots_indexed", 0),
+            }
+            if split.get("replies"):
+                pr_res = post_replies(args.repo, args.pr, split["replies"])
+                reply_posted = int(pr_res.get("posted") or 0)
+                reply_meta["post"] = pr_res
+            comments = list(split.get("new_inlines") or [])
+
+    if not comments and reply_posted:
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "posted": 0,
+                    "replies_posted": reply_posted,
+                    "f60": reply_meta,
+                    "skipped": "all findings replied on existing threads",
+                },
+                indent=2,
+            )
+        )
+        return 0
+    if not comments:
+        print(json.dumps({"ok": True, "posted": 0, "skipped": "no mappable findings", "f60": reply_meta}))
+        return 0
+
     commit = (args.commit or os.environ.get("HEAD_SHA") or "").strip()
     if not commit and not (os.environ.get("LUFFY_INLINE_FIXTURE") or "").strip():
         print(
@@ -924,6 +990,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0  # soft
     result = post_review(args.repo, args.pr, commit or "0" * 40, comments)
+    result["replies_posted"] = reply_posted
+    result["f60"] = reply_meta
     print(json.dumps(result, indent=2))
     return 0  # always soft for pipeline
 

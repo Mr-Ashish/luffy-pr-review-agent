@@ -119,6 +119,15 @@ REGISTRY: list[ToggleSpec] = [
         "F9c",
     ),
     ToggleSpec(
+        "reply_on_thread",
+        "LUFFY_REPLY_ON_THREAD",
+        "bool",
+        True,
+        "product",
+        "Reply in existing Luffy inline threads on re-review (in_reply_to)",
+        "F60",
+    ),
+    ToggleSpec(
         "pr_labels",
         "LUFFY_PR_LABELS",
         "bool",

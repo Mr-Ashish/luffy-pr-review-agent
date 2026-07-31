@@ -296,12 +296,17 @@ if [[ "$INLINE_ON" != "0" && "$INLINE_ON" != "off" && "$INLINE_ON" != "false" ]]
         python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(int(d.get("posted") or 0))' \
           "$INLINE_JSON" 2>/dev/null || echo 0
       )"
-      log "F9 inline comments posted=$INLINE_POSTED"
+      REPLY_POSTED="$(
+        python3 -c 'import json,sys; d=json.loads(sys.argv[1]); print(int(d.get("replies_posted") or 0))' \
+          "$INLINE_JSON" 2>/dev/null || echo 0
+      )"
+      log "F9 inline comments posted=$INLINE_POSTED f60_replies=$REPLY_POSTED"
       if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
         {
-          echo "### Luffy inline comments (F9)"
+          echo "### Luffy inline comments (F9/F60)"
           echo ""
-          echo "- **posted:** $INLINE_POSTED"
+          echo "- **posted (new):** $INLINE_POSTED"
+          echo "- **thread replies (F60):** $REPLY_POSTED"
           echo "- **diff:** \`$DIFF_FILE\`"
           echo ""
         } >>"$GITHUB_STEP_SUMMARY"

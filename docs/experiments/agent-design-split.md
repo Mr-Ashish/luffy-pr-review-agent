@@ -13,7 +13,8 @@
 | F45/F49 tool turns | gate + reprompt scripts | whether re-ask is needed | — | `tool_turns_gate`, `tool_turns_reprompt` |
 | F55 toggles | **`feature_toggles.py` registry + resolve** | none | DEV.md split note | `.luffy/toggles.json` + env |
 | Federated memory | publish/ingest I/O scripts | light apply of FP patterns | MEMORY.seed principles | `hub_publish`, `local_publish` |
-| Mermaid / filler / incremental / reply / testplan | backlog → scripts first | judgment only where needed | thin recipes | new registry entries |
+| F60 reply on thread | `reply_on_thread.py` match+`in_reply_to` | — | inline markers | `reply_on_thread` |
+| Mermaid / filler / incremental / testplan | backlog → scripts first | judgment only where needed | thin recipes | new registry entries |
 
 ## Hermes boundary (research note)
 
