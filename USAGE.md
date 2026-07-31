@@ -13,7 +13,7 @@
 devmemory extract --fixture sample-auth-module --apply
 ```
 
-- Inspect the effective Hermes pin locally without network: `scripts/hermes-pin.sh resolve` (empty output = floating), `scripts/hermes-pin.sh default` (baked-in known-good SHA), `scripts/hermes-pin.sh install-args` (exact `install.sh` args), `scripts/hermes-pin.sh cache-suffix` (Actions cache key suffix).
+- Inspect the effective Hermes pin locally without network: `scripts/hermes-pin.sh resolve` (empty output = floating), `scripts/hermes-pin.sh default` (baked-in known-good SHA — **F25 single source of truth** for CI when `vars.LUFFY_HERMES_COMMIT` is unset), `scripts/hermes-pin.sh install-args` (exact `install.sh` args), `scripts/hermes-pin.sh cache-suffix` (Actions cache key suffix).
 - Check whether an installed tree satisfies the pin: `scripts/hermes-pin.sh matches <git-head-sha>` — exit 0 means acceptable (short/full SHA prefixes both count).
 - Per-run pin actually used is recorded at `.luffy-out/hermes-pin.txt` and shipped in the trace artifact — read it before blaming the model for a behaviour change.
 

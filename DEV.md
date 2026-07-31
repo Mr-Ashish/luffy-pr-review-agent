@@ -14,7 +14,7 @@
 ## Design decisions
 
 - **F8 prebaked runner:** `ensure_hermes` short-circuits when `LUFFY_HERMES_PREBAKED=1` or `/root/.hermes-pin`/`$HOME/.hermes-pin` exists and `hermes` is on PATH (image from `docker/luffy-runner/`). Workflow optional `container: vars.LUFFY_RUNNER_IMAGE`; Hermes Actions cache is skipped when prebaked is detected.
-- Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (default known-good SHA; `latest`/`main`/`floating`/empty = float), emits `install.sh` args (`--skip-setup --commit … --force-commit`), and supplies the Actions cache key suffix (`v4-<12-char-pin>`). Pin mismatch on a warm cache triggers reinstall.
+- Hermes install is pinned for repro (F7/F25): `scripts/hermes-pin.sh` is the **single source of truth** for `DEFAULT_HERMES_COMMIT`. Workflows pass through `vars.LUFFY_HERMES_COMMIT` only; when empty, **Resolve Hermes pin (F25)** writes `hermes-pin.sh default` into `$GITHUB_ENV` (empty GHA var must not float). Explicit `latest`/`main`/`floating` still float. `install.sh` args via `install-args`; cache key suffix `v4-<12-char-pin>`.
 - Re-runs replace prior Luffy comments by deleting bodies matching the `<!-- luffy-review pr=N` marker before posting; set `LUFFY_REPLACE_PREVIOUS=0` to stack instead.
 - Failure UX is always-publish: missing OpenRouter secret, Hermes/model failure, and job crash before the review file each still produce a PR comment (failure stub / low-confidence COMMENT verdict) rather than a silent red X.
 
@@ -43,7 +43,8 @@
 
 - Default model diverges by layer: `scripts/run-hermes-review.sh` falls back to `anthropic/claude-opus-5` while the ops docs advertise `openai/gpt-5-mini` as the default. Anyone reasoning about cost from the docs alone will be wrong for local/dry runs — set `LUFFY_MODEL` explicitly instead of relying on either default.
 - Pin verification degrades to a substring check: when the install tree has no `.git`, `ensure_hermes` accepts the binary if `hermes --version` merely contains the pin's first 8 chars. A cached install without git metadata can therefore pass the pin gate on weak evidence — check `hermes-pin.txt` in the trace when a run's behaviour looks off for the pinned SHA.
-- `DEFAULT_HERMES_COMMIT` is hardcoded in `scripts/hermes-pin.sh` and duplicated as the workflow env fallback (`vars.LUFFY_HERMES_COMMIT || <sha>`); bumping the pin means editing both or the workflow will keep overriding the script default.
+- F25 fixed pin duplication: workflows must **not** embed `|| '<sha>'` fallbacks. Bump only `DEFAULT_HERMES_COMMIT` in `scripts/hermes-pin.sh`. Caveat: `docker/luffy-runner/Dockerfile` still has an `ARG HERMES_COMMIT=` default for standalone `docker build` without the helper — image builds via `build-luffy-runner.yml` pass the resolved pin and stay in sync.
+- GHA empty-string trap: job env `LUFFY_HERMES_COMMIT: ${{ vars.X }}` with unset var sets the env to `""`, and `hermes-pin.sh resolve` treats empty as **floating**. That is why F25 rewrites empty → `default` into `$GITHUB_ENV` before cache/install — do not remove that step.
 
 - `gh api --paginate` can emit **several concatenated JSON arrays** (one per page), so a plain `json.loads` on its output fails; `cooldown-check.sh` walks the buffer with `json.JSONDecoder().raw_decode` and extends a single list. Reuse that loop for any new paginated `gh api --jq` consumer instead of assuming one array.
 - A non-integer `LUFFY_COOLDOWN_SECONDS` is treated as **disabled** (`reason=disabled_invalid`, warning only) rather than an error — a typo in the repo variable silently removes the spend guard.

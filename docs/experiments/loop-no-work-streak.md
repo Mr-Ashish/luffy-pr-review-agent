@@ -6,5 +6,5 @@ Track consecutive scheduled fires that found **no P0/P1** Luffy product work
 | Field | Value |
 |-------|------:|
 | streak | **0** |
-| last_fire | 2026-07-31 (F24 dismiss prior PR reviews shipped) |
+| last_fire | 2026-07-31 (F25 Hermes pin single SoT shipped) |
 | note | Reset to 0 whenever a fire ships product work |

@@ -53,11 +53,11 @@ jobs:
     # F8: optional prebaked container (null when var unset/empty → host runner + Hermes cache)
     container: ${{ vars.LUFFY_RUNNER_IMAGE != '' && vars.LUFFY_RUNNER_IMAGE || null }}
     timeout-minutes: 90
-    # F7: pin Hermes for repro; vars.LUFFY_HERMES_COMMIT overrides (latest|main = floating)
-    # F8: prebaked image (LUFFY_RUNNER_IMAGE) or self-hosted with /root/.hermes-pin + hermes on PATH.
-    # Default: ubuntu-latest + Actions cache of ~/.local+~/.hermes (F2/F14).
+    # F7/F25: pin Hermes for repro. Pass-through repo var only — no hardcoded SHA here.
+    # Empty/unset → resolved after pack checkout from scripts/hermes-pin.sh default (single SoT).
+    # Explicit latest|main|floating → float on install.sh tip. F8: optional LUFFY_RUNNER_IMAGE.
     env:
-      LUFFY_HERMES_COMMIT: ${{ vars.LUFFY_HERMES_COMMIT || '53559aaf86b84dadae83cd9bb605ca476f9a0606' }}
+      LUFFY_HERMES_COMMIT: ${{ vars.LUFFY_HERMES_COMMIT }}
 
     steps:
       - name: Resolve PR number & gate
@@ -139,6 +139,31 @@ jobs:
             agent
             scripts
           sparse-checkout-cone-mode: true
+
+      # F25: single-source Hermes pin — empty GHA var must not float; fill from hermes-pin.sh default
+      - name: Resolve Hermes pin (F25)
+        if: steps.gate.outputs.matched == 'true'
+        run: |
+          set -euo pipefail
+          PIN_HELPER="${{ github.workspace }}/luffy/scripts/hermes-pin.sh"
+          if [[ ! -x "$PIN_HELPER" && -f "$PIN_HELPER" ]]; then
+            chmod +x "$PIN_HELPER" || true
+          fi
+          RAW="${LUFFY_HERMES_COMMIT:-}"
+          if [[ -z "$RAW" ]]; then
+            if [[ -x "$PIN_HELPER" || -f "$PIN_HELPER" ]]; then
+              PIN="$(bash "$PIN_HELPER" default | tr -d '\n')"
+            else
+              echo "::warning::F25 hermes-pin.sh missing; leave LUFFY_HERMES_COMMIT empty (floating)"
+              PIN=""
+            fi
+            if [[ -n "$PIN" ]]; then
+              echo "LUFFY_HERMES_COMMIT=$PIN" >> "$GITHUB_ENV"
+              echo "::notice::F25 Hermes pin from hermes-pin.sh default=$PIN"
+            fi
+          else
+            echo "::notice::F25 Hermes pin from vars.LUFFY_HERMES_COMMIT=$RAW"
+          fi
 
       # F19: skip paid OpenRouter run if a successful Luffy review landed recently on this PR
       - name: Cooldown gate
@@ -297,15 +322,19 @@ jobs:
             echo "yes=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # F2/F14/F7: cache Hermes install keyed by pin (save only on miss)
+      # F2/F14/F7/F25: cache Hermes install keyed by pin (save only on miss)
       - name: Resolve Hermes cache suffix
         if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.prebaked.outputs.yes != 'true'
         id: hermes_pin
         run: |
           set -euo pipefail
           # Prefer pack helper when luffy/ is checked out; else mirror hermes-pin.sh
-          if [[ -x luffy/scripts/hermes-pin.sh ]]; then
-            SUF="$(LUFFY_HERMES_COMMIT="${LUFFY_HERMES_COMMIT:-}" luffy/scripts/hermes-pin.sh cache-suffix | tr -d '\n')"
+          # F25: if still empty after Resolve Hermes pin, treat as baked default (not float)
+          if [[ -z "${LUFFY_HERMES_COMMIT:-}" && -f luffy/scripts/hermes-pin.sh ]]; then
+            export LUFFY_HERMES_COMMIT="$(bash luffy/scripts/hermes-pin.sh default | tr -d '\n')"
+          fi
+          if [[ -x luffy/scripts/hermes-pin.sh || -f luffy/scripts/hermes-pin.sh ]]; then
+            SUF="$(LUFFY_HERMES_COMMIT="${LUFFY_HERMES_COMMIT:-}" bash luffy/scripts/hermes-pin.sh cache-suffix | tr -d '\n')"
           else
             RAW="${LUFFY_HERMES_COMMIT:-}"
             if [[ -z "$RAW" || "$RAW" == "latest" || "$RAW" == "main" || "$RAW" == "floating" ]]; then

@@ -14,7 +14,8 @@
 set -euo pipefail
 
 # Upstream tip pinned for reproducible CI (2026-07-31; NousResearch/hermes-agent main).
-# Bump intentionally after smoke-testing a new SHA; set LUFFY_HERMES_COMMIT=latest to float.
+# F25 single source of truth: bump ONLY here (workflows resolve via `default` when var unset).
+# Set repo var LUFFY_HERMES_COMMIT=latest|main|floating to float on install.sh tip.
 DEFAULT_HERMES_COMMIT="53559aaf86b84dadae83cd9bb605ca476f9a0606"
 
 resolve_pin() {

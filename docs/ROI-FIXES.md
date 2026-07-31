@@ -37,7 +37,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 21 | **F22** | Verdict-aware done signal (reaction + commit status + job summary) | XS | 🔥 Trust UX — REQUEST CHANGES no longer looks like ✅ | **Shipped** (`parse-verdict.py`, `report-verdict.sh`) |
 | 22 | **F23** | Formal GitHub PR Review event from verdict (Reviews panel) | XS | 🔥 Trust UX — APPROVE/REQUEST_CHANGES/COMMENT as real PR reviews | **Shipped** (`review_event` + `report-verdict.sh`) |
 | 23 | **F24** | Dismiss prior Luffy PR reviews on re-run (Reviews hygiene) | XS | 🔥 Trust UX — re-@luffy no longer stacks APPROVE/REQUEST_CHANGES | **Shipped** (`dismiss-prior-pr-reviews.sh`) |
-| 24 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 24 | **F25** | Hermes pin single source of truth (no workflow hardcoded SHA) | XS | 🔥 Ops/repro — bump pin in one place | **Shipped** (workflows call `hermes-pin.sh default`) |
+| 25 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -90,6 +91,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 13 (shipped)
 
 **F24** dismiss prior Luffy PR reviews: before posting a new F23 review, `dismiss-prior-pr-reviews.sh` finds bodies with `<!-- luffy-pr-review pr=N` and dismisses `APPROVED` / `CHANGES_REQUESTED` (GitHub cannot dismiss `COMMENTED`). Shares `LUFFY_REPLACE_PREVIOUS` with F12 (0 = leave history). Soft-fail; fixture-testable via `LUFFY_PR_REVIEWS_FIXTURE`.
+
+### Sprint 14 (shipped)
+
+**F25** Hermes pin single source of truth: remove hardcoded `DEFAULT_HERMES_COMMIT` from workflow `env:` fallbacks. Empty/unset `vars.LUFFY_HERMES_COMMIT` → after pack checkout, write pin from `scripts/hermes-pin.sh default` into `$GITHUB_ENV`. Explicit `latest`/`main`/`floating` still float. Same for `build-luffy-runner.yml`. Bump pin only in `hermes-pin.sh` (Dockerfile ARG may lag for standalone builds).
 
 ### readme-kit (shipped)
 

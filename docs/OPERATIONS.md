@@ -13,7 +13,7 @@
    ```
 2. Repository secret: `OPENROUTER_API_KEY`
 3. Optional variable: `LUFFY_MODEL` (default in scripts: `openai/gpt-5-mini`)
-4. Optional variable: `LUFFY_HERMES_COMMIT` — pin Hermes to a git SHA (default baked into workflow + `scripts/hermes-pin.sh`); set `latest` or `main` to float on install.sh tip
+4. Optional variable: `LUFFY_HERMES_COMMIT` — pin Hermes to a git SHA (default from `scripts/hermes-pin.sh` only — F25); set `latest` or `main` to float on install.sh tip
 5. On a PR, comment: `@luffy review this pr`
 
 ## High-ROI fixes
@@ -33,6 +33,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 11 (F22):** verdict-aware reaction + commit status `luffy/review` + job-summary verdict section
 - **Sprint 12 (F23):** formal GitHub PR Review event from verdict (Reviews panel); opt-out `vars.LUFFY_PR_REVIEW=0`
 - **Sprint 13 (F24):** dismiss prior Luffy PR reviews on re-run (APPROVED/CHANGES_REQUESTED); shares `LUFFY_REPLACE_PREVIOUS`
+- **Sprint 14 (F25):** Hermes pin single source of truth — bump only `scripts/hermes-pin.sh`; workflows resolve empty var via `default`
 
 ## Central hub memory (cross-repo)
 

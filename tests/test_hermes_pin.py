@@ -81,6 +81,35 @@ class HermesPinTests(unittest.TestCase):
         r = _run(["cache-suffix"], env={"LUFFY_HERMES_COMMIT": "main"})
         self.assertEqual(r.stdout.strip(), "latest")
 
+    def test_workflows_no_hardcoded_pin_fallback(self):
+        """F25: workflows must not embed DEFAULT_HERMES_COMMIT; hermes-pin.sh is SoT."""
+        wf_dir = ROOT / ".github" / "workflows"
+        for name in ("luffy-review-reusable.yml", "build-luffy-runner.yml"):
+            text = (wf_dir / name).read_text()
+            self.assertNotIn(
+                f"|| '{DEFAULT}'",
+                text,
+                msg=f"{name} still hardcodes pin fallback",
+            )
+            self.assertNotIn(
+                f'|| "{DEFAULT}"',
+                text,
+                msg=f"{name} still hardcodes pin fallback",
+            )
+            # Still mention hermes-pin.sh as the source of truth
+            self.assertIn("hermes-pin.sh", text)
+
+    def test_default_is_only_in_pin_helper_not_workflow_env_or(self):
+        """Dockerfile may still ARG the pin for standalone builds; workflows must not ||-fallback."""
+        reusable = (ROOT / ".github" / "workflows" / "luffy-review-reusable.yml").read_text()
+        self.assertIn("F25", reusable)
+        self.assertIn("vars.LUFFY_HERMES_COMMIT", reusable)
+        # Job env is pass-through only (no || 'sha')
+        self.assertRegex(
+            reusable,
+            r"LUFFY_HERMES_COMMIT:\s*\$\{\{\s*vars\.LUFFY_HERMES_COMMIT\s*\}\}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
