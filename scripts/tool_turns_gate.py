@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""F45 + F49: tool-turns gate (H12) and soft re-prompt (H15).
+"""F45 + F49 + F51: tool-turns gate (H12), soft re-prompt (H15), tool depth (H26).
 
 Agentic review is the product differentiator. A no-tool run on a multi-file
 code PR can APPROVE while missing real gaps (odoo e2e #2 mini vs GHA).
@@ -14,6 +14,11 @@ F49 soft re-prompt (H15):
   - Same eligibility as F45, once per review
   - Builds a short tool-nudge suffix so hermes -z can re-run before F45 annotate
   - Writes tool-turns-reprompt.env for pack/UI chips
+
+F51 tool depth (H26):
+  - Re-prompt suffix (and review prompt) forbid head-only reads of large files
+  - Prefer unified diff hunks / rg+line-range around changed symbols
+  - Evidenced on odoo e2e #6: F49 0→1 tools but `head -80 misc.py` missed street_split
 
 Usage:
   python3 scripts/tool_turns_gate.py decide \\
@@ -380,7 +385,7 @@ def build_reprompt_suffix(
     file_count: int = 0,
     paths: list[str] | None = None,
 ) -> str:
-    """Short soft nudge appended to the original review prompt (H15)."""
+    """Soft nudge appended to the original review prompt (H15 + H26 tool depth)."""
     paths = [normalize_path(p) for p in (paths or []) if normalize_path(p)]
     sample = paths[:12]
     more = len(paths) - len(sample)
@@ -392,15 +397,24 @@ def build_reprompt_suffix(
         files_block = f"\nChanged paths (from the PR):\n{bullets}\n"
     return (
         "\n\n---\n\n"
-        "## Soft re-prompt (Luffy H15 / F49)\n\n"
+        "## Soft re-prompt (Luffy H15 / F49 + H26 / F51)\n\n"
         f"Your previous reply used **{tool_turns} tool turns** on a multi-file "
         f"code PR (**{file_count}** files). That is incomplete for an agentic "
         "review: do **not** finalize from the diff text alone.\n\n"
         "Before writing the final review you **must** use workspace tools at "
         "least once:\n"
-        "1. Read or list the changed files under the workspace root\n"
+        "1. Inspect **changed hunks** (not just file prologues) under the workspace\n"
         "2. Spot-check related tests (or note they are missing)\n"
         "3. Only then emit the full review in the required Markdown contract\n\n"
+        "**Tool depth (H26 / F51) — critical:**\n"
+        "- Do **not** stop after `head` / first-N-lines on large files. Headers "
+        "miss mid-file symbols (e.g. a regex deep in `misc.py`).\n"
+        "- Prefer the unified **diff file** for exact `+/-` hunks, or "
+        "`rg`/`grep -n` for symbols from the PR title/summary/changed paths.\n"
+        "- After a symbol hit: read a **line range** around it "
+        "(`sed -n 'START,ENDp' path` or equivalent). At least one tool must "
+        "target a **changed region or symbol**, not only file prologues.\n"
+        "- Do not claim you reviewed a symbol you only saw via `head`.\n\n"
         "Prefer terminal/file tools over guessing. If a path is missing, say so "
         "explicitly instead of approving on incomplete evidence.\n"
         f"{files_block}"
@@ -421,8 +435,9 @@ def write_reprompt_prompt(
         file_count=file_count,
         paths=paths,
     )
-    # Avoid stacking multiple H15 blocks if called twice.
-    marker = "## Soft re-prompt (Luffy H15 / F49)"
+    # Avoid stacking multiple H15/H26 blocks if called twice.
+    # Prefix match: title may be "…H15 / F49)" or "…H15 / F49 + H26 / F51)".
+    marker = "## Soft re-prompt (Luffy H15"
     if marker in base:
         text = base
     else:

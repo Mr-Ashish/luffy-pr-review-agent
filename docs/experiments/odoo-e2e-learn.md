@@ -128,3 +128,11 @@ Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luff
 3. **Score 34/50:** lowest F49 row; APPROVE 95 + soft regex-maintainability nits; cheap (~$0.005 · 2 API · 32s hermes) but quality-capped by tool depth.
 4. **ROI signal:** raise H18/H26 from pure "first-pass tools" to **depth-after-reprompt** (rg/sed around diff hunks, not head).
 5. **Ops:** orchestrator cancelled mid publish_local; hermes+trace+review complete; pack-run-for-ui re-run offline OK.
+
+## Introspect (F51 / H26 tool depth)
+
+1. **Root cause of #6 shallow recovery:** F49 only required *some* tool use; mini satisfied with parallel `head -80` and never hit the changed regex region.
+2. **Minimal fix (prompt control-plane, no second hermes loop):** F49 `build_reprompt_suffix` now includes **Tool depth (H26 / F51)** — forbid head-only large files; prefer unified diff + `rg`/line-range on changed symbols. Same guidance in `agent/review-prompt.md` Workspace and one SOUL Scope bullet.
+3. **Idempotency:** re-prompt marker relaxed to `## Soft re-prompt (Luffy H15` so F49+F51 title does not double-append.
+4. **Not yet live-verified on #6:** H27 backlog — re-run mini F49+F51 and re-score D1/D8 vs 34/50.
+5. **Next P0:** H27 live #6 re-score, or H25 7th corpus PR if growth preferred.

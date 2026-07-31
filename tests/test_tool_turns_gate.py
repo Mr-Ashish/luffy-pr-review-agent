@@ -157,9 +157,22 @@ class RepromptTests(unittest.TestCase):
         s = _mod.build_reprompt_suffix(
             tool_turns=0, file_count=3, paths=["a.py", "b.py", "c.py"]
         )
-        self.assertIn("Soft re-prompt (Luffy H15 / F49)", s)
+        self.assertIn("Soft re-prompt (Luffy H15 / F49", s)
         self.assertIn("0 tool turns", s)
         self.assertIn("`a.py`", s)
+
+    def test_build_suffix_tool_depth_h26(self):
+        """F51/H26: re-prompt must forbid head-only large-file reads."""
+        s = _mod.build_reprompt_suffix(
+            tool_turns=0,
+            file_count=14,
+            paths=["odoo/tools/misc.py", "addons/base_address_extended/tests/test_street_fields.py"],
+        )
+        self.assertIn("Tool depth (H26 / F51)", s)
+        self.assertIn("head", s.lower())
+        self.assertIn("changed region", s.lower())
+        self.assertIn("rg", s.lower())
+        self.assertIn("`odoo/tools/misc.py`", s)
 
     def test_write_reprompt_idempotent(self):
         with tempfile.TemporaryDirectory() as td:
@@ -184,8 +197,9 @@ class RepromptTests(unittest.TestCase):
                 paths=["x.js", "y.js"],
             )
             twice = pout.read_text(encoding="utf-8")
-            self.assertEqual(once.count("Soft re-prompt (Luffy H15 / F49)"), 1)
-            self.assertEqual(twice.count("Soft re-prompt (Luffy H15 / F49)"), 1)
+            self.assertEqual(once.count("Soft re-prompt (Luffy H15 / F49"), 1)
+            self.assertEqual(twice.count("Soft re-prompt (Luffy H15 / F49"), 1)
+            self.assertIn("Tool depth (H26 / F51)", once)
             self.assertIn("hello review prompt", twice)
 
 
