@@ -393,6 +393,8 @@ jobs:
           # F28: repo-local .luffy/ memory (default); hub only when mode/hub publish set
           LUFFY_MEMORY_MODE: ${{ vars.LUFFY_MEMORY_MODE }}
           LUFFY_MEMORY_PATH: ${{ vars.LUFFY_MEMORY_PATH }}
+          # F29: soft max OpenRouter spend (USD) for PR footer during hermes stage
+          LUFFY_MAX_COST_USD: ${{ vars.LUFFY_MAX_COST_USD }}
           # F7: job-level env already sets default; re-export for pipeline scripts
           LUFFY_HERMES_COMMIT: ${{ env.LUFFY_HERMES_COMMIT }}
         run: |
@@ -412,6 +414,10 @@ jobs:
           # Do not hardcode a second default here; leave unset when var empty.
           if [[ -z "${LUFFY_MODEL:-}" ]]; then
             unset LUFFY_MODEL || true
+          fi
+          # F29: empty budget var → disabled
+          if [[ -z "${LUFFY_MAX_COST_USD:-}" ]]; then
+            unset LUFFY_MAX_COST_USD || true
           fi
           export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
           chmod +x "$LUFFY_ROOT/scripts/"*.sh "$LUFFY_ROOT/scripts/"*.py 2>/dev/null || true
