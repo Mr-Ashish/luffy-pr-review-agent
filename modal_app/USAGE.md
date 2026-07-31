@@ -21,4 +21,5 @@
 - Path-skip offline: `python3 scripts/modal_parity.py path-skip --path README.md --globs docs` → exit 2 means Modal would skip OpenRouter.
 
 - F41: `LUFFY_MAX_TURNS` (default 40) caps Hermes tool iterations on Modal; set `0`/`off` to disable.
-- **F66** app version `0.7.0-f66`: Modal is default prod live e2e host. Defaults `LUFFY_LENS_PACK=auto` (F63 domain packs). Optional `LUFFY_MEMORY_TENANT` (F65 multi-tenant hub), `LUFFY_HUB_PUBLISH=1` for hub ingest from Modal secrets/env.
+- **F66** Modal is default prod live e2e host. Defaults `LUFFY_LENS_PACK=auto` (F63 domain packs). Optional `LUFFY_MEMORY_TENANT` (F65 multi-tenant hub), `LUFFY_HUB_PUBLISH=1` for hub ingest from Modal secrets/env.
+- **F67** app version `0.8.0-f67`: live stream of orchestrator + Hermes agent.log / stderr into Modal UI logs (`print`+flush, background file tails, `LUFFY_STREAM_LOGS=1` tee in `run-hermes-review.sh`). Result includes `artifact_summary` + `log_streaming: true`. Traces still on volume `luffy-traces`.

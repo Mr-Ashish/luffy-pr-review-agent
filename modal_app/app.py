@@ -22,19 +22,20 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, IO
 
 import modal
 
 APP_NAME = "luffy-pr-review"
+# F67: live log streaming to Modal UI (Hermes agent activity + stages)
 # F66: Modal is the default prod live e2e host (lens auto + F65 tenant pass-through)
-LUFFY_MODAL_VERSION = "0.7.0-f66"
+LUFFY_MODAL_VERSION = "0.8.0-f67"
 HERMES_PIN = "53559aaf86b84dadae83cd9bb605ca476f9a0606"
 # OpenRouter — keep Modal compute cheap AND LLM spend low
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
-
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Slim image: no build-essential/python3-dev (not needed if hermes install works without)
@@ -104,16 +105,235 @@ _CHEAP = dict(
 )
 
 
+def _mlog(msg: str, *, stream: str = "stdout") -> None:
+    """Emit a line into Modal function logs (UI + `modal app logs`).
+
+    Modal captures container stdout/stderr. Anything only stored in files is
+    invisible in the Modal UI unless we print it (with flush).
+    """
+    line = msg if msg.endswith("\n") else msg + "\n"
+    if stream == "stderr":
+        sys.stderr.write(line)
+        sys.stderr.flush()
+    else:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+
+
+def _banner(stage: str, detail: str = "") -> None:
+    bar = "=" * 64
+    _mlog(bar)
+    _mlog(f"[luffy/{stage}] {detail}".rstrip())
+    _mlog(bar)
+
+
 def _run(
     cmd: list[str],
     *,
     env: dict | None = None,
     cwd: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    """Quiet capture for short probes (not streamed to UI)."""
     merged = {**os.environ, **(env or {})}
     return subprocess.run(
         cmd, capture_output=True, text=True, check=False, env=merged, cwd=cwd
     )
+
+
+def _pump_pipe(
+    pipe: IO[str] | None,
+    *,
+    prefix: str,
+    sink: list[str],
+    to_stderr: bool = False,
+) -> None:
+    if pipe is None:
+        return
+    try:
+        for raw in pipe:
+            sink.append(raw)
+            text = raw.rstrip("\n")
+            _mlog(f"{prefix}{text}", stream="stderr" if to_stderr else "stdout")
+    except Exception as e:  # noqa: BLE001
+        _mlog(f"{prefix}[pump error: {e}]", stream="stderr")
+
+
+def _run_stream(
+    cmd: list[str],
+    *,
+    env: dict | None = None,
+    cwd: str | None = None,
+    label: str = "cmd",
+) -> subprocess.CompletedProcess[str]:
+    """Run a long command streaming stdout/stderr live into Modal UI logs.
+
+    Unlike `_run` (capture_output=True), this prints every line with flush so
+    operators can watch Hermes stages in the Modal dashboard / `modal run`.
+    Full stdout/stderr are still collected for the result dict tails.
+    """
+    merged = {**os.environ, **(env or {})}
+    _mlog(f"[luffy/exec] start {label}: {' '.join(cmd[:8])}{'…' if len(cmd) > 8 else ''}")
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=merged,
+        cwd=cwd,
+        bufsize=1,
+    )
+    out_buf: list[str] = []
+    err_buf: list[str] = []
+    t_out = threading.Thread(
+        target=_pump_pipe,
+        args=(proc.stdout,),
+        kwargs={"prefix": f"[{label}:out] ", "sink": out_buf, "to_stderr": False},
+        daemon=True,
+    )
+    t_err = threading.Thread(
+        target=_pump_pipe,
+        args=(proc.stderr,),
+        kwargs={"prefix": f"[{label}:err] ", "sink": err_buf, "to_stderr": True},
+        daemon=True,
+    )
+    t_out.start()
+    t_err.start()
+    rc = proc.wait()
+    t_out.join(timeout=30)
+    t_err.join(timeout=30)
+    _mlog(f"[luffy/exec] end {label} rc={rc}")
+    return subprocess.CompletedProcess(
+        args=cmd,
+        returncode=rc,
+        stdout="".join(out_buf),
+        stderr="".join(err_buf),
+    )
+
+
+def _tail_file_loop(
+    path: Path,
+    *,
+    prefix: str,
+    stop: threading.Event,
+    poll_s: float = 0.4,
+    start_at_end: bool = False,
+) -> None:
+    """Follow a growing file and print new lines to Modal logs (Hermes agent.log)."""
+    pos = 0
+    if start_at_end and path.is_file():
+        try:
+            pos = path.stat().st_size
+        except OSError:
+            pos = 0
+    while not stop.is_set():
+        try:
+            if path.is_file():
+                with path.open("r", encoding="utf-8", errors="replace") as fh:
+                    fh.seek(pos)
+                    chunk = fh.read()
+                    if chunk:
+                        pos = fh.tell()
+                        for line in chunk.splitlines():
+                            if line.strip():
+                                _mlog(f"{prefix}{line}")
+        except Exception as e:  # noqa: BLE001
+            _mlog(f"{prefix}[tail error: {e}]", stream="stderr")
+        stop.wait(poll_s)
+    # final drain
+    try:
+        if path.is_file():
+            with path.open("r", encoding="utf-8", errors="replace") as fh:
+                fh.seek(pos)
+                for line in fh.read().splitlines():
+                    if line.strip():
+                        _mlog(f"{prefix}{line}")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _emit_artifact_summary(out_dir: Path, pr_number: int) -> dict[str, Any]:
+    """Print key Hermes/agent-loop artifacts into Modal logs; return summary dict."""
+    summary: dict[str, Any] = {}
+    _banner("artifacts", f"OUT_DIR={out_dir}")
+
+    # Hermes stderr (tool noise often lands here)
+    for name in (
+        f"hermes-{pr_number}.stderr",
+        f"hermes-{pr_number}.reprompt.stderr",
+        "hermes-run.log",
+        "hermes-usage.json",
+        "timings.json",
+        "agent-loop/agent-loop.json",
+        "agent-loop/agent-loop.md",
+        f"review-{pr_number}.md",
+    ):
+        p = out_dir / name
+        if not p.is_file():
+            continue
+        try:
+            size = p.stat().st_size
+        except OSError:
+            size = -1
+        summary[name] = size
+        _mlog(f"[luffy/artifact] {name} bytes={size}")
+
+    # Structured agent-loop stats
+    loop_json = out_dir / "agent-loop" / "agent-loop.json"
+    if loop_json.is_file():
+        try:
+            data = json.loads(loop_json.read_text(encoding="utf-8", errors="replace"))
+            tool_turns = data.get("tool_call_turns") or data.get("tool_turns")
+            n_msgs = len(data.get("messages") or data.get("turns") or [])
+            summary["agent_loop"] = {
+                "tool_call_turns": tool_turns,
+                "messages_or_turns": n_msgs,
+                "keys": sorted(list(data.keys()))[:20],
+            }
+            _mlog(
+                f"[luffy/agent-loop] tool_call_turns={tool_turns} "
+                f"messages_or_turns={n_msgs}"
+            )
+            # Sample tool names if present
+            tools = data.get("tools") or data.get("tool_calls") or []
+            if isinstance(tools, list) and tools:
+                names = []
+                for t in tools[:30]:
+                    if isinstance(t, dict):
+                        names.append(str(t.get("name") or t.get("tool") or t)[:80])
+                    else:
+                        names.append(str(t)[:80])
+                _mlog(f"[luffy/agent-loop] tools_sample={names[:12]}")
+                summary["tools_sample"] = names[:12]
+        except Exception as e:  # noqa: BLE001
+            _mlog(f"[luffy/agent-loop] parse failed: {e}", stream="stderr")
+
+    # Tail hermes-run.log (offset-sliced agent activity)
+    hrun = out_dir / "hermes-run.log"
+    if hrun.is_file():
+        try:
+            text = hrun.read_text(encoding="utf-8", errors="replace")
+            tail = text[-6000:] if len(text) > 6000 else text
+            _banner("hermes-run.log tail", f"bytes={len(text)}")
+            for line in tail.splitlines()[-80:]:
+                _mlog(f"[hermes-run] {line}")
+            summary["hermes_run_log_bytes"] = len(text)
+        except Exception as e:  # noqa: BLE001
+            _mlog(f"[hermes-run] read failed: {e}", stream="stderr")
+
+    # Tail hermes stderr
+    hse = out_dir / f"hermes-{pr_number}.stderr"
+    if hse.is_file():
+        try:
+            text = hse.read_text(encoding="utf-8", errors="replace")
+            tail = text[-4000:] if len(text) > 4000 else text
+            _banner("hermes stderr tail", f"bytes={len(text)}")
+            for line in tail.splitlines()[-60:]:
+                _mlog(f"[hermes:err] {line}", stream="stderr")
+            summary["hermes_stderr_bytes"] = len(text)
+        except Exception as e:  # noqa: BLE001
+            _mlog(f"[hermes:err] read failed: {e}", stream="stderr")
+
+    return summary
 
 
 @app.function()  # absolute minimum resources
@@ -281,15 +501,26 @@ def review_pr(
     model: str = DEFAULT_MODEL,
     post_comment: bool = True,
 ) -> dict:
-    """Bit 3: Luffy review on cheapest Modal profile + cheap LLM default."""
+    """Bit 3: Luffy review on cheapest Modal profile + cheap LLM default.
+
+    F67: streams orchestrator + Hermes agent.log / hermes stderr into Modal UI
+    logs (print+flush). Previously capture_output=True hid all agent activity
+    until a tiny orch_*_tail at the end.
+    """
     t0 = time.time()
+    _banner(
+        "review_pr",
+        f"repo={repo} pr={pr_number} model={model} post={post_comment} v={LUFFY_MODAL_VERSION}",
+    )
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
     or_key = os.environ.get("OPENROUTER_API_KEY") or ""
     if not token or not or_key:
+        _mlog("[luffy] missing secrets", stream="stderr")
         return {"ok": False, "error": "missing secrets"}
 
     luffy_root = Path("/opt/luffy")
     if not (luffy_root / "scripts" / "run-luffy-review.sh").is_file():
+        _mlog("[luffy] pack missing under /opt/luffy", stream="stderr")
         return {"ok": False, "error": "luffy pack missing"}
 
     work = Path(f"/tmp/luffy-run-{pr_number}-{int(t0)}")
@@ -309,6 +540,7 @@ def review_pr(
 
     hermes_home.mkdir(parents=True)
     (hermes_home / "memories").mkdir(parents=True)
+    (hermes_home / "logs").mkdir(parents=True)
     seed = pack / "agent" / "MEMORY.seed.md"
     if seed.is_file():
         shutil.copy(seed, hermes_home / "memories" / "MEMORY.md")
@@ -342,9 +574,11 @@ def review_pr(
         ),
         "POST_COMMENT": "1" if post_comment else "0",
         "TRIGGER_COMMENT": "modal cheap e2e",
-        "MAX_DIFF_BYTES": "200000",  # smaller context = fewer tokens
+        "MAX_DIFF_BYTES": os.environ.get("MAX_DIFF_BYTES", "400000"),
         "LUFFY_TOOLSETS": "terminal",
         "LUFFY_HOST": "modal",  # F31/F66 Run Console host label (prod default e2e)
+        # F67: stream Hermes stderr + agent activity (scripts tee when set)
+        "LUFFY_STREAM_LOGS": "1",
         # F63: domain pack auto-select from changed paths (default product)
         "LUFFY_LENS_PACK": os.environ.get("LUFFY_LENS_PACK", "auto"),
         "LUFFY_LENS_PACKS": os.environ.get("LUFFY_LENS_PACKS", "1"),
@@ -366,7 +600,13 @@ def review_pr(
             "PATH",
             "/root/.local/bin:/root/.hermes/bin:/usr/local/bin:/usr/bin:/bin",
         ),
+        # Force line-buffered Python/Hermes children where possible
+        "PYTHONUNBUFFERED": "1",
     }
+    _mlog(
+        f"[luffy/env] HERMES_HOME={hermes_home} OUT_DIR={out_dir} "
+        f"WORKSPACE={workspace} STREAM_LOGS=1 LENS_PACK={env.get('LUFFY_LENS_PACK')}"
+    )
 
     # ------------------------------------------------------------------
     # F39: path-skip preflight (F38) BEFORE clone / OpenRouter spend
@@ -480,8 +720,11 @@ def review_pr(
         }
 
     try:
+        _banner("checkout", f"sparse PR head {repo}#{pr_number}")
         head_sha = _sparse_checkout_pr(repo, pr_number, workspace, token)
+        _mlog(f"[luffy/checkout] head={head_sha}")
     except Exception as e:  # noqa: BLE001
+        _mlog(f"[luffy/checkout] FAILED: {e}", stream="stderr")
         return {"ok": False, "error": f"checkout: {e}", "elapsed_s": round(time.time() - t0, 1)}
 
     # Full SHA for F22 commit status + F9 inline
@@ -490,9 +733,52 @@ def review_pr(
     env["HEAD_SHA"] = head_full
     env["WORKSPACE_ROOT"] = str(workspace)
 
+    # F67: follow Hermes agent.log + stderr while orchestrator runs
+    stop_tails = threading.Event()
+    agent_log = hermes_home / "logs" / "agent.log"
+    hermes_stderr = out_dir / f"hermes-{pr_number}.stderr"
+    hermes_run_log = out_dir / "hermes-run.log"
+    tails = [
+        threading.Thread(
+            target=_tail_file_loop,
+            args=(agent_log,),
+            kwargs={"prefix": "[hermes-agent] ", "stop": stop_tails, "start_at_end": False},
+            daemon=True,
+            name="tail-agent-log",
+        ),
+        threading.Thread(
+            target=_tail_file_loop,
+            args=(hermes_stderr,),
+            kwargs={"prefix": "[hermes:err-live] ", "stop": stop_tails, "start_at_end": False},
+            daemon=True,
+            name="tail-hermes-stderr",
+        ),
+        threading.Thread(
+            target=_tail_file_loop,
+            args=(hermes_run_log,),
+            kwargs={"prefix": "[hermes-run-live] ", "stop": stop_tails, "start_at_end": False},
+            daemon=True,
+            name="tail-hermes-run",
+        ),
+    ]
+    for t in tails:
+        t.start()
+
     orch = pack / "scripts" / "run-luffy-review.sh"
-    proc = _run(["bash", str(orch)], env=env)
+    _banner("orchestrator", f"run-luffy-review.sh pr={pr_number}")
+    try:
+        proc = _run_stream(
+            ["bash", str(orch)],
+            env=env,
+            label="orch",
+        )
+    finally:
+        stop_tails.set()
+        for t in tails:
+            t.join(timeout=5)
+
     orch_rc = proc.returncode
+    _mlog(f"[luffy/orchestrator] rc={orch_rc}")
 
     review_files = [
         p
@@ -501,9 +787,13 @@ def review_pr(
     ]
     review_path = review_files[0] if review_files else None
 
+    # F67: dump Hermes/agent-loop artifacts into Modal logs
+    artifact_summary = _emit_artifact_summary(out_dir, pr_number)
+
     post_rc = None
     if post_comment and review_path and review_path.is_file():
-        post = _run(
+        _banner("post_comment", f"{repo}#{pr_number}")
+        post = _run_stream(
             [
                 "bash",
                 str(pack / "scripts" / "post-review-comment.sh"),
@@ -511,22 +801,24 @@ def review_pr(
                 str(pr_number),
             ],
             env=env,
+            label="post",
         )
         post_rc = post.returncode
+        _mlog(f"[luffy/post] rc={post_rc}")
 
     # ------------------------------------------------------------------
     # F39: GHA-parity signals — commit status, PR review, inline, labels
     # ------------------------------------------------------------------
     verdict_rc = None
     if review_path and review_path.is_file() and (pack / "scripts" / "report-verdict.sh").is_file():
-        # Copy pr.diff next to review if assemble put it in OUT_DIR (already)
+        _banner("report_verdict", f"pipeline_rc={orch_rc}")
         v_env = {
             **env,
             "HEAD_SHA": head_full,
             "PIPELINE_RC": str(orch_rc),
             "LUFFY_INLINE_DIFF": str(out_dir / "pr.diff"),
         }
-        v = _run(
+        v = _run_stream(
             [
                 "bash",
                 str(pack / "scripts" / "report-verdict.sh"),
@@ -534,22 +826,52 @@ def review_pr(
                 str(orch_rc),
             ],
             env=v_env,
+            label="verdict",
         )
         verdict_rc = v.returncode
+        _mlog(f"[luffy/verdict] rc={verdict_rc}")
 
     run_id = f"{repo.replace('/', '--')}-pr{pr_number}-{int(t0)}"
     vol_dest = Path("/traces") / run_id
     vol_err = None
     try:
         if out_dir.exists():
+            _banner("trace_volume", f"copy → {vol_dest}")
             shutil.copytree(out_dir, vol_dest, dirs_exist_ok=True)
+            # Also write a small modal-visible index of what was streamed
+            index = {
+                "version": LUFFY_MODAL_VERSION,
+                "repo": repo,
+                "pr": pr_number,
+                "run_id": run_id,
+                "artifact_summary": artifact_summary,
+                "orch_rc": orch_rc,
+            }
+            (vol_dest / "modal-run-index.json").write_text(
+                json.dumps(index, indent=2) + "\n", encoding="utf-8"
+            )
+            # Persist a concatenated stream hint file for offline replay
+            stream_note = out_dir / "modal-stream-note.txt"
+            stream_note.write_text(
+                "F67: live logs were printed to Modal function stdout/stderr.\n"
+                "Re-fetch: modal app logs luffy-pr-review  OR dashboard run page.\n"
+                f"Volume path: {vol_dest}\n"
+                f"Artifacts: {json.dumps(artifact_summary)}\n",
+                encoding="utf-8",
+            )
+            shutil.copy2(stream_note, vol_dest / "modal-stream-note.txt")
             trace_vol.commit()
+            _mlog(f"[luffy/traces] committed volume path={vol_dest}")
     except Exception as e:  # noqa: BLE001
         vol_err = str(e)
+        _mlog(f"[luffy/traces] volume error: {e}", stream="stderr")
 
     preview = ""
     if review_path and review_path.is_file():
         preview = review_path.read_text(errors="replace")[:1200]
+        _banner("review_preview", f"{review_path.name}")
+        for line in preview.splitlines()[:40]:
+            _mlog(f"[review] {line}")
 
     # F31: surface Run Console bundle path (orchestrator writes run-bundle.json)
     run_bundle = out_dir / "run-bundle.json"
@@ -578,6 +900,13 @@ def review_pr(
             except Exception:  # noqa: BLE001
                 pass
 
+    elapsed = round(time.time() - t0, 1)
+    _banner(
+        "done",
+        f"ok={orch_rc == 0 and bool(review_path)} orch_rc={orch_rc} "
+        f"elapsed_s={elapsed} review={bool(review_path)}",
+    )
+
     return {
         "ok": orch_rc == 0 and bool(review_path),
         "bit": 3,
@@ -595,12 +924,18 @@ def review_pr(
         "review_path": str(review_path) if review_path else None,
         "run_bundle": str(run_bundle) if run_bundle.is_file() else None,
         "review_preview": preview,
-        "orch_stderr_tail": (proc.stderr or "")[-1500:],
-        "orch_stdout_tail": (proc.stdout or "")[-800:],
-        "elapsed_s": round(time.time() - t0, 1),
+        "orch_stderr_tail": (proc.stderr or "")[-4000:],
+        "orch_stdout_tail": (proc.stdout or "")[-2000:],
+        "artifact_summary": artifact_summary,
+        "elapsed_s": elapsed,
         "trace_volume_path": str(vol_dest),
         "trace_volume_error": vol_err,
         "resources": "default-min (no cpu/memory reservation)",
+        "log_streaming": True,
+        "stream_note": (
+            "Live logs streamed to Modal UI via print+flush; "
+            "Hermes agent.log / hermes stderr tailed during orchestrator"
+        ),
     }
 
 

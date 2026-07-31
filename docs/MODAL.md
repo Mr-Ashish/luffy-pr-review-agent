@@ -5,6 +5,20 @@
 for installed target repos (`@luffy review`); Modal is the kitchen for
 operator-driven multi-repo scoring (milvus corpus, dogfood).
 
+**F67:** Live log streaming into the **Modal UI**. Previously `_run(..., capture_output=True)`
+hid Hermes agent activity; only a tiny `orch_*_tail` returned at the end. Now:
+
+| Stream | Source |
+|--------|--------|
+| `[orch:out/err]` | `run-luffy-review.sh` stage notices (line-pumped) |
+| `[hermes-agent]` | live tail of `$HERMES_HOME/logs/agent.log` |
+| `[hermes:err-live]` | live tail of `hermes-{pr}.stderr` (also teed by F67) |
+| `[hermes-run-live]` | live tail of offset-sliced `hermes-run.log` |
+| `[luffy/agent-loop]` | tool_turns / tools sample after capture |
+| volume | `/traces/{repo}--prN-ts/` still holds full OUT_DIR + `modal-run-index.json` |
+
+Watch: Modal dashboard run page, or `modal app logs luffy-pr-review`.
+
 GitHub Actions = legacy doorbell + kitchen. Modal = prod kitchen (+ webhook doorbell).
 
 ## Setup (once)

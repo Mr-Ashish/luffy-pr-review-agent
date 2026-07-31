@@ -13,6 +13,7 @@
 | F64 | Durable fp-rules.json self-learn | product, memory | MERGED PR #15 |
 | F65 | Multi-tenant federated hub memory | product, memory | **MERGED** PR #16 |
 | F66 | Modal default prod live e2e host | product, ops | **MERGED** PR #16 (`0.7.0-f66`) |
+| F67 | Modal live Hermes/orch log streaming | product, ops | **shipping** (`0.8.0-f67`) |
 
 ## IN_PROGRESS
 
@@ -27,7 +28,7 @@
 
 ## Counts
 
-- **features_built_count:** 23 (F44–F66)
+- **features_built_count:** 24 (F44–F67)
 - **types_built:** agent_quality, product, memory, ops
 - **left_count:** 2 (large deferred)
 - **progress_pct:** ~97%

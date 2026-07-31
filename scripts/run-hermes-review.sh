@@ -440,18 +440,42 @@ _hermes_wrap() {
 
 notice "Hermes review · model=$MODEL tier=${MODEL_TIER_SELECTED:-?} toolsets=$TOOLSETS workspace=$WORKSPACE_ROOT hermes_home=$HERMES_HOME timeout=${TIMEOUT_SECS}s max_turns=${MAX_TURNS_VAL:-off}"
 
+# F67: when LUFFY_STREAM_LOGS=1 (Modal sets this) or LUFFY_HOST=modal, tee Hermes
+# stderr to both the capture file AND process stderr so Modal UI / CI live logs
+# show tool/agent activity in real time (review body still goes only to RAW_OUT).
+STREAM_LOGS=0
+case "${LUFFY_STREAM_LOGS:-}${LUFFY_HOST:-}" in
+  *1*|*modal*|*true*|*yes*) STREAM_LOGS=1 ;;
+esac
+if [[ "${LUFFY_HOST:-}" == "modal" ]]; then
+  STREAM_LOGS=1
+fi
+if [[ $STREAM_LOGS -eq 1 ]]; then
+  notice "F67 stream logs ON (tee hermes stderr → file + process stderr for Modal UI)"
+fi
+
 TIMED_OUT=0
 set +e
 (
   cd "$WORKSPACE_ROOT"
   # --usage-file: tokens/cost/session_id for the agentic loop package
   # -t toolsets: allow terminal/file tools so the loop can inspect the workspace
-  _hermes_wrap hermes -z "$PROMPT" \
-    --provider openrouter \
-    --model "$MODEL" \
-    -t "$TOOLSETS" \
-    --usage-file "$USAGE_FILE" \
-    >"$RAW_OUT" 2>"$STDERR_FILE"
+  if [[ $STREAM_LOGS -eq 1 ]]; then
+    # process-substitution tee: live stderr for Modal + durable STDERR_FILE
+    _hermes_wrap hermes -z "$PROMPT" \
+      --provider openrouter \
+      --model "$MODEL" \
+      -t "$TOOLSETS" \
+      --usage-file "$USAGE_FILE" \
+      >"$RAW_OUT" 2> >(tee -a "$STDERR_FILE" >&2)
+  else
+    _hermes_wrap hermes -z "$PROMPT" \
+      --provider openrouter \
+      --model "$MODEL" \
+      -t "$TOOLSETS" \
+      --usage-file "$USAGE_FILE" \
+      >"$RAW_OUT" 2>"$STDERR_FILE"
+  fi
 )
 RC=$?
 if [[ $RC -eq 124 ]]; then
@@ -492,10 +516,17 @@ if [[ $TIMED_OUT -eq 0 && $HERMES_CLI_ARGV_BROKEN -eq 0 && ( $RC -ne 0 || ! -s "
   notice "hermes -z failed or empty (rc=$RC); trying hermes chat -q"
   (
     cd "$WORKSPACE_ROOT"
-    _hermes_wrap hermes chat -q "$PROMPT" \
-      --provider openrouter \
-      --model "$MODEL" \
-      >"$RAW_OUT" 2>>"$STDERR_FILE"
+    if [[ $STREAM_LOGS -eq 1 ]]; then
+      _hermes_wrap hermes chat -q "$PROMPT" \
+        --provider openrouter \
+        --model "$MODEL" \
+        >"$RAW_OUT" 2> >(tee -a "$STDERR_FILE" >&2)
+    else
+      _hermes_wrap hermes chat -q "$PROMPT" \
+        --provider openrouter \
+        --model "$MODEL" \
+        >"$RAW_OUT" 2>>"$STDERR_FILE"
+    fi
   )
   RC=$?
   if [[ $RC -eq 124 ]]; then
@@ -598,12 +629,21 @@ if [[ -f "$TOOL_TURNS_GATE_HELPER" && $TIMED_OUT -eq 0 && "${HERMES_CLI_ARGV_BRO
       set +e
       (
         cd "$WORKSPACE_ROOT"
-        _hermes_wrap hermes -z "$PROMPT" \
-          --provider openrouter \
-          --model "$MODEL" \
-          -t "$TOOLSETS" \
-          --usage-file "$USAGE_FILE" \
-          >"$RAW_OUT" 2>"$STDERR_FILE_RP"
+        if [[ $STREAM_LOGS -eq 1 ]]; then
+          _hermes_wrap hermes -z "$PROMPT" \
+            --provider openrouter \
+            --model "$MODEL" \
+            -t "$TOOLSETS" \
+            --usage-file "$USAGE_FILE" \
+            >"$RAW_OUT" 2> >(tee -a "$STDERR_FILE_RP" >&2)
+        else
+          _hermes_wrap hermes -z "$PROMPT" \
+            --provider openrouter \
+            --model "$MODEL" \
+            -t "$TOOLSETS" \
+            --usage-file "$USAGE_FILE" \
+            >"$RAW_OUT" 2>"$STDERR_FILE_RP"
+        fi
       )
       RC_RP=$?
       set -e
