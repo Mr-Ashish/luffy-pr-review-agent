@@ -29,8 +29,9 @@ Corpus size: **5** open eval PRs (grew fire: ported odoo#279360).
 | **2026-07-31 corpus+4** | **#4** | **local / pr4-runlocal-a1** (`.luffy-out-e2e-pr4-h16`) | **openai/gpt-4.1-mini** | local | Port odoo#279776; hermes `-z` ok; tool_turns=**0**; F45 APPROVE→COMMENT/55; **F48 soul_blocked=0** (clean); score **31/50** |
 | **2026-07-31 F49 live** | **#2** | **local / pr2-runlocal-a1** (`.luffy-out-e2e-pr2-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→23**; F45 skipped; APPROVE 95; ~$0.063 · 24 API · 95s; soul_blocked=0; chip `tool-reprompt-ok`; score **36/50** (was 30 H16) |
 | **2026-07-31 H19 F49 #4** | **#4** | **local / pr4-runlocal-a1** (`.luffy-out-e2e-pr4-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→9**; F45 skipped; APPROVE 95; ~$0.014 · 10 API · 58s; soul_blocked=0; chip `tool-reprompt-ok`; score **38/50** (was 31 post-F48) |
+| **2026-07-31 H22 F49 #5** | **#5** | **local / pr5-runlocal-a1** (`.luffy-out-e2e-pr5-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→8**; F45 skipped; APPROVE 92; ~$0.026 · 9 API · 56s; soul_blocked=0; chip `tool-reprompt-ok`; score **37/50** |
 
-Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`; F49 #2: `.luffy-out-e2e-pr2-f49/`; F49 #4: `.luffy-out-e2e-pr4-f49/`.
+Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`; F49 #2: `.luffy-out-e2e-pr2-f49/`; F49 #4: `.luffy-out-e2e-pr4-f49/`; F49 #5: `.luffy-out-e2e-pr5-f49/`.
 
 ## Introspect (F46)
 
@@ -91,10 +92,9 @@ Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luff
 
 ## Next learn targets
 
-- **F49 live #4** (confirm multi-module recovery; update #4 best score).
+- **H20** severity calibration (missing tests → blocking) — largest remaining D1 gap vs GHA on #2.
+- Source **6th** complex upstream PR (corpus stable at 5 scored).
 - H18 optional (first-pass tools / cost), not blocking.
-- Maintain corpus ≥4; source 5th complex upstream after #4 re-score.
-- Severity ranking (D9): teach when missing tests are blocking vs soft.
 
 ## Introspect (H19 / F49 live #4)
 
@@ -102,10 +102,18 @@ Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luff
 2. **Score lift 31→38:** Tools enable real file/test reads; verdict APPROVE 95 with cache-comment suggestion is more grounded than zero-tool F45 COMMENT/55.
 3. **Cheaper recovery than #2:** #4 attempt-2 ~$0.014 / 10 API / 58s vs #2 ~$0.063 / 24 API / 95s — recovery cost scales with tool thrash, not just file count.
 4. **H18 still optional:** First-pass zero tools is model choice; F49 is enough for corpus; hard nudge is cost-optional only.
-5. **Next:** Grow corpus (5th complex upstream) and/or H20 severity calibration on #2 GHA gap.
+5. **Next was H21/H22** — corpus #5 + score.
 
 ## Introspect (corpus #5 / odoo#279360)
 
 1. **Port clean:** `gh pr diff 279360` applied with zero conflicts onto Mr-Ashish/odoo@19.0 (6 files point_of_sale + pos_restaurant).
 2. **Diversity:** multi-module POS frontend (JS/XML/SCSS) — complements web fields #2, tools #3, stock/mrp PERF #4.
-3. **Next:** live mini e2e with F49 on #5; score into benchmark.
+3. **H22 done:** F49 mini scored **37/50** (tools 0→8).
+
+## Introspect (H22 / F49 live #5)
+
+1. **F49 third independent recovery:** POS frontend 6-file; first pass tool_turns=0; re-prompt **0→8**; F45 skipped; soul_blocked=0.
+2. **Score 37/50:** mid-pack between #2 F49 (36) and #4 F49 (38); APPROVE 92 justified for pure UI if no defects — but soft i18n/`_t` + unused-import nits risk false precision (head-only file read).
+3. **Cost mid:** attempt-1 ~$0.002 + attempt-2 ~$0.026 · 9 API · 56s — between #4 (~$0.017) and #2 (~$0.065).
+4. **Coverage ok, depth soft:** agent found no UI tests and approved; did not stress responsive breakpoints, OWL lifecycle, or restaurant inheritance edge cases (D1/D3 ceiling).
+5. **Corpus fully scored:** all 5 eval PRs have best rows; next ROI is **H20** severity or **6th** upstream PR.
