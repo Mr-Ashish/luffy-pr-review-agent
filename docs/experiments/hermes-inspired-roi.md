@@ -22,10 +22,12 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | **H12** | **Fail closed when tool_turns=0 on multi-file non-docs PR (COMMENT, not re-prompt)** | **S** | **#2 mini APPROVE missed known test gap; GHA/tools did not** | **Shipped F45** |
 | **H13** | **SOUL.md hermes prompt_injection false-positive workaround** | **S** | **F44 log: SOUL blocked — review discipline may not load** | **Shipped F46** |
 | **H14** | **Make hermes -z reliable; avoid chat -q fallback** | **S** | **-z rc=2 was bogus `--max-turns` CLI flag → chat path** | **Shipped F47** |
-| **H15** | **Soft re-prompt once when tool_turns=0 + multi-file (before F45 annotate)** | **M** | **Recover quality without always failing closed; evidenced on #2 and #4** | **Shipped F49** |
+| **H15** | **Soft re-prompt once when tool_turns=0 + multi-file (before F45 annotate)** | **M** | **Recover quality without always failing closed; evidenced on #2 and #4** | **Shipped F49** + **live #2 recovered 0→23** |
 | H16 | Live re-score #2 mini after F47 (-z tools + F46 SOUL) | S | Measure D1/D8 lift vs F44/F45 rows | **Done H16** (total 30; -z ok; tools still 0) |
 | **H17** | **Scope SOUL/max-turns detect + agent.log capture to this-invocation log offset** | **S** | **H16: stale agent.log → false soul_blocked=1** | **Shipped F48** |
-| H18 | Hard tool nudge / require ≥1 workspace read on multi-file code PRs | S–M | gpt-4.1-mini single-shots even when -z works; if F49 stays 0 tools | **P0 next if F49 no recovery** |
+| H18 | Hard tool nudge / require ≥1 workspace read on multi-file code PRs | S–M | First-pass still 0 tools on mini; F49 recovers — optional cost win | **P2 optional** (F49 live ok) |
+| H19 | Live F49 re-score #4 multi-module PERF | S | Confirm recovery + lift 31→? on 7-file stock/mrp | **P0 next** |
+| H20 | Severity calibration: missing tests → blocking when issue claims fix | S | F49 #2 APPROVE 95 vs GHA REQUEST CHANGES on alias tests | backlog |
 
 ## Selection rule
 
@@ -54,3 +56,5 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 **Corpus #4** (2026-07-31): port odoo#279776 → Mr-Ashish/odoo#4; mini score 31/50; F48 verified `soul_blocked=0`; tool_turns=0 again → H15 still P0.
 
 **H15 → F49** (2026-07-31): soft re-prompt once on zero-tool multi-file code PRs before F45. `reprompt-decide`/`reprompt-write` + second `hermes -z`; `tool-turns-reprompt.env` + chips. F45 still fail-closes if attempt-2 also 0 tools.
+
+**F49 live #2** (2026-07-31): `.luffy-out-e2e-pr2-f49` — recovered tool_turns **0→23**; score **36/50** (H16 was 30); F45 skipped; ~$0.063. H18 demoted; **H19** (#4 F49 re-run) is next.

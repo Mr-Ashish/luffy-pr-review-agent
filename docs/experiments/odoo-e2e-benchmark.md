@@ -24,8 +24,9 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 | #2 web fields (F44 mini local) | 2 | 3 | 2 | 3 | 2 | 5 | 3 | 1 | 2 | 2 | **25** | D1/D3/D8 no tools + SOUL block |
 | #2 web fields (F45 gate on F44) | 3 | 3 | 2 | 4 | 2 | 5 | 4 | 1 | 3 | 3 | **30** | Still no tools; no longer false APPROVE |
 | #2 web fields (H16 mini post-F47) | 2 | 3 | 2 | 4 | 2 | 5 | 4 | 2 | 3 | 3 | **30** | -z ok; tool_turns=0 model choice; F45 gate |
+| #2 web fields (F49 mini re-prompt) | 3 | 4 | 4 | 4 | 3 | 3 | 5 | 3 | 3 | 4 | **36** | tools 0→23 recovered; still soft vs GHA gap |
 | #3 xml scrub (local mini+showcase) | 4 | 4 | 4 | 4 | 3 | 4 | 5 | 3 | 4 | 4 | **39** | D5 inline |
-| #4 stock/mrp PERF (mini post-F48) | 2 | 3 | 2 | 4 | 2 | 5 | 5 | 2 | 3 | 3 | **31** | tool_turns=0; multi-module needs tools |
+| #4 stock/mrp PERF (mini post-F48) | 2 | 3 | 2 | 4 | 2 | 5 | 5 | 2 | 3 | 3 | **31** | tool_turns=0; multi-module needs tools; F49 not re-run |
 
 ### Evidence (one line)
 
@@ -34,6 +35,7 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 - **#2 F44 mini:** APPROVE despite same gap; medium findings are speculative (“other field types”); raw was prompt-polluted until F44.
 - **#2 F45 gate:** Same body post-processed — APPROVE→COMMENT + F45 banner + score 55; honesty/trust up, findings unchanged.
 - **#2 H16 mini:** F47 confirmed — `hermes -z` (no argv reject, no chat fallback); 1 API call · ~$0.003 · 12s; still `tool_turns=0` (model single-shot); F45→COMMENT/55; F46 preflight clean; **false** runtime `soul_blocked` from stale agent.log → **F48**.
+- **#2 F49 mini:** Soft re-prompt recovered `tool_turns` **0→23** (session `20260731_221752_851ba1`); F45 gate skipped (`tools_used`); APPROVE 95 · ~$0.063 · 24 API · 95s; soft float `format:false` test ask (not GHA-level REQUEST CHANGES on missing alias tests); chip `tool-reprompt-ok`; soul_blocked=0.
 - **#3:** Approve justified; tests cover str/bytes/lxml; showcase loop usable.
 - **#4 mini:** Port of odoo#279776 (7 files stock/mrp/purchase_mrp); `-z` ok; F48 `soul_blocked=0`; tool_turns=0 → F45 COMMENT/55; soft rename nit only; ~$0.002 · 16s.
 
@@ -67,6 +69,17 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 | D8a SOUL/memory load | 3 | Preflight clean; pin `scan_for_threats` empty; runtime FP fixed in F48 |
 | D8b tool/workspace use | 1 | `tool_turns=0` — model chose text stop (not CLI failure) |
 
+### #2 F49 sub-dims (D1=3, D6=3, D8=3)
+
+| Sub | Score | Note |
+|-----|------:|------|
+| D1a true positives | 3 | Soft float `format:false` test gap; still not GHA blocking severity |
+| D1b false positives / noise | 4 | Less empty-approve than attempt-1; comment-on-alias nit ok |
+| D6a attempt cost | 3 | ~$0.063 + 24 calls vs attempt-1 ~$0.002 (2× hermes -z) |
+| D7a reprompt path | 5 | recovered=1; F45 skipped; soul_blocked=0; 95s |
+| D8b tool/workspace use | 4 | 23 tool turns; terminal `rg` + file reads across PR paths |
+| D9 severity vs GHA | 3 | APPROVE 95 vs GHA REQUEST CHANGES on missing alias tests |
+
 ### #4 mini sub-dims (D1=2, D8=2)
 
 | Sub | Score | Note |
@@ -81,24 +94,24 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 | PR | Best total | Primary gap |
 |----|------------|-------------|
 | #1 | 35 | Memory/context |
-| #2 | 40 (GHA) | Memory; cheap path still 30 (tools not used) |
+| #2 | 40 (GHA); cheap F49 **36** | GHA still best signal; mini recovered tools |
 | #3 | 39 | Inline precision |
-| #4 | 31 (mini) | tool_turns=0; no GHA/full-model run yet |
+| #4 | 31 (mini pre-F49) | Needs F49 re-run; tool_turns=0 legacy |
 
-**Corpus average (best-per-PR): 36.3 / 50** (was 38.0 @3 PRs; #4 mini pulls avg down until tool-using run)  
-**Cheap-path pattern (replicated #2+#4):** gpt-4.1-mini + working `-z` still **0 tools** → F45 COMMENT; D1 stuck ~2 until F49 recovery or H18.
+**Corpus average (best-per-PR): 36.3 / 50** (unchanged — #2 best still GHA 40)  
+**Cheap-path after F49 (#2):** attempt-1 still 0 tools → soft re-prompt → **23 tools**, total **36/50** (was 30 H16). D1 still lags GHA severity ranking.
 
-### Pending re-score after F49
+### F49 live verify (done on #2)
 
-- Re-run #2 and/or #4 mini with F49 soft re-prompt; record `tool_turns_before/after` + recovered flag.
-- If recovered: expect D1/D8 lift and possible F45 skip; update best-per-PR rollup.
-- If not: keep current scores; escalate H18.
+- Artifacts: `.luffy-out-e2e-pr2-f49/` · run `pr2-runlocal-a1` · `tool-turns-reprompt.env` recovered=1 (0→23).
+- **#4 F49 re-run still pending** for multi-module PERF confirmation.
+- H18 demoted from P0 (recovery works); optional for first-pass tools / cost.
 
 ## Comparison notes (D10)
 
 - PR-Agent-style: stronger structured findings tables + severity; Luffy GHA run competitive; chat-fallback path is not.
-- Hermes-style: agentic tool loop is the product differentiator — F44/H16 mini still **0 tool turns** on gpt-4.1-mini even with working `-z`.
-- F45: control-plane fail-closed mirrors “don’t ship green without tools” — PR-Agent never claimed agentic; we must not green-light when we aren’t.
+- Hermes-style: agentic tool loop is the product differentiator — F49 proves recovery works on mini (`tool_turns` 0→23); attempt-1 alone still 0 tools.
+- F45: control-plane fail-closed mirrors “don’t ship green without tools” — PR-Agent never claimed agentic; we must not green-light when we aren’t. F49 recovered → gate skipped.
 
 ### F46 note (SOUL load)
 
@@ -123,5 +136,5 @@ the this-run log slice; detect only invocation-scoped logs.
 Sourced upstream [odoo/odoo#279776](https://github.com/odoo/odoo/pull/279776) → [Mr-Ashish/odoo#4](https://github.com/Mr-Ashish/odoo/pull/4).
 First multi-module backend PERF eval PR. Confirms H16 cheap-path residual on a second PR.
 
-_Last updated: 2026-07-31 corpus #4_
+_Last updated: 2026-07-31 F49 live #2_
 

@@ -26,8 +26,9 @@ Corpus size: **4** open eval PRs (grew fire: ported odoo#279776).
 | **2026-07-31 F45** | **#2** | **offline gate on F44 body** | n/a (post-process) | local | **H12/F45** re-apply: tool_turns=0 + 4 files → **APPROVE→COMMENT**, score 55, F45 banner; no new Hermes spend |
 | **2026-07-31 H16** | **#2** | **local / pr2-runlocal-a1** (`.luffy-out-e2e-pr2-h16`) | **openai/gpt-4.1-mini** | local | **F47 verify:** hermes `-z` rc=0 (no argv reject, no chat fallback); tool_turns=**0** (model text stop); F45→COMMENT/55; SOUL preflight clean; false `soul_blocked` from stale log → **F48** |
 | **2026-07-31 corpus+4** | **#4** | **local / pr4-runlocal-a1** (`.luffy-out-e2e-pr4-h16`) | **openai/gpt-4.1-mini** | local | Port odoo#279776; hermes `-z` ok; tool_turns=**0**; F45 APPROVE→COMMENT/55; **F48 soul_blocked=0** (clean); score **31/50** |
+| **2026-07-31 F49 live** | **#2** | **local / pr2-runlocal-a1** (`.luffy-out-e2e-pr2-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→23**; F45 skipped; APPROVE 95; ~$0.063 · 24 API · 95s; soul_blocked=0; chip `tool-reprompt-ok`; score **36/50** (was 30 H16) |
 
-Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`.
+Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`; F49: `.luffy-out-e2e-pr2-f49/`.
 
 ## Introspect (F46)
 
@@ -75,11 +76,20 @@ Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luff
 1. **Soft re-prompt before F45:** recovery attempt is cheaper than inventing findings and honest if it fails (F45 still gates).
 2. **Spend trade:** eligible multi-file zero-tool runs pay a second `hermes -z` (~2× cheap mini). Acceptable vs false APPROVE risk.
 3. **Attempt-1 preserved:** `*.attempt1.raw.md` + `agent-loop-attempt1/` for A/B scoring.
-4. **Next:** live mini re-run #2 or #4 with F49; if still `tool_turns=0` after nudge → H18 hard tool nudge.
+4. **Live #2 verify:** recovered **0→23** tool turns; F45 skipped; D1 2→3 / total 30→36; still softer than GHA on missing alias-test severity.
+5. **Attempt-1 still claims full coverage:** re-prompt is required for honesty on mini — not optional.
+
+## Introspect (F49 live #2)
+
+1. **H15 works end-to-end:** `tool-turns-reprompt.env` reason=`reprompt_recovered`; signals.flags=`tool-reprompt-ok`; gate reason=`tools_used`.
+2. **Quality lift is real but incomplete:** agent used terminal/`rg` across web model + field widgets; soft-asks float `format:false` test; GHA still stronger (REQUEST CHANGES).
+3. **Cost:** attempt-1 ~$0.002 + attempt-2 ~$0.063 ≈ 30× single-shot; still cheap vs full model; 95s wall.
+4. **H18 demoted:** not P0 while recovery works; optional first-pass nudge to avoid double-run cost.
+5. **Next:** F49 re-run #4 (7-file PERF); then optional 5th upstream PR; D9 severity calibration if #4 also soft-approves.
 
 ## Next learn targets
 
-- **Live verify F49** on #2 or #4 mini (measure tool_turns before/after).
-- **H18 (P0 if F49 no recovery):** hard tool nudge / require ≥1 workspace read.
-- Maintain corpus ≥4; optional 5th after F49 live score.
-- Re-score D1/D8 after next mini that achieves tool_turns>0.
+- **F49 live #4** (confirm multi-module recovery; update #4 best score).
+- H18 optional (first-pass tools / cost), not blocking.
+- Maintain corpus ≥4; source 5th complex upstream after #4 re-score.
+- Severity ranking (D9): teach when missing tests are blocking vs soft.
