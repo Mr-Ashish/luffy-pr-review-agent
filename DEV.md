@@ -7,12 +7,13 @@
 - Luffy is a gated GitHub Actions control plane, not a chat bot: `@luffy review this pr` → gate + per-PR concurrency → dual checkout → restore Hermes memory → assemble context → `hermes -z` → normalize → PR comment → distill memory → cache/artifacts.
 - Orchestration is deterministic shell (`scripts/run-luffy-review.sh` composes stages and records timings); only the inner review step is LLM-driven, so every run leaves reproducible artifacts.
 - Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact), usage-summary.py (F21 cost footer + job summary from hermes-usage.json), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
-- **F20 install pack:** `scripts/install-luffy.sh` is the adoption entrypoint — copies `agent/`, a runtime-script allowlist (not image-build/bench tools), and `luffy-pr-review.yml` into a target repo; optional `--with-hub-ingest` / `--with-runner-build`; writes `.luffy-install-stamp` with source SHA.
-- Dual workspace separates trust domains: `luffy/` holds SOUL + prompts + scripts from the default branch, `workspace/` holds only the PR head, `.luffy-hermes-home/` holds Hermes config + growing memory.
+- **F20/F10 install:** `scripts/install-luffy.sh` is the adoption entrypoint. Default **pack** mode copies `agent/`, runtime scripts, thin `luffy-pr-review.yml`, and `luffy-review-reusable.yml`. **`--caller`** installs only the hub-managed thin workflow from `pack/luffy-pr-review-caller.yml` (no agent/scripts). Optional `--with-hub-ingest` / `--with-runner-build` (pack mode). Stamp `.luffy-install-stamp` records `mode=pack|caller` + source SHA.
+- Dual workspace separates trust domains: `luffy/` holds SOUL + prompts + scripts (from pack default branch or hub checkout), `workspace/` holds only the PR head, `.luffy-hermes-home/` holds Hermes config + growing memory.
+- **F10 packaging split:** the whole review job lives in `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`, inputs `luffy_repository` / `luffy_ref`); `luffy-pr-review.yml` is a thin trigger-only caller that owns `issue_comment` / `workflow_dispatch`, concurrency and permissions, then `uses:` the reusable job.
 
 ## Design decisions
 
-- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout. **F21** makes spend visible on the PR comment + job summary (see below) without blocking runs.
+- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a job timeout. **F21** makes spend visible on the PR comment + job summary without blocking runs.
 - **F8 prebaked runner:** `ensure_hermes` short-circuits when `LUFFY_HERMES_PREBAKED=1` or `/root/.hermes-pin`/`$HOME/.hermes-pin` exists and `hermes` is on PATH (image from `docker/luffy-runner/`). Workflow optional `container: vars.LUFFY_RUNNER_IMAGE`; Hermes Actions cache is skipped when prebaked is detected.
 - Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (default known-good SHA; `latest`/`main`/`floating`/empty = float), emits `install.sh` args (`--skip-setup --commit … --force-commit`), and supplies the Actions cache key suffix (`v4-<12-char-pin>`). Pin mismatch on a warm cache triggers reinstall.
 - Re-runs replace prior Luffy comments by deleting bodies matching the `<!-- luffy-review pr=N` marker before posting; set `LUFFY_REPLACE_PREVIOUS=0` to stack instead.
@@ -27,11 +28,16 @@
 - Source root defaults to the parent of `scripts/` (`--source` overrides) and is validated by three presence checks — `agent/`, `scripts/`, `.github/workflows/luffy-pr-review.yml` — before any copy, so a wrong `--source` fails fast instead of half-installing.
 - Installing the pack into the Luffy source tree itself (`SRC == DEST`) is refused unless `--force`, explicitly to avoid half-copies over the canonical tree.
 - Exit contract: `0` ok, `1` usage/error (including refuse install into source tree without `--force`); existing target files are **skipped** (not exit 2) unless `--force`. All human output goes to **stderr** via `log()`.
-- Provenance is a plain-text stamp, not a version string: `.luffy-install-stamp` records `installed_at`, `source_sha` (`git rev-parse --short HEAD` of the source, `unknown` outside git), `source_path`, and the pack contents.
+- Provenance is a plain-text stamp, not a version string: `.luffy-install-stamp` records `installed_at`, `source_sha`, `source_path`, `mode=pack|caller`, and pack description.
 
-- **F21 cost visibility** is a post-normalize decoration, not a pipeline stage: `scripts/usage-summary.py` reads the `hermes --usage-file` JSON (`hermes-usage.json`) written by `run-hermes-review.sh` and exposes three subcommands — `footer` (emit one italic Markdown line), `append` (inject/update that line on an existing `review.md`), `step-summary` (a **Luffy cost / usage** section for `$GITHUB_STEP_SUMMARY` with model, estimated USD, tokens, API calls, stage timings).
+- **F21 cost visibility** is a post-normalize decoration, not a pipeline stage: `scripts/usage-summary.py` reads `hermes-usage.json` and exposes `footer` / `append` / `step-summary`.
 - Telemetry is explicitly non-load-bearing: missing, empty, non-dict, or unparseable usage files are soft no-ops that exit 0, and `run-hermes-review.sh` calls the `append` step guarded by `[[ -f … ]]` with `|| notice "usage-summary append soft-failed"` — cost reporting can never fail a review.
 - Both the PR-comment footer and the job summary are fed from the same usage file so cost is visible without downloading an artifact; number formatting is deliberately lossy/human (tokens as `1.5k`/`10k`/`1.0M`, `n/a` when a field is absent or non-numeric, booleans rejected as numbers).
+
+- The reusable workflow declares **no `permissions:` block** — "Permissions come from the caller workflow/job", so every caller must grant `contents`/`pull-requests`/`issues`/`actions` write itself; a caller that forgets one fails at post/cache time, not at call time.
+- Both reusable secrets (`OPENROUTER_API_KEY`, `LUFFY_HUB_TOKEN`) are declared `required: false` and callers are expected to use `secrets: inherit`; this keeps forks/unfunded repos from failing the `workflow_call` contract up front, with `LUFFY_HUB_TOKEN` falling back to `GITHUB_TOKEN`.
+- Reusable inputs default to the hub (`luffy_repository: Mr-Ashish/luffy-pr-review-agent`, `luffy_ref: main`), so an under-specified caller still resolves to a working runtime instead of erroring.
+- `install-luffy.sh` preflights **both** F10 files (`.github/workflows/luffy-review-reusable.yml` and `pack/luffy-pr-review-caller.yml`) before copying anything, so a source tree missing the reusable pair dies before producing a half-install.
 
 ## Pitfalls
 
@@ -55,9 +61,12 @@
 - `agent/` is copied with `-maxdepth 1 -type f`, so nested files under `agent/` are never installed — keep agent assets flat.
 - `usage()` renders help by slicing the file header (`sed -n '2,25p' "$0"`); editing or growing the top comment block silently truncates or corrupts `--help` output.
 
-- `usage-summary.py` is textually coupled to `normalize-review.py`: `_FOOTER_RX` matches the exact brand footer line (`*Luffy · Hermes Agent · OpenRouter · memory-backed review…*`) to anchor where the cost line goes. Editing that footer string in `normalize-review.py` silently misplaces (or drops) the F21 cost line — change both together.
+- `usage-summary.py` is textually coupled to `normalize-review.py`: `_FOOTER_RX` matches the brand footer line to anchor the cost line — edit both together.
 - Re-appending is idempotent by design via `_COST_LINE_RX` (`^\*Cost / usage:.*\*$`): an existing cost line is replaced, not stacked. Rewriting that line's shape in one place breaks dedup and produces duplicated footers on re-runs.
 - A missing `*Cost / usage: …*` line on a posted review is not necessarily a bug — it is the documented soft no-op when `hermes-usage.json` is absent/empty/malformed. Check the usage file before suspecting the review path.
+
+- The `@luffy review` gate `if:` expression is duplicated in *both* the thin caller job and the reusable job. Changing the trigger phrase or association logic in one place silently no-ops (caller filters everything out) or double-gates; keep the two conditions in sync.
+- Hub-managed callers point at `…/luffy-review-reusable.yml@main`, i.e. unpinned by design — a broken hub `main` breaks every `--caller` target repo at once, and there is no per-target rollback short of editing that `uses:` ref.
 
 ## Patterns
 

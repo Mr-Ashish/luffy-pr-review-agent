@@ -1,18 +1,30 @@
 ```json
 {
-  "summary": "The session's genuinely new durable content is the F21 cost/usage telemetry layer: the `scripts/usage-summary.py` contract (footer/append/step-summary subcommands, soft no-op on missing telemetry), its regex coupling to the brand footer that `normalize-review.py` appends, the soft-failing hook in `run-hermes-review.sh`, and its inclusion in the install pack's runtime-script allowlist. Existing knowledge already covered F1–F20, architecture, hub memory, agent SOUL, and the prebaked runner, so those are omitted.",
+  "summary": "The session covers F10 (shipped): the review job was extracted into a `workflow_call` reusable workflow with `luffy_repository`/`luffy_ref` inputs, plus two packaging modes — self-contained pack vs. hub-managed thin caller installed by `install-luffy.sh --caller` from `pack/luffy-pr-review-caller.yml`. None of this appears in the existing claim index (which stops at F20/F21).",
   "session_ids": ["dogfood-luffy-session"],
   "units": [
     {
       "kind": "dev",
       "path": ".",
       "action": "merge",
-      "section": "Design decisions",
-      "content": "- **F21 cost visibility** is a post-normalize decoration, not a pipeline stage: `scripts/usage-summary.py` reads the `hermes --usage-file` JSON (`hermes-usage.json`) written by `run-hermes-review.sh` and exposes three subcommands — `footer` (emit one italic Markdown line), `append` (inject/update that line on an existing `review.md`), `step-summary` (a **Luffy cost / usage** section for `$GITHUB_STEP_SUMMARY` with model, estimated USD, tokens, API calls, stage timings).\n- Telemetry is explicitly non-load-bearing: missing, empty, non-dict, or unparseable usage files are soft no-ops that exit 0, and `run-hermes-review.sh` calls the `append` step guarded by `[[ -f … ]]` with `|| notice \"usage-summary append soft-failed\"` — cost reporting can never fail a review.\n- Both the PR-comment footer and the job summary are fed from the same usage file so cost is visible without downloading an artifact; number formatting is deliberately lossy/human (tokens as `1.5k`/`10k`/`1.0M`, `n/a` when a field is absent or non-numeric, booleans rejected as numbers).\n- `usage-summary.py` is part of the F20 install pack's `RUNTIME_SCRIPTS` allowlist in `scripts/install-luffy.sh`, so target repos get cost visibility on install; image-build/benchmark scripts (`build-luffy-runner-image.sh`, `benchmark-hermes-startup.sh`) remain excluded.",
+      "section": "Architecture",
+      "content": "- **F10 packaging split:** the whole review job now lives in `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`); `luffy-pr-review.yml` is a thin trigger-only caller that owns `issue_comment` / `workflow_dispatch`, concurrency and permissions, then `uses:` the reusable job.\n- Two install shapes off the same reusable job: **pack** (default) copies `agent/`, the runtime script allowlist and *both* workflow files so the target is self-contained; **caller** (`install-luffy.sh --caller`) copies only `pack/luffy-pr-review-caller.yml`, and the runtime is checked out from the hub on every run (free upgrades, nothing to re-install).\n- Runtime source is parameterised, not hardcoded: inputs `luffy_repository` (repo providing `agent/` + `scripts/`) and `luffy_ref` (branch/tag/SHA). The in-repo caller passes `github.repository` + `github.event.repository.default_branch`; the hub caller pins `Mr-Ashish/luffy-pr-review-agent` @ `main`.",
       "evidence": [
-        "Cost UX | `scripts/usage-summary.py` | Append cost/tokens footer + job-summary from `hermes-usage.json` (F21)",
-        "Missing or empty usage files are soft no-ops (exit 0) so the pipeline never fails because cost telemetry was absent.",
-        "python3 \"$LUFFY_ROOT/scripts/usage-summary.py\" append --usage \"$USAGE_FILE\" --review \"$FINAL_OUT\" || notice \"usage-summary append soft-failed\""
+        "Hub implementation file: `.github/workflows/luffy-review-reusable.yml` (`on: workflow_call`, inputs `luffy_repository` + `luffy_ref`)",
+        "Does not listen to events itself — caller owns issue_comment / workflow_dispatch."
+      ],
+      "confidence": "high"
+    },
+    {
+      "kind": "dev",
+      "path": ".",
+      "action": "merge",
+      "section": "Design decisions",
+      "content": "- The reusable workflow declares **no `permissions:` block** — \"Permissions come from the caller workflow/job\", so every caller must grant `contents`/`pull-requests`/`issues`/`actions` write itself; a caller that forgets one fails at post/cache time, not at call time.\n- Both reusable secrets (`OPENROUTER_API_KEY`, `LUFFY_HUB_TOKEN`) are declared `required: false` and callers are expected to use `secrets: inherit`; this keeps forks/unfunded repos from failing the `workflow_call` contract up front, with `LUFFY_HUB_TOKEN` falling back to `GITHUB_TOKEN`.\n- Reusable inputs default to the hub (`luffy_repository: Mr-Ashish/luffy-pr-review-agent`, `luffy_ref: main`), so an under-specified caller still resolves to a working runtime instead of erroring.\n- `install-luffy.sh` preflights **both** F10 files (`.github/workflows/luffy-review-reusable.yml` and `pack/luffy-pr-review-caller.yml`) before copying anything, so a source tree missing the reusable pair dies before producing a half-install.",
+      "evidence": [
+        "# Permissions come from the caller workflow/job.",
+        "OPENROUTER_API_KEY:\n        required: false",
+        "die \"source missing pack/luffy-pr-review-caller.yml (F10)\""
       ],
       "confidence": "high"
     },
@@ -21,38 +33,36 @@
       "path": ".",
       "action": "merge",
       "section": "Pitfalls",
-      "content": "- `usage-summary.py` is textually coupled to `normalize-review.py`: `_FOOTER_RX` matches the exact brand footer line (`*Luffy · Hermes Agent · OpenRouter · memory-backed review…*`) to anchor where the cost line goes. Editing that footer string in `normalize-review.py` silently misplaces (or drops) the F21 cost line — change both together.\n- Re-appending is idempotent by design via `_COST_LINE_RX` (`^\\*Cost / usage:.*\\*$`): an existing cost line is replaced, not stacked. Rewriting that line's shape in one place breaks dedup and produces duplicated footers on re-runs.\n- A missing `*Cost / usage: …*` line on a posted review is not necessarily a bug — it is the documented soft no-op when `hermes-usage.json` is absent/empty/malformed. Check the usage file before suspecting the review path.",
+      "content": "- The `@luffy review` gate `if:` expression is duplicated in *both* the thin caller job and the reusable job. Changing the trigger phrase or association logic in one place silently no-ops (caller filters everything out) or double-gates; keep the two conditions in sync.\n- Hub-managed callers point at `…/luffy-review-reusable.yml@main`, i.e. unpinned by design — a broken hub `main` breaks every `--caller` target repo at once, and there is no per-target rollback short of editing that `uses:` ref.\n- Only the reusable file is versioned per-mode: pack installs carry a *local copy* of the reusable workflow, so pack-installed targets do **not** pick up hub fixes until re-run through `install-luffy.sh`.",
       "evidence": [
-        "# Matches the brand footer normalize-review.py appends.\n_FOOTER_RX = re.compile(r\"^\\*Luffy · Hermes Agent · OpenRouter · memory-backed review[^*]*\\*\\s*$\", re.M)",
-        "_COST_LINE_RX = re.compile(r\"^\\*Cost / usage:.*\\*\\s*$\", re.M)",
-        "append — inject/update that line on an existing review.md"
-      ],
-      "confidence": "high"
-    },
-    {
-      "kind": "usage",
-      "path": ".",
-      "action": "merge",
-      "section": "Common commands",
-      "content": "- Render the F21 cost line standalone: `python3 scripts/usage-summary.py footer --usage <hermes-usage.json>`.\n- Inject/refresh the cost line on a normalized review body: `python3 scripts/usage-summary.py append --usage <hermes-usage.json> --review <review.md>` (idempotent; safe to re-run).\n- Produce the Actions job-summary section: `python3 scripts/usage-summary.py step-summary --usage <hermes-usage.json>` (accepts a timings JSON for stage durations).\n- All three exit 0 with no output when the usage file is missing or empty, so they are safe to wire into scripts unguarded.",
-      "evidence": [
-        "footer        — one Markdown italic line for the posted review\n  append        — inject/update that line on an existing review.md\n  step-summary  — Markdown section for $GITHUB_STEP_SUMMARY",
-        "Reads hermes --usage-file JSON (see run-hermes-review.sh)"
-      ],
-      "confidence": "high"
-    },
-    {
-      "kind": "usage",
-      "path": ".",
-      "action": "merge",
-      "section": "Debugging",
-      "content": "- To audit what a review cost, read the **Luffy cost / usage** section in the Actions job summary first — no artifact download needed; the same numbers appear as the `*Cost / usage: …*` footer on the PR comment.\n- For deeper digging, `hermes-usage.json` travels with the run package (see `docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/hermes-usage.json` for a captured example alongside `timings.json`).\n- If cost/token values render as `n/a`, the usage JSON parsed but the specific field was absent or non-numeric; if the whole line is missing, the usage file itself was missing/empty and every subcommand no-opped.",
-      "evidence": [
-        "the Actions job summary has a matching **Luffy cost / usage** section (no artifact download required)",
-        "docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/hermes-usage.json",
-        "def format_tokens(n: float | int | None) -> str:\n    if n is None:\n        return \"n/a\""
+        "uses: Mr-Ashish/luffy-pr-review-agent/.github/workflows/luffy-review-reusable.yml@main",
+        "Default pack mode still copies agent/scripts + both workflow files for self-contained targets."
       ],
       "confidence": "medium"
+    },
+    {
+      "kind": "usage",
+      "path": ".",
+      "action": "merge",
+      "section": "Setup",
+      "content": "- Hub-managed (multi-repo, recommended) install — thin workflow only, no `agent/`/`scripts/` copy on the target: `./scripts/install-luffy.sh --caller /path/to/target-repo`. Self-contained install stays `./scripts/install-luffy.sh /path/to/target-repo`.\n- A `--caller` target still needs the repo secret `OPENROUTER_API_KEY`; optional `LUFFY_HUB_TOKEN` and vars `LUFFY_MODEL` / `LUFFY_HERMES_COMMIT` / `LUFFY_COOLDOWN_SECONDS` / `LUFFY_RUNNER_IMAGE` behave the same as in pack mode because the reusable job reads them from the calling repo.\n- Preview either mode without writing: `./scripts/install-luffy.sh --dest /path/to/target-repo --dry-run`; `install-luffy.sh` refuses to install into the Luffy source tree itself unless `--force` is passed.",
+      "evidence": [
+        "# Hub-managed (F10, recommended for multi-repo): thin workflow only\n   ./scripts/install-luffy.sh --caller /path/to/target-repo",
+        "Required secret on this repo: OPENROUTER_API_KEY\n# Optional: LUFFY_HUB_TOKEN, vars LUFFY_MODEL / LUFFY_HERMES_COMMIT / LUFFY_COOLDOWN_SECONDS / LUFFY_RUNNER_IMAGE"
+      ],
+      "confidence": "high"
+    },
+    {
+      "kind": "dev",
+      "path": "pack",
+      "action": "merge",
+      "section": "Architecture",
+      "content": "- `pack/` holds installable templates that are *not* live workflows in this repo: `luffy-pr-review-caller.yml` is the F10 hub-managed thin caller, copied verbatim to `.github/workflows/luffy-pr-review.yml` on the target by `install-luffy.sh --caller`.\n- It differs from this repo's own `luffy-pr-review.yml` in exactly one way: `uses:` is the absolute hub ref `Mr-Ashish/luffy-pr-review-agent/.github/workflows/luffy-review-reusable.yml@main` with literal `luffy_repository`/`luffy_ref` values, instead of the local `./.github/workflows/...` path with `github.repository`.\n- Triggers, `permissions`, and the `luffy-${{ github.repository }}-<pr>` concurrency group are duplicated in the template because a `workflow_call` job cannot own them — edits to gating must be applied to `pack/luffy-pr-review-caller.yml` as well as the in-repo caller.",
+      "evidence": [
+        "# Luffy — hub-managed thin caller (F10)\n#\n# Install with: ./scripts/install-luffy.sh --caller /path/to/target-repo",
+        "No agent/ or scripts/ copy required; runtime is checked out from the hub on each run."
+      ],
+      "confidence": "high"
     }
   ]
 }

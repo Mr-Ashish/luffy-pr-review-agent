@@ -4,7 +4,8 @@
 
 ## Common commands
 
-- Install Luffy pack into another repo: `./scripts/install-luffy.sh /path/to/target-repo` (add `--force` to overwrite; `--dry-run` to preview).
+- Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).
+- Hub-managed thin install (F10, no agent/scripts copy): `./scripts/install-luffy.sh --caller /path/to/target-repo`.
 - Build prebaked Hermes runner image: `./scripts/build-luffy-runner-image.sh` (optional `PUSH=1`).
 - Benchmark Hermes startup paths: `SKIP_COLD=1 ./scripts/benchmark-hermes-startup.sh` → `docs/benchmarks/`.
 
@@ -24,7 +25,9 @@ devmemory extract --fixture sample-auth-module --apply
 
 ## Setup
 
-- Install on each target repo: from this repo run `./scripts/install-luffy.sh /path/to/target-repo` (or manually copy `agent/`, runtime `scripts/`, and `.github/workflows/luffy-pr-review.yml`) onto that repo's **default branch** (workflow only runs from default branch).
+- Install on each target repo's **default branch** (workflow only runs from default branch):
+  - **Hub-managed (F10):** `./scripts/install-luffy.sh --caller /path/to/target-repo` — only `.github/workflows/luffy-pr-review.yml` pointing at `luffy-review-reusable.yml@main`.
+  - **Pack:** `./scripts/install-luffy.sh /path/to/target-repo` — `agent/`, runtime `scripts/`, thin caller + local reusable.
 - Required secret: `OPENROUTER_API_KEY`. For cross-repo hub memory also add `LUFFY_HUB_TOKEN` (PAT with contents write on the hub).
 - Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_RUNNER_IMAGE` (optional prebaked Hermes container image, F8), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
 - Trigger a review by commenting `@luffy review this pr` (or `@luffy review`) on the PR.
@@ -46,7 +49,7 @@ devmemory extract --fixture sample-auth-module --apply
 
 ## Troubleshooting
 
-- Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` in the target and compare `source_sha` with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`.
+- Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` (`mode=pack|caller`, `source_sha`) and compare with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`. For `mode=caller`, runtime tracks hub `main`, not the stamp alone.
 - Installer output is entirely on stderr; capture it with `./scripts/install-luffy.sh /path/to/repo 2>&1 | tee install.log` and grep for `exists (skip` / `WARN missing` before committing the pack.
 - Preview exactly what would be written (including the stamp) with `--dry-run`; lines are prefixed `DRY  <from> → <to>`.
-- Interpret exit codes: `1` is a usage/validation error (missing dest, bad `--source`, or install into the Luffy source tree without `--force`). Existing target files are skipped with a stderr notice unless you pass `--force` (exit still `0`).
+- Interpret exit codes: `1` is a usage/validation error (missing dest, bad `--source`, missing F10 workflow files, or install into the Luffy source tree without `--force`). Existing target files are skipped with a stderr notice unless you pass `--force` (exit still `0`).

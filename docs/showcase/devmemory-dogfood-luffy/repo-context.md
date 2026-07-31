@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T12:36:22Z
+- **assembled_at:** 2026-07-31T12:42:28Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+fbf3452 feat(install): reusable workflow_call + hub thin caller (F10)
+41e7b66 docs(knowledge): dogfood F21 cost/usage into DEV/USAGE + showcase
 91262f5 feat(cost): surface usage on PR comments + job summary (F21)
 b20f7c3 feat(ops): prebaked Hermes runner image + startup benchmark (F8)
 7f5dc5b docs(knowledge): dogfood F20 install-luffy pack semantics + showcase
-bd8e3f6 feat(install): one-command Luffy pack install into target repos (F20)
-28e7d6e docs(knowledge): dogfood F8 prebaked runner into docker/ + showcase
 ```
 
 ## tree (sample)
@@ -64,6 +64,8 @@ tests/test_hub_ingest.py
 tests/test_install_luffy.py
 tests/test_normalize_review.py
 tests/test_usage_summary.py
+pack/README.md
+pack/luffy-pr-review-caller.yml
 agent/DEV.md
 agent/MEMORY.seed.md
 agent/SOUL.md
@@ -169,10 +171,10 @@ assets/brand-options/three-artifacts.html
 ### claim index (do not restate these claims)
 - [DEV.md#Architecture] @luffy action assemble cacheartifact checkout comment concurrency context
 - [DEV.md#Architecture] artifact compos deterministic every inner llm-driven orchestr record
-- [DEV.md#Architecture] assemble-contextsh contractfencessizehtml distill-memorysh hermes-pinsh hub-ingest-runpy marker normalize-reviewpy one-shot
+- [DEV.md#Architecture] assemble-contextsh contractfencessizehtml distill-memorysh f21 footer hermes-pinsh hermes-usagejson hub-ingest-runpy
 - [DEV.md#Architecture] --with-hub-ingest --with-runner-build adoption agent allowlist entrypoint f20 image-buildbench
 - [DEV.md#Architecture] branch config default domain luffy luffy-hermes-home memory prompt
-- [DEV.md#Design decisions] 400000 45-minute 900s @luffy allowlist author-associ bypas cancel-in-progres
+- [DEV.md#Design decisions] 400000 45-minute 900s @luffy allowlist author-associ below block
 - [DEV.md#Design decisions] action cache container detect dockerluffy-runner ensureherm exist image
 - [DEV.md#Design decisions] --commit --force-commit --skip-setup action cache default float install
 - [DEV.md#Design decisions] comment delet luffy luffy-review luffyreplaceprevious=0 marker match prior
@@ -186,11 +188,11 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Design decisions] --force avoid canonical explicitly half-cop install itself luffy
 - [DEV.md#Design decisions] --force contract exist human includ install output refuse
 - [DEV.md#Design decisions] --short content installedat luffy-install-stamp outside plain-text provenance record
+- [DEV.md#Design decisions] $githubstepsummary --usage-file append decor estimat exist expos f21
+- [DEV.md#Design decisions] append empty explicitly guard never no-op non-dict non-load-bear
+- [DEV.md#Design decisions] 15k10k10m absent artifact boolean deliberately download field footer
 - [DEV.md#Pitfalls] 403 cannot classic clone default dispatch githubtoken ingest
-- [DEV.md#Pitfalls] content cross-repo githubtoken itself luffy luffyhubtoken publish requir
-- [DEV.md#Pitfalls] again agent comment common embedd f18 github honour
-- [DEV.md#Pitfalls] 100000 budget default exceed growth maxmemorybyt memorymd otherwise
-- [DEV.md#Pitfalls] back
+- [DEV.md
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -199,11 +201,11 @@ assets/brand-options/three-artifacts.html
 ## Architecture
 - Luffy is a gated GitHub Actions control plane, not a chat bot: `@luffy review this pr` → gate + per-PR concurrency → dual checkout → restore Hermes memory → assemble context → `hermes -z` → normalize → PR comment → distill memory → cache/artifacts.
 - Orchestration is deterministic shell (`scripts/run-luffy-review.sh` composes stages and records timings); only the inner review step is LLM-driven, so every run leaves reproducible artifacts.
-- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
+- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact), usage-summary.py (F21 cost footer + job summary from hermes-usage.json), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
 - **F20 install pack:** `scripts/install-luffy.sh` is the adoption entrypoint — copies `agent/`, a runtime-script allowlist (not image-build/bench tools), and `luffy-pr-review.yml` into a target repo; optional `--with-hub-ingest` / `--with-runner-build`; writes `.luffy-install-stamp` with source SHA.
 
 ## Design decisions
-- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (de
+- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after a *successful* Luffy comment; failure stubs do not start the window; `@luffy review force` / `workflow_dispatch` / `LUFFY_COOLDOWN_SECONDS=0` bypass), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disabl
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/DEV.md

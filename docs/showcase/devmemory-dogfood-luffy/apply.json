@@ -3,8 +3,17 @@
     "path": "DEV.md",
     "kind": "dev",
     "action": "merge",
+    "section": "Architecture",
+    "bytes": 12731,
+    "applied": true,
+    "unit_path": "."
+  },
+  {
+    "path": "DEV.md",
+    "kind": "dev",
+    "action": "merge",
     "section": "Design decisions",
-    "bytes": 12383,
+    "bytes": 13731,
     "applied": true,
     "unit_path": "."
   },
@@ -13,7 +22,7 @@
     "kind": "dev",
     "action": "merge",
     "section": "Pitfalls",
-    "bytes": 13191,
+    "bytes": 14235,
     "applied": true,
     "unit_path": "."
   },
@@ -21,18 +30,18 @@
     "path": "USAGE.md",
     "kind": "usage",
     "action": "merge",
-    "section": "Common commands",
-    "bytes": 4948,
+    "section": "Setup",
+    "bytes": 5464,
     "applied": true,
     "unit_path": "."
   },
   {
-    "path": "USAGE.md",
-    "kind": "usage",
+    "path": "pack/DEV.md",
+    "kind": "dev",
     "action": "merge",
-    "section": "Debugging",
-    "bytes": 5570,
+    "section": "Architecture",
+    "bytes": 936,
     "applied": true,
-    "unit_path": "."
+    "unit_path": "pack"
   }
 ]
