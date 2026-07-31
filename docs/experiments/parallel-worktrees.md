@@ -6,13 +6,14 @@ Worktree root convention: `/Users/ashishmishra/Documents/experiments/pr-review-a
 
 | Worktree | Branch | PR | Status | Notes |
 |----------|--------|-----|--------|-------|
-| `…/pr-review-agent-wt/f52-multi-lens` | `feature/f52-multi-lens` | (opening) | active | F52 H28 multi-lens checklist |
+| *(none active)* | — | — | — | F52 multi-lens merged via PR #2 |
 
 ## Open Luffy PRs (Mr-Ashish/luffy-pr-review-agent)
 
 | PR | Branch | Notes |
 |----|--------|-------|
 | [#1](https://github.com/Mr-Ashish/luffy-pr-review-agent/pull/1) | e2e/luffy-demo | demo e2e only |
+| [#2](https://github.com/Mr-Ashish/luffy-pr-review-agent/pull/2) | feature/f52-multi-lens | **MERGED** F52 H28 multi-lens |
 
 ## Eval corpus (Mr-Ashish/odoo)
 
@@ -20,4 +21,4 @@ Worktree root convention: `/Users/ashishmishra/Documents/experiments/pr-review-a
 |----|--------|--------|
 | [#1](https://github.com/Mr-Ashish/odoo/pull/1)–[#6](https://github.com/Mr-Ashish/odoo/pull/6) | fix/* | OPEN luffy-eval |
 
-Updated: 2026-07-31 (F52).
+Updated: 2026-07-31 (F52 merged).
