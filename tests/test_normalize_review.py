@@ -14,25 +14,26 @@ SCRIPT = ROOT / "scripts" / "normalize-review.py"
 
 
 class NormalizeReviewTests(unittest.TestCase):
-    def run_norm(self, raw: str, pr: str = "42") -> str:
+    def run_norm(self, raw: str, pr: str = "42", *, diff_truncated: bool = False) -> str:
         with tempfile.TemporaryDirectory() as td:
             inp = Path(td) / "raw.md"
             out = Path(td) / "out.md"
             inp.write_text(raw)
-            subprocess.check_call(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--input",
-                    str(inp),
-                    "--output",
-                    str(out),
-                    "--pr",
-                    pr,
-                    "--run-id",
-                    "test",
-                ]
-            )
+            cmd = [
+                sys.executable,
+                str(SCRIPT),
+                "--input",
+                str(inp),
+                "--output",
+                str(out),
+                "--pr",
+                pr,
+                "--run-id",
+                "test",
+            ]
+            if diff_truncated:
+                cmd.append("--diff-truncated")
+            subprocess.check_call(cmd)
             return out.read_text()
 
     def _full_contract(self, summary: str = "ok") -> str:
@@ -117,6 +118,23 @@ class NormalizeReviewTests(unittest.TestCase):
         out = self.run_norm(self._full_contract("solid fix with tests"))
         self.assertIn("**Score:** 92/100", out)
         self.assertNotIn("contract repair", out.lower())
+
+    def test_f27_diff_truncated_banner_before_verdict(self):
+        out = self.run_norm(self._full_contract(), diff_truncated=True)
+        self.assertIn("Diff truncated (F27)", out)
+        self.assertIn("⚠️", out)
+        # Banner must appear before the verdict line
+        self.assertLess(out.index("Diff truncated (F27)"), out.index("**Verdict:**"))
+
+    def test_f27_banner_idempotent(self):
+        once = self.run_norm(self._full_contract(), diff_truncated=True)
+        twice = self.run_norm(once, diff_truncated=True)
+        self.assertEqual(once.count("Diff truncated (F27)"), 1)
+        self.assertEqual(twice.count("Diff truncated (F27)"), 1)
+
+    def test_f27_no_banner_when_full_diff(self):
+        out = self.run_norm(self._full_contract(), diff_truncated=False)
+        self.assertNotIn("Diff truncated (F27)", out)
 
 
 if __name__ == "__main__":

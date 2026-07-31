@@ -265,11 +265,29 @@ EOF
 fi
 
 # Normalize into final review.md
+# F27: pass --diff-truncated when assemble-context capped the PR diff (meta.env)
+_NORM_EXTRA=()
+case "${DIFF_TRUNCATED:-false}" in
+  true|TRUE|1|yes|YES) _NORM_EXTRA+=(--diff-truncated) ;;
+esac
 python3 "$LUFFY_ROOT/scripts/normalize-review.py" \
   --input "$RAW_OUT" \
   --output "$FINAL_OUT" \
   --pr "$PR_NUMBER" \
-  --run-id "${GITHUB_RUN_ID:-local}"
+  --run-id "${GITHUB_RUN_ID:-local}" \
+  "${_NORM_EXTRA[@]+"${_NORM_EXTRA[@]}"}"
+
+if [[ "${#_NORM_EXTRA[@]}" -gt 0 ]]; then
+  notice "F27 diff was truncated — banner injected into posted review"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    {
+      echo "### Luffy diff truncation (F27)"
+      echo "- **DIFF_TRUNCATED:** true — review saw only the first \`MAX_DIFF_BYTES\` of the PR diff"
+      echo "- Posted review includes a visible ⚠️ banner"
+      echo
+    } >>"$GITHUB_STEP_SUMMARY" || true
+  fi
+fi
 
 # F21: surface cost/tokens on the posted comment (soft-fail if no usage file)
 if [[ -f "$LUFFY_ROOT/scripts/usage-summary.py" ]]; then

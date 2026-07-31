@@ -39,7 +39,8 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 23 | **F24** | Dismiss prior Luffy PR reviews on re-run (Reviews hygiene) | XS | 🔥 Trust UX — re-@luffy no longer stacks APPROVE/REQUEST_CHANGES | **Shipped** (`dismiss-prior-pr-reviews.sh`) |
 | 24 | **F25** | Hermes pin single source of truth (no workflow hardcoded SHA) | XS | 🔥 Ops/repro — bump pin in one place | **Shipped** (workflows call `hermes-pin.sh default`) |
 | 25 | **F26** | Align default model docs + code (`anthropic/claude-opus-5` SoT) | XS | 🔥 Trust/cost — ops docs no longer understate spend | **Shipped** (`DEFAULT_LUFFY_MODEL`) |
-| 26 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
+| 26 | **F27** | Auto banner when PR diff was size-truncated | XS | 🔥 Trust — incomplete context always visible on PR | **Shipped** (`normalize-review --diff-truncated`) |
+| 27 | F9 | Inline GitHub review comments (line-level) | L | Product | Later |
 
 ### Sprint 1 (shipped)
 
@@ -100,6 +101,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 15 (shipped)
 
 **F26** default model alignment: `DEFAULT_LUFFY_MODEL=anthropic/claude-opus-5` in `run-hermes-review.sh` is SoT; OPERATIONS/USAGE/.env.example no longer claim `gpt-5-mini` as the script default. Workflow leaves empty `vars.LUFFY_MODEL` unset so the script default applies (no second hardcoded fallback). Effective model → `.luffy-out/luffy-model.txt`.
+
+### Sprint 16 (shipped)
+
+**F27** diff-truncation trust banner: when `assemble-context` sets `DIFF_TRUNCATED=true` (PR diff > `MAX_DIFF_BYTES`), `normalize-review.py --diff-truncated` injects a ⚠️ callout before `**Verdict:**` so the posted comment always shows incomplete context even if the model forgets. Job summary gets a **Luffy diff truncation (F27)** section.
 
 ### readme-kit (shipped)
 

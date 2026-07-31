@@ -52,6 +52,33 @@ def redact_secrets(text: str) -> str:
     return out
 
 
+# F27: always-visible trust banner when assemble-context truncated the PR diff.
+_TRUNCATION_BANNER = (
+    "> ⚠️ **Diff truncated (F27)** — this review only saw the first "
+    "`MAX_DIFF_BYTES` of the PR diff. Treat findings as incomplete; "
+    "confidence may be lower than a full-diff review.\n"
+)
+_TRUNCATION_MARKER = "Diff truncated (F27)"
+
+
+def inject_diff_truncated_banner(text: str, truncated: bool) -> str:
+    """Insert a Markdown callout near the top when the assembled diff was capped."""
+    if not truncated:
+        return text
+    if _TRUNCATION_MARKER in text:
+        return text
+    body = text.lstrip("\n")
+    # Prefer after HTML marker / title, before **Verdict:**
+    m = re.search(r"^(\*\*Verdict:\*\*)", body, re.M)
+    if m:
+        return body[: m.start()] + _TRUNCATION_BANNER + "\n" + body[m.start() :]
+    # After first heading line
+    lines = body.splitlines(keepends=True)
+    if lines and lines[0].startswith("#"):
+        return lines[0] + "\n" + _TRUNCATION_BANNER + "\n" + "".join(lines[1:])
+    return _TRUNCATION_BANNER + "\n" + body
+
+
 def strip_outer_fence(text: str) -> str:
     t = text.strip()
     if not (t.startswith("```") and t.endswith("```")):
@@ -142,6 +169,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--output", "-o", required=True, type=Path)
     p.add_argument("--pr", required=True)
     p.add_argument("--run-id", default="local")
+    p.add_argument(
+        "--diff-truncated",
+        action="store_true",
+        help="F27: inject visible banner that assembled PR diff was size-capped",
+    )
     args = p.parse_args(argv)
 
     raw = args.input.read_text(errors="replace")
@@ -150,6 +182,8 @@ def main(argv: list[str] | None = None) -> int:
     cleaned = redact_secrets(cleaned)
     final = ensure_contract(cleaned, str(args.pr))
     final = redact_secrets(final)
+    # F27 after contract so repair path also gets the banner
+    final = inject_diff_truncated_banner(final, args.diff_truncated)
     final = final.replace(
         f"<!-- luffy-review pr={args.pr} -->",
         f"<!-- luffy-review pr={args.pr} run={args.run_id} -->",

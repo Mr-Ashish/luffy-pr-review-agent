@@ -22,6 +22,7 @@ devmemory extract --fixture sample-auth-module --apply
 - Image-building extra: `--with-runner-build` copies `build-luffy-runner.yml`, `docker/luffy-runner/{Dockerfile,README.md}`, plus `scripts/build-luffy-runner-image.sh` and `scripts/benchmark-hermes-startup.sh`, which are otherwise excluded from target packs.
 
 - F21 cost/usage CLI: `python3 scripts/usage-summary.py footer --usage <hermes-usage.json>` (print line); `… append --usage … --review review.md` (inject into posted body); `… step-summary --usage … --timings timings.json` (Actions job summary Markdown). All three exit 0 with no/minimal output when the usage file is missing or empty.
+- F27 truncation banner: `python3 scripts/normalize-review.py -i raw.md -o out.md --pr N --diff-truncated` injects a ⚠️ callout when the assembled PR diff was capped (`MAX_DIFF_BYTES`; set via env / repo var).
 
 - Regenerate the Hermes startup comparison: `./scripts/benchmark-hermes-startup.sh` writes `docs/benchmarks/hermes-startup-latest.md` (cold Hermes install measured at ~1–2 min, which is what the cache/prebaked-image paths are traded against).
 
