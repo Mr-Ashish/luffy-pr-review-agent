@@ -8,7 +8,7 @@
 # - Optionally posts a commit status on the PR head SHA (LUFFY_COMMIT_STATUS)
 # - F23: Optionally submits a formal PR Review event (LUFFY_PR_REVIEW)
 # - F24: Dismisses prior Luffy PR reviews (same marker) before posting a new one
-# - F9/F9c: Path-anchored inline findings + apply-suggestion blocks (LUFFY_INLINE_*)
+# - F9/F9c/F54: Path-anchored inline findings + apply-suggestion + fix-it prompts (LUFFY_INLINE_*, LUFFY_FIXIT_PROMPTS)
 # - F37: Verdict-aware PR labels (luffy:approve|request-changes|comment|error)
 #
 # Usage:
@@ -25,6 +25,7 @@
 #   LUFFY_PR_REVIEW — 1 (default) to submit formal PR review; 0/off to skip
 #   LUFFY_REPLACE_PREVIOUS — 1 (default) also dismisses prior F23 PR reviews
 #   LUFFY_INLINE_COMMENTS — 1 (default) post F9 inline notes; 0/off to skip
+  LUFFY_FIXIT_PROMPTS — 1 (default) attach F54 fix-it agent prompts on findings; 0/off
 #   LUFFY_PR_LABELS — 1 (default) apply F37 labels; 0/off to skip
 #   LUFFY_LABEL_PREFIX — default "luffy" → labels luffy:approve etc.
 #   HEAD_SHA — optional; resolved via gh pr view when empty
