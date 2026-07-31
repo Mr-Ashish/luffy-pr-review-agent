@@ -32,3 +32,5 @@
 - **F42:** `run-hermes-review.sh` may select cheap vs full model via `scripts/model_tier.py` when `LUFFY_MODEL_TIER=auto` (docs/tiny → cheap). Does not change SOUL/prompt content.
 
 - **F43:** preflight cost may skip Hermes or force cheap model when `LUFFY_MAX_COST_USD` is tight — SOUL/prompt unchanged; stub review is COMMENT.
+
+- `agent/SOUL.md` can be **blocked by Hermes' own prompt_injection scanner** (its trust-model section quotes injection strings like "ignore previous instructions"), which means the reviewer contract and finding discipline may silently not load for a run. Check the Hermes log for a SOUL-blocked line when review quality/format degrades unexpectedly; a phrasing workaround is tracked as H13 (P1).

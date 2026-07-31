@@ -2,20 +2,60 @@
   "units": [
     {
       "kind": "dev",
-      "path": "ui",
+      "path": ".",
       "action": "merge",
       "section": "Design decisions",
-      "content": "- | H5 | Session/search memory over past PR traces (FTS5 pattern) | M | Better repo memory than append-only distill | backlog |.\n- | H10 | Soft skill nudge mid-loop (“prefer fewer tools”) | M | Hermes skill nudge pattern; needs hermes hooks | backlog |.",
+      "content": "- **F44 normalizer is a trust boundary, not a formatter:** `normalize-review.py` now runs `extract_agent_review()` → `normalize_loose_headings()` → `strip_outer_fence()` *before* `redact_secrets()` and `ensure_contract()`, because the `hermes chat -q` fallback prints `Query:` plus the whole prompt (which embeds the required Markdown template) ahead of the model answer.\n- Contract validity is no longer \"all REQUIRED_SNIPPETS present\": `_looks_like_template_only()` rejects output whose only verdict is the angle-bracket placeholder (`Verdict: < APPROVE | … >`), so a prompt echo fails the contract instead of passing it. Repair reason is stamped as `prompt/template echo or placeholder verdict (F44)`.\n- Candidate selection is scored, not positional: `_candidate_score()` slices on `Luffy Review — PR #n` headings and penalises placeholder verdicts (-50), `Required Markdown template` / `Trust boundary` text (-30) and a leading `Query:` (-40) while rewarding a concrete verdict (+40); ties go to the *last* candidate since the model answer trails the echo.\n- Chat-mode output is accepted with loose formatting: unbolded `Verdict:` / `Summary` / `Blocking` / `Security audit` / `Tests & risk` labels are promoted to the hard contract form (`**Verdict:**`, `### Summary`) so `parse-verdict.py` and the contract check still match rather than falling into repair.\n- Bare `───` horizontal rules are deliberately **not** treated as TUI chrome (models use them between findings); only explicit chrome lines (`Query:`, `Initializing agent`, `Session:`, `Duration:`, `Messages:`, `╭…╮`/`╰…╯` boxes, `⚕ Hermes`, `⚠ tirith`) are dropped, and the session footer truncates the slice.\n- Contract-repair fallback truncates the preserved raw body to 4000 chars (`_(raw truncated by normalizer)_`) so a rejected prompt echo can never be re-posted in full to GitHub.",
       "evidence": [
-        "dogfood-luffy-session"
+        "Normalizer is a trust boundary: never treat prompt-echo as valid contract just because snippets match.",
+        "F44: reject prompt-template echo even if REQUIRED_SNIPPETS are present",
+        "Do NOT treat bare ─── rules as chrome: models often use them between findings."
+      ],
+      "confidence": "high"
+    },
+    {
+      "kind": "dev",
+      "path": ".",
+      "action": "merge",
+      "section": "Pitfalls",
+      "content": "- `hermes -z` is not reliable: an observed `-z` rc=2 on odoo PR #2 forced the `hermes chat -q` path, which is exactly the polluted-output case F44 scrubs. Anything that assumes one-shot mode always wins will regress (tracked as H14).\n- `tool_turns=0` on a multi-file PR is a quality smell for an *agentic* review product, not a cheap win: the no-tool mini run on PR #2 returned APPROVE while an earlier GHA tool-using review caught the real gap (missing `format:false` tests). Treat zero-tool multi-file reviews as suspect (H12: fail closed / re-prompt / downgrade to COMMENT).",
+      "evidence": [
+        "Cheap run on PR #2: hermes -z failed → chat fallback; without F44 would post full prompt.",
+        "GHA prior review on PR #2 had higher signal (missing format:false tests) than no-tool mini run.",
+        "tool_turns=0 on multi-file PRs is a quality smell for agentic review product."
+      ],
+      "confidence": "high"
+    },
+    {
+      "kind": "dev",
+      "path": "agent",
+      "action": "merge",
+      "section": "Pitfalls",
+      "content": "- `agent/SOUL.md` can be **blocked by Hermes' own prompt_injection scanner** (its trust-model section quotes injection strings like \"ignore previous instructions\"), which means the reviewer contract and finding discipline may silently not load for a run. Check the Hermes log for a SOUL-blocked line when review quality/format degrades unexpectedly; a phrasing workaround is tracked as H13 (P1).",
+      "evidence": [
+        "SOUL.md can be blocked by Hermes prompt_injection scanner — needs a P1 workaround.",
+        "H13 | SOUL.md hermes prompt_injection false-positive workaround | S | F44 log: SOUL blocked — review discipline may not load | **P1**"
       ],
       "confidence": "medium"
+    },
+    {
+      "kind": "usage",
+      "path": ".",
+      "action": "merge",
+      "section": "Debugging",
+      "content": "- When a posted review looks like the prompt, diff the normalizer input against its output rather than the model: assert the final body contains none of `Query:`, `Required Markdown template`, or `< APPROVE | REQUEST CHANGES | COMMENT >`, and that `**Verdict:**` carries a concrete token. Regression coverage is `tests/test_normalize_review.py::test_f44_*` (chat-chrome extraction, template-only rejection, loose-heading promotion) — run `python3 -m unittest tests.test_normalize_review` after touching any chrome/heading regex.\n- If a review body is replaced by contract repair, read the `### Summary` reason: `placeholder verdict (F44)` means prompt/template echo was rejected (re-run, likely a `hermes -z` failure into chat fallback), whereas `missing: …` means genuinely absent contract sections.\n- Multi-PR e2e corpus for scoring review quality: `Mr-Ashish/odoo` PRs #1–#3 (PRs titled `luffy-eval …`); per-run output for the F44 investigation was kept under `.luffy-out-e2e-pr2-f44/` with the write-up in `docs/experiments/odoo-e2e-benchmark.md` / `odoo-e2e-learn.md`.",
+      "evidence": [
+        "self.assertNotIn(\"Query:\", out)",
+        "self.assertIn(\"placeholder verdict (F44)\", out)",
+        "Multi-PR corpus on Mr-Ashish/odoo PRs #1 #2 #3 (luffy-eval titles)."
+      ],
+      "confidence": "high"
     }
   ],
-  "summary": "offline heuristic extract (1 units)",
+  "summary": "F44 makes scripts/normalize-review.py a hardened trust boundary between Hermes CLI output and GitHub: it extracts the real review out of `hermes chat -q` chrome/prompt echo and rejects placeholder-verdict template echo even when every required contract snippet is present. Session also records two durable operational hazards: `hermes -z` failing into the chat fallback, and Hermes' prompt_injection scanner blocking agent/SOUL.md.",
   "session_ids": [
     "dogfood-luffy-session"
   ],
-  "model": "anthropic/claude-opus-5+offline-fallback",
-  "raw_path": null
+  "model": "anthropic/claude-opus-5",
+  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T213505-5fb391/extract.raw.md"
 }

@@ -136,6 +136,104 @@ class NormalizeReviewTests(unittest.TestCase):
         out = self.run_norm(self._full_contract(), diff_truncated=False)
         self.assertNotIn("Diff truncated (F27)", out)
 
+    def test_f44_extracts_review_from_hermes_chat_chrome(self):
+        # hermes chat -q echoes Query + prompt template (with placeholder verdict)
+        # then the real answer (often unbolded headings).
+        template = (
+            "## 🏴‍☠️ Luffy Review — PR #2\n\n"
+            "**Verdict:** < APPROVE | REQUEST CHANGES | COMMENT >\n"
+            "**Confidence:** < low | medium | high >\n"
+            "**Score:** <0-100>/100\n"
+            "**Review effort:** <1-5>/5\n\n"
+            "### Summary\n<fill>\n\n"
+            "### Blocking\n- None\n\n"
+            "### Security audit\nNo\n\n"
+            "### Tests & risk\n- Risk: low\n"
+        )
+        real = (
+            "🏴‍☠️ Luffy Review — PR #2\n\n"
+            "Verdict: REQUEST CHANGES\n"
+            "Confidence: high\n"
+            "Score: 72/100\n"
+            "Review effort: 3/5\n\n"
+            "Summary\nMissing tests for format:false alias.\n\n"
+            "Blocking\n"
+            "- Add tests for integer/float format alias.\n\n"
+            "Key findings\nNone\n\n"
+            "Security audit\nNo\n\n"
+            "Suggestions\n- None\n\n"
+            "Code suggestions\nNone\n\n"
+            "Nits\n- None\n\n"
+            "Tests & risk\n"
+            "- Relevant tests added/updated: no\n"
+            "- Coverage: getFieldsSpec only\n"
+            "- Risk: low — small\n"
+            "- Rollback: easy\n\n"
+            "What I checked\n- diff of field extractors\n"
+        )
+        raw = (
+            "Query: # Task\n\nYou are reviewing a PR.\n\n"
+            "## Required Markdown template\n\n"
+            "```markdown\n"
+            f"{template}\n"
+            "```\n\n"
+            "Initializing agent...\n"
+            "╭─ ⚕ Hermes ───────────────────────────────╮\n"
+            f"{real}\n"
+            "────────────────────────────────────────\n"
+        )
+        out = self.run_norm(raw, pr="2")
+        self.assertNotIn("Query:", out)
+        self.assertNotIn("< APPROVE | REQUEST CHANGES | COMMENT >", out)
+        self.assertNotIn("Required Markdown template", out)
+        self.assertIn("**Verdict:** REQUEST CHANGES", out)
+        self.assertIn("**Score:** 72/100", out)
+        self.assertIn("### Summary", out)
+        self.assertIn("Missing tests for format:false", out)
+        self.assertIn("<!-- luffy-review pr=2 run=test -->", out)
+        self.assertNotIn("contract repair", out.lower())
+
+    def test_f44_rejects_template_only_echo(self):
+        raw = (
+            "Query: # Task\n\n"
+            "## 🏴‍☠️ Luffy Review — PR #9\n\n"
+            "**Verdict:** < APPROVE | REQUEST CHANGES | COMMENT >\n"
+            "**Confidence:** < low | medium | high >\n"
+            "**Score:** <0-100>/100\n"
+            "**Review effort:** <1-5>/5\n\n"
+            "### Summary\n<template>\n\n"
+            "### Blocking\n- None\n\n"
+            "### Security audit\nNo\n\n"
+            "### Tests & risk\n- Risk: unknown\n"
+        )
+        out = self.run_norm(raw, pr="9")
+        self.assertIn("**Verdict:** COMMENT", out)
+        self.assertIn("placeholder verdict (F44)", out)
+        self.assertIn("contract repair", out.lower())
+
+    def test_f44_promotes_loose_headings_on_clean_body(self):
+        raw = (
+            "🏴‍☠️ Luffy Review — PR #5\n\n"
+            "Verdict: APPROVE\n"
+            "Confidence: medium\n"
+            "Score: 88/100\n"
+            "Review effort: 2/5\n\n"
+            "Summary\nLooks good.\n\n"
+            "Blocking\nNone\n\n"
+            "Security audit\nNo\n\n"
+            "Tests & risk\n"
+            "- Relevant tests added/updated: yes\n"
+            "- Coverage: unit\n"
+            "- Risk: low — n/a\n"
+            "- Rollback: easy\n\n"
+            "What I checked\n- full diff\n"
+        )
+        out = self.run_norm(raw, pr="5")
+        self.assertIn("**Verdict:** APPROVE", out)
+        self.assertIn("### Summary", out)
+        self.assertIn("### Security audit", out)
+        self.assertNotIn("contract repair", out.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

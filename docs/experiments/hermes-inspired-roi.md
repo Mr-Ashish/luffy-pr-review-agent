@@ -18,6 +18,10 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | H8 | Subagent fan-out for multi-file PRs | L | Parallel review streams; Modal cost + complexity | backlog |
 | H9 | Trajectory packaging for offline eval datasets | M | Quality regressions measurable | backlog (capture-hermes-loop partial) |
 | H10 | Soft skill nudge mid-loop (“prefer fewer tools”) | M | Hermes skill nudge pattern; needs hermes hooks | backlog |
+| **H11** | **Strip hermes chat chrome + reject prompt-template echo in normalizer** | **S** | **F44 e2e: chat -q posted Query+template; contract false-positive** | **Shipped F44** |
+| H12 | Fail closed when tool_turns=0 on multi-file non-docs PR (re-prompt or COMMENT) | S | #2 mini APPROVE missed known test gap; GHA/tools did not | **P0 next** |
+| H13 | SOUL.md hermes prompt_injection false-positive workaround | S | F44 log: SOUL blocked — review discipline may not load | **P1** |
+| H14 | Make hermes -z reliable; avoid chat -q fallback | M | -z rc=2 forced chat path that needs F44 scrubbing | backlog |
 
 ## Selection rule
 
@@ -30,3 +34,5 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 **H7 → F42** (2026-07-31): auto model tier (`LUFFY_MODEL_TIER=auto`) — cheap for tiny/docs, full otherwise.
 
 **H6 → F43** (2026-07-31): hard preflight cost estimate — force_cheap then refuse when still over budget.
+
+**H11 → F44** (2026-07-31): normalizer extracts real review from hermes chat chrome; rejects placeholder verdict / template echo; promotes loose headings for parse-verdict.
