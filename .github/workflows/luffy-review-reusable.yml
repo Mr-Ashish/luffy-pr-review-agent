@@ -521,6 +521,9 @@ jobs:
           LUFFY_MODEL_TIER: ${{ vars.LUFFY_MODEL_TIER }}
           LUFFY_MODEL_CHEAP: ${{ vars.LUFFY_MODEL_CHEAP }}
           LUFFY_MODEL_FULL: ${{ vars.LUFFY_MODEL_FULL }}
+          # F43: hard preflight cost (uses LUFFY_MAX_COST_USD when set)
+          LUFFY_PREFLIGHT_COST: ${{ vars.LUFFY_PREFLIGHT_COST }}
+          LUFFY_PREFLIGHT_ACTION: ${{ vars.LUFFY_PREFLIGHT_ACTION }}
           # F7: job-level env already sets default; re-export for pipeline scripts
           LUFFY_HERMES_COMMIT: ${{ env.LUFFY_HERMES_COMMIT }}
         run: |
@@ -562,6 +565,12 @@ jobs:
           fi
           if [[ -z "${LUFFY_MODEL_FULL:-}" ]]; then
             unset LUFFY_MODEL_FULL || true
+          fi
+          if [[ -z "${LUFFY_PREFLIGHT_COST:-}" ]]; then
+            unset LUFFY_PREFLIGHT_COST || true
+          fi
+          if [[ -z "${LUFFY_PREFLIGHT_ACTION:-}" ]]; then
+            unset LUFFY_PREFLIGHT_ACTION || true
           fi
           export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
           chmod +x "$LUFFY_ROOT/scripts/"*.sh "$LUFFY_ROOT/scripts/"*.py 2>/dev/null || true

@@ -125,6 +125,7 @@ RUNTIME_SCRIPTS=(
   run-with-timeout.py
   max_turns.py
   model_tier.py
+  preflight_cost.py
   save-trace.sh
   review-to-openui.py
   sparse-pr-paths.sh

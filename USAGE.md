@@ -5,7 +5,7 @@
 ## Run console
 
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
-- **F40/F41/F42 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns / model-tier + `flags[]`) and `loop` metrics. Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip → `ops-signals.env`; F41 → `hermes-max-turns.env`; F42 → `model-tier.env`.
+- **F40–F43 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns / model-tier + `flags[]`) and `loop` metrics. Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip → `ops-signals.env`; F41 → `hermes-max-turns.env`; F42 → `model-tier.env`.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
 - Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
@@ -79,6 +79,25 @@ python3 scripts/max_turns.py detect hermes.stderr          # exit 2 if budget hi
 
 On hit: job-summary **Luffy max turns (F41)**, `hermes-max-turns.env`, run-bundle
 `signals.max_turns_hit` + `loop` metrics. Complements F36 wall-clock timeout.
+
+### Preflight cost gate (F43)
+
+Hard estimate **before** Hermes (complements F29 post-hoc soft budget):
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_MAX_COST_USD` | unset | Threshold; when set, F43 hard-gates by default |
+| `LUFFY_PREFLIGHT_COST` | `auto` | `auto`/`on`/`hard` / `off` / `estimate` |
+| `LUFFY_PREFLIGHT_ACTION` | `force_cheap` | `force_cheap` → cheap model; `refuse` → stub; `warn` → allow |
+
+```bash
+LUFFY_MAX_COST_USD=0.05 python3 scripts/preflight_cost.py decide \
+  --model anthropic/claude-opus-5 --diff-bytes 200000 --file-count 20
+# → decision=force_cheap model=openai/gpt-4.1-mini
+```
+
+Evidence: `preflight-cost.env`, job-summary **Luffy preflight cost (F43)**,
+run-bundle chips `preflight-cheap` / `preflight-refuse`.
 
 ### Auto model tier (F42)
 

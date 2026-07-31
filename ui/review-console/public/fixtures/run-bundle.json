@@ -143,6 +143,9 @@
     "model_tier": null,
     "model_tier_reason": null,
     "model": null,
+    "preflight_refuse": false,
+    "preflight_forced_cheap": false,
+    "preflight_estimated_usd": null,
     "flags": [],
     "any": false
   },

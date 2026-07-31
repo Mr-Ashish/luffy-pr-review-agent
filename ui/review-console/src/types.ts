@@ -89,6 +89,11 @@ export interface RunBundle {
     model_tier?: string | null;
     model_tier_reason?: string | null;
     model?: string | null;
+    preflight_refuse?: boolean;
+    preflight_forced_cheap?: boolean;
+    preflight_estimated_usd?: number | string | null;
+    preflight_decision?: string;
+    preflight_reason?: string;
   };
   /** F41: Hermes agent-loop metrics */
   loop?: {

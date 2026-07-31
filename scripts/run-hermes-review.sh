@@ -12,6 +12,9 @@
 #   LUFFY_MAX_TURNS  F41 Hermes tool-iteration cap (default 40; 0/off = Hermes default ~500)
 #   LUFFY_MODEL_TIER  F42 off|auto|cheap|full (default off) — auto picks cheap model for tiny/docs PRs
 #   LUFFY_MODEL_CHEAP / LUFFY_MODEL_FULL  F42 tier models (defaults gpt-4.1-mini / opus-5)
+#   LUFFY_MAX_COST_USD  F29 soft + F43 hard preflight threshold when set
+#   LUFFY_PREFLIGHT_COST  F43 on|off|auto (default auto=hard when budget set)
+#   LUFFY_PREFLIGHT_ACTION  F43 force_cheap|refuse|warn (default force_cheap)
 #   PR_NUMBER
 set -euo pipefail
 
@@ -100,6 +103,115 @@ if [[ "$MODEL_TIER_MODE" == "auto" || "$MODEL_TIER_MODE" == "cheap" || "$MODEL_T
       echo
     } >>"$GITHUB_STEP_SUMMARY" || true
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# F43: hard preflight spend estimate (before Hermes / OpenRouter)
+# ---------------------------------------------------------------------------
+PREFLIGHT_HELPER="$LUFFY_ROOT/scripts/preflight_cost.py"
+PREFLIGHT_DECISION="allow"
+PREFLIGHT_REASON="skipped"
+PREFLIGHT_EST=""
+PREFLIGHT_REFUSED=0
+PREFLIGHT_FORCED_CHEAP=0
+if [[ -f "$PREFLIGHT_HELPER" ]]; then
+  _pf_args=(decide --model "$MODEL" --diff-bytes "${DIFF_SIZE:-0}" --file-count "${FILE_COUNT:-0}")
+  [[ -n "${LUFFY_MAX_COST_USD:-}" ]] && _pf_args+=(--max-usd "$LUFFY_MAX_COST_USD")
+  [[ -n "${LUFFY_PREFLIGHT_COST:-}" ]] && _pf_args+=(--mode "$LUFFY_PREFLIGHT_COST")
+  [[ -n "${LUFFY_PREFLIGHT_ACTION:-}" ]] && _pf_args+=(--action "$LUFFY_PREFLIGHT_ACTION")
+  [[ -n "${LUFFY_MODEL_CHEAP:-}" ]] && _pf_args+=(--cheap-model "$LUFFY_MODEL_CHEAP")
+  [[ -n "${LUFFY_MAX_TURNS:-}" ]] && _pf_args+=(--max-turns "$LUFFY_MAX_TURNS")
+  set +e
+  _pf_out="$(python3 "$PREFLIGHT_HELPER" "${_pf_args[@]}" 2>/dev/null)"
+  _pf_rc=$?
+  set -e
+  if [[ -n "$_pf_out" ]]; then
+    PREFLIGHT_DECISION="$(printf '%s\n' "$_pf_out" | awk -F= '/^decision=/{print $2; exit}')"
+    PREFLIGHT_REASON="$(printf '%s\n' "$_pf_out" | awk -F= '/^reason=/{print $2; exit}')"
+    PREFLIGHT_EST="$(printf '%s\n' "$_pf_out" | awk -F= '/^estimated_usd=/{print $2; exit}')"
+    _pf_model="$(printf '%s\n' "$_pf_out" | awk -F= '/^model=/{print substr($0,7); exit}')"
+    _pf_forced="$(printf '%s\n' "$_pf_out" | awk -F= '/^forced_cheap=/{print $2; exit}')"
+    _pf_refused="$(printf '%s\n' "$_pf_out" | awk -F= '/^refused=/{print $2; exit}')"
+    if [[ "$_pf_forced" == "true" && -n "$_pf_model" ]]; then
+      MODEL="$_pf_model"
+      export LUFFY_MODEL="$MODEL"
+      export OPENROUTER_MODEL="$MODEL"
+      printf '%s\n' "$MODEL" >"$OUT_DIR/luffy-model.txt" || true
+      PREFLIGHT_FORCED_CHEAP=1
+      # Reflect forced cheap in model-tier.env
+      {
+        echo "mode=${MODEL_TIER_MODE:-off}"
+        echo "tier=cheap"
+        echo "reason=f43_preflight_force_cheap"
+        echo "model=$MODEL"
+        echo "diff_bytes=${DIFF_SIZE:-}"
+        echo "file_count=${FILE_COUNT:-}"
+      } >"$OUT_DIR/model-tier.env" || true
+    fi
+    if [[ "$_pf_refused" == "true" || "$_pf_rc" -eq 2 ]]; then
+      PREFLIGHT_REFUSED=1
+    fi
+  fi
+  # Always persist telemetry
+  {
+    printf '%s\n' "$_pf_out"
+    echo "preflight_rc=${_pf_rc:-0}"
+  } >"$OUT_DIR/preflight-cost.env" || true
+  notice "F43 preflight cost · decision=${PREFLIGHT_DECISION:-?} reason=${PREFLIGHT_REASON:-?} est=\$${PREFLIGHT_EST:-?} model=$MODEL"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    {
+      echo "### Luffy preflight cost (F43)"
+      echo "- **Decision:** \`${PREFLIGHT_DECISION:-?}\` · **reason:** \`${PREFLIGHT_REASON:-?}\`"
+      echo "- **Estimate:** \~$\`${PREFLIGHT_EST:-n/a}\` · model \`$MODEL\`"
+      echo "- Budget: \`vars.LUFFY_MAX_COST_USD\` · action \`vars.LUFFY_PREFLIGHT_ACTION\` (default force_cheap)"
+      echo
+    } >>"$GITHUB_STEP_SUMMARY" || true
+  fi
+fi
+
+if [[ "$PREFLIGHT_REFUSED" -eq 1 ]]; then
+  notice "F43 preflight REFUSED paid Hermes (est=\$${PREFLIGHT_EST:-?} > budget) — writing stub review"
+  _pf_summary="Luffy **preflight cost gate (F43)** refused the paid Hermes run. Estimated spend ~\$${PREFLIGHT_EST:-?} (model was headed for premium tokens on a large PR) exceeds \`LUFFY_MAX_COST_USD\`. No OpenRouter agent loop was started."
+  _pf_blocking="Raise \`LUFFY_MAX_COST_USD\`, set \`LUFFY_PREFLIGHT_ACTION=warn\`, force with \`LUFFY_PREFLIGHT_FORCE=1\` / \`@luffy review force\`, use a cheaper \`LUFFY_MODEL\`, or shrink the PR."
+  cat >"$OUT_DIR/review-${PR_NUMBER}.md" <<EOF
+<!-- luffy-review pr=${PR_NUMBER} -->
+## 🏴‍☠️ Luffy Review — PR #${PR_NUMBER}
+
+**Verdict:** COMMENT
+**Confidence:** low
+
+### Summary
+${_pf_summary}
+
+### Blocking
+- ${_pf_blocking}
+
+### Suggestions
+- Split the PR or enable \`LUFFY_MODEL_TIER=auto\` / a cheap model for large diffs
+- Or raise the soft/hard budget via \`vars.LUFFY_MAX_COST_USD\`
+
+### Nits
+- None
+
+### Tests & risk
+- Coverage: n/a (preflight refuse — no agent review)
+- Risk: unknown (review skipped to protect spend)
+- Rollback: n/a
+
+### What I checked
+- F43 preflight cost estimate only (diff bytes + model rate proxy)
+- Reason: \`${PREFLIGHT_REASON:-refused}\`
+
+---
+*Luffy · Hermes Agent · OpenRouter · memory-backed review · F43 preflight refuse*
+*Cost / usage: model=\`none\` · ~\$0 (preflight refuse) · budget gate*
+EOF
+  # Also raw for any consumers expecting it
+  cp -f "$OUT_DIR/review-${PR_NUMBER}.md" "$OUT_DIR/review-${PR_NUMBER}.raw.md" 2>/dev/null || true
+  printf '0\n' >"$OUT_DIR/hermes-skipped.txt" || true
+  echo "skip=preflight_cost" >>"$OUT_DIR/preflight-cost.env" || true
+  notice "F43 stub review written; skipping Hermes install + agent loop"
+  exit 0
 fi
 
 export HERMES_HOME

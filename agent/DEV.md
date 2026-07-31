@@ -30,3 +30,5 @@
 - **F41 max_turns:** `agent/config.yaml` sets `agent.max_turns: 40` (Hermes default 500 is unsafe for CI). Override with `LUFFY_MAX_TURNS`; `scripts/max_turns.py` resolves/detects budget hits.
 
 - **F42:** `run-hermes-review.sh` may select cheap vs full model via `scripts/model_tier.py` when `LUFFY_MODEL_TIER=auto` (docs/tiny → cheap). Does not change SOUL/prompt content.
+
+- **F43:** preflight cost may skip Hermes or force cheap model when `LUFFY_MAX_COST_USD` is tight — SOUL/prompt unchanged; stub review is COMMENT.

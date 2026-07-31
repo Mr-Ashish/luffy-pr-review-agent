@@ -348,6 +348,10 @@ def review_pr(
         "LUFFY_MODEL_TIER": os.environ.get("LUFFY_MODEL_TIER", "off"),
         "LUFFY_MODEL_CHEAP": os.environ.get("LUFFY_MODEL_CHEAP", ""),
         "LUFFY_MODEL_FULL": os.environ.get("LUFFY_MODEL_FULL", ""),
+        # F43: hard preflight cost (auto hard when LUFFY_MAX_COST_USD set)
+        "LUFFY_MAX_COST_USD": os.environ.get("LUFFY_MAX_COST_USD", ""),
+        "LUFFY_PREFLIGHT_COST": os.environ.get("LUFFY_PREFLIGHT_COST", ""),
+        "LUFFY_PREFLIGHT_ACTION": os.environ.get("LUFFY_PREFLIGHT_ACTION", ""),
         "PATH": os.environ.get(
             "PATH",
             "/root/.local/bin:/root/.hermes/bin:/usr/local/bin:/usr/bin:/bin",

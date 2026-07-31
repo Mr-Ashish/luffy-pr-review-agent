@@ -137,6 +137,7 @@ def collect_signals(
       review OVER BUDGET / usage + env max (F29)       → over_budget
       hermes-max-turns.env / iteration budget logs     → max_turns_hit (F41)
       model-tier.env (F42)                              → model_tier / selected_tier
+      preflight-cost.env (F43)                          → preflight_refuse / forced_cheap
     """
     signals: dict = {
         "timeout": False,
@@ -150,6 +151,9 @@ def collect_signals(
         "model_tier": None,
         "model_tier_reason": None,
         "model": None,
+        "preflight_refuse": False,
+        "preflight_forced_cheap": False,
+        "preflight_estimated_usd": None,
         "flags": [],  # short chip labels for UI
     }
     te = _parse_env_file(dir_path / "hermes-timeout.env")
@@ -276,6 +280,27 @@ def collect_signals(
             except OSError:
                 pass
 
+    # F43 preflight cost
+    pfc = _parse_env_file(dir_path / "preflight-cost.env")
+    if pfc.get("decision"):
+        signals["preflight_decision"] = pfc["decision"]
+    if pfc.get("reason"):
+        signals["preflight_reason"] = pfc["reason"]
+    if pfc.get("estimated_usd"):
+        try:
+            signals["preflight_estimated_usd"] = float(pfc["estimated_usd"])
+        except ValueError:
+            signals["preflight_estimated_usd"] = pfc["estimated_usd"]
+    if pfc.get("refused") in ("1", "true", "yes") or pfc.get("decision") == "refuse" or pfc.get("skip") == "preflight_cost":
+        signals["preflight_refuse"] = True
+    if pfc.get("forced_cheap") in ("1", "true", "yes") or pfc.get("decision") == "force_cheap":
+        signals["preflight_forced_cheap"] = True
+    # Soft: review text
+    if not signals["preflight_refuse"] and (
+        "preflight cost gate (f43)" in low or "f43 preflight refuse" in low
+    ):
+        signals["preflight_refuse"] = True
+
     flags: list[str] = []
     if signals["path_skip"]:
         flags.append("path-skip")
@@ -287,6 +312,10 @@ def collect_signals(
         flags.append("diff-truncated")
     if signals["max_turns_hit"]:
         flags.append("max-turns")
+    if signals.get("preflight_refuse"):
+        flags.append("preflight-refuse")
+    elif signals.get("preflight_forced_cheap"):
+        flags.append("preflight-cheap")
     # Surface auto/cheap/full when tier mode is active (not plain off/default)
     mode = (signals.get("model_tier_mode") or "").lower()
     tier = (signals.get("model_tier") or "").lower()

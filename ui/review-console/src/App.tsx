@@ -507,6 +507,23 @@ export default function App() {
                         </dd>
                       </>
                     )}
+                    {(signals.preflight_refuse ||
+                      signals.preflight_forced_cheap) && (
+                      <>
+                        <dt>Preflight cost (F43)</dt>
+                        <dd>
+                          {signals.preflight_refuse
+                            ? "Refused paid Hermes — estimate exceeded budget"
+                            : "Forced cheap model — estimate exceeded budget on premium model"}
+                          {signals.preflight_estimated_usd != null
+                            ? ` · est $${signals.preflight_estimated_usd}`
+                            : ""}
+                          {signals.preflight_reason
+                            ? ` · ${signals.preflight_reason}`
+                            : ""}
+                        </dd>
+                      </>
+                    )}
                   </dl>
                 </div>
               )}

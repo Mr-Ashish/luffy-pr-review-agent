@@ -33,3 +33,5 @@
 - `publish-run-local.sh` is added to `RUNTIME_SCRIPTS` in `install-luffy.sh` and is invoked on the config-error path too (before `publish-run-to-hub.sh`), so failed runs still leave a local record.
 
 - **F42:** `run-hermes-review.sh` may select cheap vs full model via `scripts/model_tier.py` when `LUFFY_MODEL_TIER=auto` (docs/tiny → cheap). Does not change SOUL/prompt content.
+
+- **F43:** preflight cost may skip Hermes or force cheap model when `LUFFY_MAX_COST_USD` is tight — SOUL/prompt unchanged; stub review is COMMENT.

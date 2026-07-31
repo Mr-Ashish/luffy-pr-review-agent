@@ -54,6 +54,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 32 (F40):** Ops signals in run-bundle + Run Console overview
 - **Sprint 33 (F41):** Hermes max_turns iteration budget (default 40) + loop metrics in run-bundle
 - **Sprint 34 (F42):** Auto model tier by PR size (`LUFFY_MODEL_TIER=auto` → cheap for tiny/docs)
+- **Sprint 35 (F43):** Hard preflight spend estimate before Hermes (force_cheap / refuse)
 
 ## Ops signals in Run Console (F40/F41/F42)
 
@@ -67,6 +68,7 @@ Every auto-pack (`run-bundle.json`) includes a `signals` object:
 | `diff_truncated` | `meta.env` DIFF_TRUNCATED / F27 |
 | `max_turns_hit` | `hermes-max-turns.env` / F41 iteration budget |
 | `model_tier` / `model-cheap` | `model-tier.env` / F42 auto tier |
+| `preflight_refuse` / `preflight-cheap` | `preflight-cost.env` / F43 |
 
 Also `loop` metrics: `tool_call_turns`, `message_count`, `step_count`, `max_turns`.
 
@@ -107,6 +109,24 @@ LUFFY_MODEL_TIER=auto python3 scripts/model_tier.py select --path README.md --di
 
 Wired in `run-hermes-review.sh` after assemble meta. Evidence: `model-tier.env`,
 `luffy-model.txt`, job-summary **Luffy model tier (F42)**, run-bundle `signals.model_tier*`.
+
+
+## Preflight cost (F43)
+
+Hard OpenRouter spend estimate **before** Hermes. Uses the same `LUFFY_MAX_COST_USD`
+as F29, but gates *start* of the agent loop (F29 only annotates after).
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_MAX_COST_USD` | unset | Enables hard preflight when set |
+| `LUFFY_PREFLIGHT_COST` | `auto` | `hard` when budget set; `off` / `estimate` |
+| `LUFFY_PREFLIGHT_ACTION` | `force_cheap` | or `refuse` / `warn` |
+
+```bash
+python3 scripts/preflight_cost.py decide --model anthropic/claude-opus-5 --diff-bytes 200000
+```
+
+Evidence: `preflight-cost.env`, job-summary, Run Console chips.
 
 ## Modal host parity (F39)
 
