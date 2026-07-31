@@ -7,8 +7,10 @@
 - **Run Console** loads a single `run-bundle.json` (F31 pack) — operators never need raw Hermes logs for first triage.
 - **Ops signals (F40+)** surface gates as chips + Overview rows: path-skip, timeout, over-budget, diff-truncated, max-turns (F41), model-tier (F42).
 - **F42 model tier** chips (`model-cheap` / `model-full`) come from pack `signals` filled by `model-tier.env`; Overview shows mode/tier/reason + effective model id.
+- **F43 preflight cost** chips (`preflight-cheap` / `preflight-refuse`) come from `preflight-cost.env` via pack signals — refuse means no Hermes spend; forced-cheap means estimate exceeded budget on the premium model.
 - Agent loop panel (F41) is separate from cost model tier: turns thrash vs which OpenRouter model was selected.
 - Browser is not a kitchen: **Run** tab copies `trigger-review.sh` / Modal commands; review work stays in GHA/Modal.
+
 
 ## Pitfalls
 

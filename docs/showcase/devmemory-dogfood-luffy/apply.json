@@ -4,17 +4,8 @@
     "kind": "dev",
     "action": "merge",
     "section": "Design decisions",
-    "bytes": 353,
+    "bytes": 1298,
     "applied": true,
     "unit_path": "ui"
-  },
-  {
-    "path": "USAGE.md",
-    "kind": "usage",
-    "action": "merge",
-    "section": "Common commands",
-    "bytes": 21160,
-    "applied": true,
-    "unit_path": "."
   }
 ]

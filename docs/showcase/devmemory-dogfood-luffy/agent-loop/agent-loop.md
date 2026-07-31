@@ -1,13 +1,13 @@
-# Agent loop · `run-20260731T211755-5b5f81`
+# Agent loop · `run-20260731T212248-fdd703`
 
 - **model:** `anthropic/claude-opus-5+offline-fallback`
 - **hermes_rc:** 0
-- **units:** 2
-- **at:** 2026-07-31T15:47:58Z
+- **units:** 1
+- **at:** 2026-07-31T15:52:50Z
 
 ## Summary
 
-offline heuristic extract (2 units)
+offline heuristic extract (1 units)
 
 ## Usage
 
@@ -36,11 +36,11 @@ offline heuristic extract (2 units)
 
 ```json
 {
-  "assemble_s": 0.143,
-  "extract_s": 2.779,
+  "assemble_s": 0.141,
+  "extract_s": 2.782,
   "normalize_s": 0.0,
-  "apply_s": 0.807,
-  "total_s": 3.738
+  "apply_s": 0.019,
+  "total_s": 2.949
 }
 ```
 

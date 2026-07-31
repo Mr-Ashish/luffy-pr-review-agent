@@ -1,9 +1,9 @@
 {
-  "run_id": "run-20260731T211755-5b5f81",
+  "run_id": "run-20260731T212248-fdd703",
   "model": "anthropic/claude-opus-5+offline-fallback",
   "hermes_rc": 0,
-  "units": 2,
-  "summary": "offline heuristic extract (2 units)",
+  "units": 1,
+  "summary": "offline heuristic extract (1 units)",
   "usage": {
     "estimated_cost_usd": null,
     "cost_status": null,
@@ -23,11 +23,11 @@
     "service_tier": null
   },
   "timings": {
-    "assemble_s": 0.143,
-    "extract_s": 2.779,
+    "assemble_s": 0.141,
+    "extract_s": 2.782,
     "normalize_s": 0.0,
-    "apply_s": 0.807,
-    "total_s": 3.738
+    "apply_s": 0.019,
+    "total_s": 2.949
   },
   "messages_meta": {
     "db": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/hermes-home/state.db",

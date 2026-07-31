@@ -10,20 +10,9 @@
         "dogfood-luffy-session"
       ],
       "confidence": "medium"
-    },
-    {
-      "kind": "usage",
-      "path": ".",
-      "action": "merge",
-      "section": "Common commands",
-      "content": "- `hermes-pin.sh`",
-      "evidence": [
-        "dogfood-luffy-session"
-      ],
-      "confidence": "medium"
     }
   ],
-  "summary": "offline heuristic extract (2 units)",
+  "summary": "offline heuristic extract (1 units)",
   "session_ids": [
     "dogfood-luffy-session"
   ],
