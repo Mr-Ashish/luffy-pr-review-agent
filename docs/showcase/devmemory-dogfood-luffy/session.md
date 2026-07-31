@@ -7,21 +7,23 @@
 
 ## Transcript / notes
 
-# Dogfood session — F48 SOUL detect scope (H17) + H16 re-score
+# Dogfood session — F49 soft re-prompt (H15)
 
 ## What shipped
-- F48/H17: pass HERMES_LOG_OFFSET into capture-hermes-loop; package only this-invocation agent.log slice; avoid false soul_blocked from shared HERMES_HOME log history.
-- H16 live mini re-run on Mr-Ashish/odoo#2 with openai/gpt-4.1-mini after F47.
+- F49/H15: when first hermes -z has tool_turns=0 on multi-file code PR, soft re-prompt once with tool-nudge suffix before F45 fail-closed.
+- CLI: tool_turns_gate.py reprompt-decide / reprompt-write
+- Env: LUFFY_TOOL_TURNS_REPROMPT (default on)
+- Artifacts: tool-turns-reprompt.env, review-*.attempt1.raw.md, agent-loop-attempt1/
+- Pack chips: tool-reprompt / tool-reprompt-ok
+- Evidence prior: odoo e2e #2 and #4 both mini tool_turns=0 after F47/F48
 
-## H16 results
-- hermes -z worked (no invalid choice, no chat fallback).
-- tool_turns=0 still (model single-shot text stop) → F45 gate COMMENT/55.
-- Score 30/50 same as F45; D8a improved slightly (SOUL preflight clean); residual gap is tool use not CLI.
-- False soul_blocked=1 from stale agent.log → fixed F48.
+## Lessons
+- F45 honesty gate alone does not recover D1; recovery needs a second agentic pass.
+- Soft re-prompt doubles cheap-path spend when it fires — intentional.
+- If F49 still yields tool_turns=0, next is H18 hard tool nudge.
 
-## Guardrails
-- Never scan full shared HERMES_HOME/logs/agent.log as this-run SOUL evidence.
-- Capture must honor HERMES_LOG_OFFSET when set.
-- F45 remains required when tool_turns=0 on multi-file code PRs.
-- Next: H15 soft re-prompt or H18 hard tool nudge for cheap multi-file path.
+## Verify
+- pytest test_tool_turns_gate + test_pack_run_for_ui: 36 passed
+- bash -n run-hermes-review.sh ok
+- Pushed main e153394
 

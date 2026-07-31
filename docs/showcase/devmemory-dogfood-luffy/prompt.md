@@ -44,23 +44,25 @@ Respond with **only** the JSON object (fence optional).
 
 ### Transcript
 
-# Dogfood session — F48 SOUL detect scope (H17) + H16 re-score
+# Dogfood session — F49 soft re-prompt (H15)
 
 ## What shipped
-- F48/H17: pass HERMES_LOG_OFFSET into capture-hermes-loop; package only this-invocation agent.log slice; avoid false soul_blocked from shared HERMES_HOME log history.
-- H16 live mini re-run on Mr-Ashish/odoo#2 with openai/gpt-4.1-mini after F47.
+- F49/H15: when first hermes -z has tool_turns=0 on multi-file code PR, soft re-prompt once with tool-nudge suffix before F45 fail-closed.
+- CLI: tool_turns_gate.py reprompt-decide / reprompt-write
+- Env: LUFFY_TOOL_TURNS_REPROMPT (default on)
+- Artifacts: tool-turns-reprompt.env, review-*.attempt1.raw.md, agent-loop-attempt1/
+- Pack chips: tool-reprompt / tool-reprompt-ok
+- Evidence prior: odoo e2e #2 and #4 both mini tool_turns=0 after F47/F48
 
-## H16 results
-- hermes -z worked (no invalid choice, no chat fallback).
-- tool_turns=0 still (model single-shot text stop) → F45 gate COMMENT/55.
-- Score 30/50 same as F45; D8a improved slightly (SOUL preflight clean); residual gap is tool use not CLI.
-- False soul_blocked=1 from stale agent.log → fixed F48.
+## Lessons
+- F45 honesty gate alone does not recover D1; recovery needs a second agentic pass.
+- Soft re-prompt doubles cheap-path spend when it fires — intentional.
+- If F49 still yields tool_turns=0, next is H18 hard tool nudge.
 
-## Guardrails
-- Never scan full shared HERMES_HOME/logs/agent.log as this-run SOUL evidence.
-- Capture must honor HERMES_LOG_OFFSET when set.
-- F45 remains required when tool_turns=0 on multi-file code PRs.
-- Next: H15 soft re-prompt or H18 hard tool nudge for cheap multi-file path.
+## Verify
+- pytest test_tool_turns_gate + test_pack_run_for_ui: 36 passed
+- bash -n run-hermes-review.sh ok
+- Pushed main e153394
 
 
 ## Existing directories (allowed `path` values)
@@ -108,15 +110,16 @@ agent
 ```
 ?? .luffy-out-e2e-pr2-f44/
 ?? .luffy-out-e2e-pr2-h16/
+?? .luffy-out-e2e-pr4-h16/
 ```
 
 ### recent log
 ```
+e153394 feat(F49): soft re-prompt once on zero-tool multi-file reviews (H15)
+3d1cc25 docs(e2e): corpus #4 odoo#279776 stock/mrp PERF + mini score 31/50
+87bce57 docs: dogfood F48/H16 knowledge (SOUL detect scope, tool_turns residual)
 cd03a57 F48: scope SOUL detect + agent.log capture to this invocation (H17)
 eaee0da knowledge: dogfood F47 hermes -z argv / max-turns contract
-9b99910 F47: fix hermes -z reliability (H14) — drop invalid --max-turns CLI flag
-b305fac docs(dogfood): F46 SOUL context scan knowledge + showcase
-b92deb3 fix(F46): keep SOUL.md loadable under Hermes threat scanner (H13)
 ```
 
 ### tree (sample)
@@ -237,6 +240,7 @@ docs/experiments/2026-07-31-f44-normalize-chat-chrome.md
 docs/experiments/2026-07-31-f45-tool-turns-gate.md
 docs/experiments/2026-07-31-f46-soul-context-scan.md
 docs/experiments/2026-07-31-f48-soul-detect-scope.md
+docs/experiments/2026-07-31-f49-soft-reprompt.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-f9c-suggestions.md
@@ -320,7 +324,6 @@ scripts/run-luffy-review.sh
 scripts/run-with-timeout.py
 scripts/save-trace.sh
 scripts/soul_context_scan.py
-scripts/sparse-pr-paths.sh
 ```
 
 ### git diff
@@ -458,20 +461,20 @@ scripts/sparse-pr-paths.sh
 
 ## Run console
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
-- **F40–F45 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns / model-tier / preflight / **tool-turns-gate** + `flags[]`) and `loop` metrics. Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip → `ops-signals.env`; F41 → `hermes-max-turns.env`; F42 → `model-tier.env`; F45 → `tool-turns-gate.env`.
+- **F40–F49 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns / model-tier / preflight / **tool-turns-gate** / **tool-turns-reprompt** + `flags[]`) and `loop` metrics. Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip → `ops-signals.env`; F41 → `hermes-max-turns.env`; F42 → `model-tier.env`; F45 → `tool-turns-gate.env`; F49 → `tool-turns-reprompt.env`.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
 
 ## Trigger a review (F32)
 --model anthropic/claude-opus-5 --diff-bytes 200000 --file-count 20
 --path a.js --path b.js --env-out tool-turns-gate.env
---path README.md --diff-bytes 400
---review docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/review.md \
+**before** F45 fail-closed. Attempt-1 artifacts are kept under
+--prompt-in prompt.md --prompt-out prompt-reprompt.md \
 
 ## Common commands
 - Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).
 - Hub-managed thin install (F10, no agent/scripts copy): `./scripts/install-luffy.sh --caller /path/to/target-repo`.
-- Build prebaked Hermes runner image: `./scripts/build-luffy-runner-image.sh` (option
+- Build 
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md

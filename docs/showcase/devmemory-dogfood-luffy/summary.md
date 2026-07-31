@@ -1,9 +1,9 @@
-# Run run-20260731T220501-4e40c6
+# Run run-20260731T221549-70be60
 
 - session: `dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
 - units: 4
-- summary: The session yields new durable knowledge from F48/H17: SOUL-block detection and agent.log capture must be scoped to the current invocation via HERMES_LOG_OFFSET (shared HERMES_HOME log history caused a false soul_blocked=1), plus the H16 re-score finding that after F47 the `hermes -z` CLI path is healthy while tool_turns=0 persists as a model-behaviour gap that keeps the F45 gate load-bearing.
-- at: 2026-07-31T16:35:34Z
-- timings: {"assemble_s": 0.621, "extract_s": 32.593, "normalize_s": 0.002}
+- summary: Session shipped F49/H15 soft re-prompt: when the first `hermes -z` pass ends with tool_turns=0 on a multi-file code PR, the orchestrator re-prompts once with a tool-nudge suffix before the F45 fail-closed gate. Durable new knowledge is the escalation rationale (F45 alone cannot recover a zero-tool review), the intentional cost trade-off, the env kill switch, and the new console chip pair.
+- at: 2026-07-31T16:46:25Z
+- timings: {"assemble_s": 0.671, "extract_s": 34.704, "normalize_s": 0.002}
