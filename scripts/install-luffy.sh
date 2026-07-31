@@ -126,6 +126,7 @@ RUNTIME_SCRIPTS=(
   max_turns.py
   model_tier.py
   preflight_cost.py
+  tool_turns_gate.py
   save-trace.sh
   review-to-openui.py
   sparse-pr-paths.sh

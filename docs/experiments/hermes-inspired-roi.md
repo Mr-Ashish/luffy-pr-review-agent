@@ -19,9 +19,10 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | H9 | Trajectory packaging for offline eval datasets | M | Quality regressions measurable | backlog (capture-hermes-loop partial) |
 | H10 | Soft skill nudge mid-loop (“prefer fewer tools”) | M | Hermes skill nudge pattern; needs hermes hooks | backlog |
 | **H11** | **Strip hermes chat chrome + reject prompt-template echo in normalizer** | **S** | **F44 e2e: chat -q posted Query+template; contract false-positive** | **Shipped F44** |
-| H12 | Fail closed when tool_turns=0 on multi-file non-docs PR (re-prompt or COMMENT) | S | #2 mini APPROVE missed known test gap; GHA/tools did not | **P0 next** |
-| H13 | SOUL.md hermes prompt_injection false-positive workaround | S | F44 log: SOUL blocked — review discipline may not load | **P1** |
-| H14 | Make hermes -z reliable; avoid chat -q fallback | M | -z rc=2 forced chat path that needs F44 scrubbing | backlog |
+| **H12** | **Fail closed when tool_turns=0 on multi-file non-docs PR (COMMENT, not re-prompt)** | **S** | **#2 mini APPROVE missed known test gap; GHA/tools did not** | **Shipped F45** |
+| H13 | SOUL.md hermes prompt_injection false-positive workaround | S | F44 log: SOUL blocked — review discipline may not load | **P0 next** |
+| H14 | Make hermes -z reliable; avoid chat -q fallback | M | -z rc=2 forced chat path that needs F44 scrubbing | **P1** |
+| H15 | Soft re-prompt once when tool_turns=0 + multi-file (after F45 annotate) | M | Recover quality without always failing closed | backlog |
 
 ## Selection rule
 
@@ -36,3 +37,5 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 **H6 → F43** (2026-07-31): hard preflight cost estimate — force_cheap then refuse when still over budget.
 
 **H11 → F44** (2026-07-31): normalizer extracts real review from hermes chat chrome; rejects placeholder verdict / template echo; promotes loose headings for parse-verdict.
+
+**H12 → F45** (2026-07-31): `tool_turns_gate.py` fail-closed — zero tools + multi-file non-docs → downgrade APPROVE→COMMENT, score cap 55, F45 banner; pack chip `tool-turns-gate`.

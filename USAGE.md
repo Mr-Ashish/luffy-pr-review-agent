@@ -5,7 +5,7 @@
 ## Run console
 
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
-- **F40–F43 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns / model-tier + `flags[]`) and `loop` metrics. Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip → `ops-signals.env`; F41 → `hermes-max-turns.env`; F42 → `model-tier.env`.
+- **F40–F45 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns / model-tier / preflight / **tool-turns-gate** + `flags[]`) and `loop` metrics. Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip → `ops-signals.env`; F41 → `hermes-max-turns.env`; F42 → `model-tier.env`; F45 → `tool-turns-gate.env`.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
 - Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
@@ -98,6 +98,27 @@ LUFFY_MAX_COST_USD=0.05 python3 scripts/preflight_cost.py decide \
 
 Evidence: `preflight-cost.env`, job-summary **Luffy preflight cost (F43)**,
 run-bundle chips `preflight-cheap` / `preflight-refuse`.
+
+### Tool-turns fail-closed gate (F45)
+
+When Hermes records **0 tool turns** on a **multi-file non-docs** PR, Luffy refuses
+to leave an **APPROVE** standing (H12 / odoo e2e #2 mini false green):
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_TOOL_TURNS_GATE` | `1` | `0`/`off` disables |
+| `LUFFY_TOOL_TURNS_MIN_FILES` | `2` | multi-file threshold |
+| `LUFFY_TOOL_TURNS_GATE_VERDICTS` | `APPROVE` | verdicts rewritten to COMMENT |
+
+```bash
+python3 scripts/tool_turns_gate.py decide --tool-turns 0 --file-count 4 --path a.js --path b.js
+python3 scripts/tool_turns_gate.py apply --review review.md --tool-turns 0 --file-count 4 \
+  --path a.js --path b.js --env-out tool-turns-gate.env
+```
+
+Action: APPROVE→COMMENT, confidence low, score capped at 55, F45 banner.
+Evidence: `tool-turns-gate.env`, job-summary **Luffy tool-turns gate (F45)**,
+run-bundle chip `tool-turns-gate`.
 
 ### Auto model tier (F42)
 

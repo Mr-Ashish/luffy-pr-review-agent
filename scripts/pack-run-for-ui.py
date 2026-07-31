@@ -138,6 +138,7 @@ def collect_signals(
       hermes-max-turns.env / iteration budget logs     → max_turns_hit (F41)
       model-tier.env (F42)                              → model_tier / selected_tier
       preflight-cost.env (F43)                          → preflight_refuse / forced_cheap
+      tool-turns-gate.env (F45)                         → tool_turns_gate (H12)
     """
     signals: dict = {
         "timeout": False,
@@ -154,6 +155,8 @@ def collect_signals(
         "preflight_refuse": False,
         "preflight_forced_cheap": False,
         "preflight_estimated_usd": None,
+        "tool_turns_gate": False,
+        "tool_turns_gate_reason": None,
         "flags": [],  # short chip labels for UI
     }
     te = _parse_env_file(dir_path / "hermes-timeout.env")
@@ -301,6 +304,29 @@ def collect_signals(
     ):
         signals["preflight_refuse"] = True
 
+    # F45 tool-turns gate (H12 zero tools on multi-file code)
+    ttg = _parse_env_file(dir_path / "tool-turns-gate.env")
+    if ttg.get("gate") in ("1", "true", "yes") or ttg.get("mutated") in (
+        "1",
+        "true",
+        "yes",
+    ):
+        signals["tool_turns_gate"] = True
+        if ttg.get("reason"):
+            signals["tool_turns_gate_reason"] = ttg["reason"]
+        if ttg.get("tool_turns") not in (None, ""):
+            try:
+                signals["tool_turns"] = int(ttg["tool_turns"])
+            except ValueError:
+                signals["tool_turns"] = ttg["tool_turns"]
+    if not signals["tool_turns_gate"] and (
+        "incomplete agentic review (f45)" in low
+        or "tool-turns gate (f45)" in low
+        or ("zero tool turns" in low and "f45" in low)
+    ):
+        signals["tool_turns_gate"] = True
+        signals["tool_turns_gate_reason"] = signals.get("tool_turns_gate_reason") or "review_banner"
+
     flags: list[str] = []
     if signals["path_skip"]:
         flags.append("path-skip")
@@ -316,6 +342,8 @@ def collect_signals(
         flags.append("preflight-refuse")
     elif signals.get("preflight_forced_cheap"):
         flags.append("preflight-cheap")
+    if signals.get("tool_turns_gate"):
+        flags.append("tool-turns-gate")
     # Surface auto/cheap/full when tier mode is active (not plain off/default)
     mode = (signals.get("model_tier_mode") or "").lower()
     tier = (signals.get("model_tier") or "").lower()

@@ -251,6 +251,30 @@ class PackRunForUiTests(unittest.TestCase):
             self.assertIn("model-cheap", sig.get("flags") or [])
             self.assertTrue(sig.get("any"))
 
+    def test_f45_tool_turns_gate_signal(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "run"
+            src.mkdir()
+            (src / "review-2.md").write_text(
+                "**Verdict:** COMMENT\n\n"
+                "> ⚠️ **Incomplete agentic review (F45):** Hermes recorded "
+                "**0 tool turns** on a multi-file code PR.\n",
+                encoding="utf-8",
+            )
+            (src / "tool-turns-gate.env").write_text(
+                "gate=1\nreason=zero_tools_multi_file_code\ntool_turns=0\n"
+                "file_count=4\nmutated=1\n",
+                encoding="utf-8",
+            )
+            out = Path(td) / "bundle.json"
+            r = _run(["--dir", str(src), "-o", str(out), "--host", "local"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            sig = json.loads(out.read_text())["signals"]
+            self.assertTrue(sig.get("tool_turns_gate"))
+            self.assertEqual(sig.get("tool_turns_gate_reason"), "zero_tools_multi_file_code")
+            self.assertIn("tool-turns-gate", sig.get("flags") or [])
+            self.assertTrue(sig.get("any"))
+
 
 if __name__ == "__main__":
     unittest.main()

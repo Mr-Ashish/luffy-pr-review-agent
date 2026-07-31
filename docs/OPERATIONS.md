@@ -69,6 +69,7 @@ Every auto-pack (`run-bundle.json`) includes a `signals` object:
 | `max_turns_hit` | `hermes-max-turns.env` / F41 iteration budget |
 | `model_tier` / `model-cheap` | `model-tier.env` / F42 auto tier |
 | `preflight_refuse` / `preflight-cheap` | `preflight-cost.env` / F43 |
+| `tool_turns_gate` / `tool-turns-gate` | `tool-turns-gate.env` / F45 zero-tool fail-closed |
 
 Also `loop` metrics: `tool_call_turns`, `message_count`, `step_count`, `max_turns`.
 
@@ -127,6 +128,24 @@ python3 scripts/preflight_cost.py decide --model anthropic/claude-opus-5 --diff-
 ```
 
 Evidence: `preflight-cost.env`, job-summary, Run Console chips.
+
+## Tool-turns fail-closed (F45 / H12)
+
+Zero Hermes tool turns on multi-file **code** PRs cannot leave **APPROVE** standing
+(odoo e2e #2 mini false green). Docs-only and single-file PRs are exempt.
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_TOOL_TURNS_GATE` | `1` | `0`/`off` disables |
+| `LUFFY_TOOL_TURNS_MIN_FILES` | `2` | multi-file threshold |
+| `LUFFY_TOOL_TURNS_GATE_VERDICTS` | `APPROVE` | rewritten to COMMENT |
+
+```bash
+python3 scripts/tool_turns_gate.py decide --tool-turns 0 --file-count 4 --path a.js --path b.js
+```
+
+Wired post-normalize in `run-hermes-review.sh`. Evidence: `tool-turns-gate.env`,
+job-summary **Luffy tool-turns gate (F45)**, chip `tool-turns-gate`.
 
 ## Modal host parity (F39)
 

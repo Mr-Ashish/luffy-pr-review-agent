@@ -70,6 +70,10 @@ copy_if "$OUT_DIR/hermes-${PR_NUMBER}.stderr" "$TRACE_DIR/hermes.stderr"
 copy_if "$OUT_DIR/hermes-usage.json" "$TRACE_DIR/hermes-usage.json"
 copy_if "$OUT_DIR/hermes-run.log" "$TRACE_DIR/hermes-run.log"
 copy_if "$OUT_DIR/hermes-pin.txt" "$TRACE_DIR/hermes-pin.txt"
+copy_if "$OUT_DIR/tool-turns-gate.env" "$TRACE_DIR/tool-turns-gate.env"
+copy_if "$OUT_DIR/hermes-max-turns.env" "$TRACE_DIR/hermes-max-turns.env"
+copy_if "$OUT_DIR/model-tier.env" "$TRACE_DIR/model-tier.env"
+copy_if "$OUT_DIR/preflight-cost.env" "$TRACE_DIR/preflight-cost.env"
 
 # Full agentic loop package (prompts / steps / tool calls / usage)
 if [[ -d "$OUT_DIR/agent-loop" ]]; then

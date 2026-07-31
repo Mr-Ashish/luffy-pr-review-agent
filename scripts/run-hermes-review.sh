@@ -623,6 +623,41 @@ if [[ -f "$LUFFY_ROOT/scripts/usage-summary.py" ]]; then
     --max-usd "${LUFFY_MAX_COST_USD:-}" || notice "usage-summary append soft-failed"
 fi
 
+# F45 / H12: fail closed when tool_turns=0 on multi-file non-docs PRs
+# (cheap chat-fallback can false-APPROVE — odoo e2e #2 mini vs GHA).
+TOOL_TURNS_GATE_HELPER="$LUFFY_ROOT/scripts/tool_turns_gate.py"
+if [[ -f "$TOOL_TURNS_GATE_HELPER" && -s "$FINAL_OUT" ]]; then
+  _ttg_args=(
+    apply
+    --review "$FINAL_OUT"
+    --out "$FINAL_OUT"
+    --env-out "$OUT_DIR/tool-turns-gate.env"
+  )
+  [[ -f "$LOOP_DIR/agent-loop.json" ]] && _ttg_args+=(--loop-json "$LOOP_DIR/agent-loop.json")
+  [[ -n "${FILE_COUNT:-}" ]] && _ttg_args+=(--file-count "$FILE_COUNT")
+  [[ -f "$OUT_DIR/files.txt" ]] && _ttg_args+=(--paths-file "$OUT_DIR/files.txt")
+  if _ttg_kv="$(python3 "$TOOL_TURNS_GATE_HELPER" "${_ttg_args[@]}" 2>/dev/null)"; then
+    _ttg_gate="$(printf '%s\n' "$_ttg_kv" | sed -n 's/^gate=//p' | head -1)"
+    _ttg_mut="$(printf '%s\n' "$_ttg_kv" | sed -n 's/^mutated=//p' | head -1)"
+    _ttg_reason="$(printf '%s\n' "$_ttg_kv" | sed -n 's/^reason=//p' | head -1)"
+    if [[ "$_ttg_gate" == "1" || "$_ttg_gate" == "true" ]]; then
+      notice "F45 tool-turns gate · reason=${_ttg_reason:-?} mutated=${_ttg_mut:-0} (zero tools on multi-file code PR)"
+      if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        {
+          echo "### Luffy tool-turns gate (F45)"
+          echo "- **Gate fired:** zero Hermes tool turns on multi-file non-docs PR"
+          echo "- **Reason:** \`${_ttg_reason:-zero_tools_multi_file_code}\`"
+          echo "- **Action:** APPROVE → COMMENT (fail closed) when applicable; banner injected"
+          echo "- Re-run so the agent reads changed files (\`hermes -z\` with tools)"
+          echo
+        } >>"$GITHUB_STEP_SUMMARY" || true
+      fi
+    fi
+  else
+    notice "F45 tool-turns gate soft-failed"
+  fi
+fi
+
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   {
     echo "review_file=$FINAL_OUT"
