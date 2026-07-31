@@ -1,9 +1,9 @@
-# Run run-20260731T174533-1c0b41
+# Run run-20260731T175144-078abc
 
 - session: `dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
-- units: 4
-- summary: The session's new durable content is the implementation-level contract of the F7 Hermes pin (hermes-pin.sh subcommand API, prefix/version-string match semantics, 12-char cache suffix) and the ensure_hermes bootstrap in run-hermes-review.sh (install-dir probing, PATH re-resolution, reinstall-on-mismatch), plus the agent-run env contract (LUFFY_TOOLSETS=terminal, verbose loop capture) and a real doc/script default-model divergence.
-- at: 2026-07-31T12:16:23Z
-- timings: {"assemble_s": 0.108, "extract_s": 49.71, "normalize_s": 0.002}
+- units: 5
+- summary: Two genuinely new areas beyond the claim index: (1) the uncommitted F8 prebaked-runner escape hatch in ensure_hermes plus the docker/ image + benchmark tooling, and (2) the mechanism-level contract of scripts/cooldown-check.sh (exit codes, fail-open, success-vs-failure comment detection, fixture/clock injection, gh --paginate multi-array pitfall). Existing F19/F7 design-level claims were not restated.
+- at: 2026-07-31T12:22:38Z
+- timings: {"assemble_s": 0.077, "extract_s": 53.908, "normalize_s": 0.002}

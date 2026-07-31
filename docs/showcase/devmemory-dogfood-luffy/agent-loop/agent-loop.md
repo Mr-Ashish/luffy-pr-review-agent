@@ -1,31 +1,31 @@
-# Agent loop · `run-20260731T174533-1c0b41`
+# Agent loop · `run-20260731T175144-078abc`
 
 - **model:** `anthropic/claude-opus-5`
 - **hermes_rc:** 0
-- **units:** 4
-- **at:** 2026-07-31T12:16:24Z
+- **units:** 5
+- **at:** 2026-07-31T12:22:39Z
 
 ## Summary
 
-The session's new durable content is the implementation-level contract of the F7 Hermes pin (hermes-pin.sh subcommand API, prefix/version-string match semantics, 12-char cache suffix) and the ensure_hermes bootstrap in run-hermes-review.sh (install-dir probing, PATH re-resolution, reinstall-on-mismatch), plus the agent-run env contract (LUFFY_TOOLSETS=terminal, verbose loop capture) and a real doc/script default-model divergence.
+Two genuinely new areas beyond the claim index: (1) the uncommitted F8 prebaked-runner escape hatch in ensure_hermes plus the docker/ image + benchmark tooling, and (2) the mechanism-level contract of scripts/cooldown-check.sh (exit codes, fail-open, success-vs-failure comment detection, fixture/clock injection, gh --paginate multi-array pitfall). Existing F19/F7 design-level claims were not restated.
 
 ## Usage
 
 ```json
 {
-  "estimated_cost_usd": 0.227643,
+  "estimated_cost_usd": 0.3560725,
   "cost_status": "estimated",
   "cost_source": "provider_models_api",
   "input_tokens": 2,
-  "output_tokens": 3922,
-  "cache_read_tokens": 20016,
-  "cache_write_tokens": 19132,
-  "reasoning_tokens": 560,
-  "total_tokens": 43072,
+  "output_tokens": 4333,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 39638,
+  "reasoning_tokens": 522,
+  "total_tokens": 43973,
   "api_calls": 1,
   "model": "anthropic/claude-opus-5",
   "provider": "openrouter",
-  "session_id": "20260731_174534_421ca8",
+  "session_id": "20260731_175145_c23f28",
   "completed": true,
   "failed": false,
   "service_tier": null
@@ -36,11 +36,11 @@ The session's new durable content is the implementation-level contract of the F7
 
 ```json
 {
-  "assemble_s": 0.108,
-  "extract_s": 49.71,
+  "assemble_s": 0.077,
+  "extract_s": 53.908,
   "normalize_s": 0.002,
-  "apply_s": 0.459,
-  "total_s": 50.283
+  "apply_s": 0.508,
+  "total_s": 54.5
 }
 ```
 

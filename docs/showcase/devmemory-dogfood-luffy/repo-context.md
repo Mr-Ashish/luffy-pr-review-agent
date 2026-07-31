@@ -1,22 +1,26 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T12:15:33Z
+- **assembled_at:** 2026-07-31T12:21:44Z
 
 ## git status
 
 ```
-(clean)
+M scripts/run-hermes-review.sh
+?? .github/workflows/build-luffy-runner.yml
+?? docker/
+?? scripts/benchmark-hermes-startup.sh
+?? scripts/build-luffy-runner-image.sh
 ```
 
 ## recent log
 
 ```
+e015fd2 feat(cost): per-PR re-trigger cooldown after successful review (F19)
+5b836d5 docs(knowledge): dogfood F7 Hermes pin into DEV/USAGE + showcase
 34841d9 feat(ops): pin Hermes install for reproducible CI (F7)
 fc672e8 feat(security): redact secrets in posted PR reviews (F18)
 0cfa72c Add colocated DEV/USAGE from devmemory dogfood on Luffy
-dea239c brand: use Three.js orbital core as README hero artifact
-6a938b1 feat(brand): Three.js square artifact gallery (not banners)
 ```
 
 ## tree (sample)
@@ -46,6 +50,7 @@ readme-kit/src/render/badges.mjs
 readme-kit/src/render/document.mjs
 readme-kit/src/assets/hero-options.mjs
 readme-kit/src/assets/hero-svg.mjs
+docker/luffy-runner/Dockerfile
 memory/DEV.md
 memory/README.md
 memory/index.json
@@ -53,6 +58,7 @@ memory/repos/Mr-Ashish--odoo/MEMORY.md
 memory/repos/Mr-Ashish--odoo/latest.json
 memory/repos/Mr-Ashish--luffy-pr-review-agent/MEMORY.md
 memory/repos/Mr-Ashish--luffy-pr-review-agent/latest.json
+tests/test_cooldown_check.py
 tests/test_gate_helpers.py
 tests/test_hermes_pin.py
 tests/test_hub_ingest.py
@@ -101,8 +107,11 @@ docs/showcase/devmemory-dogfood-luffy/timings.json
 docs/showcase/devmemory-dogfood-luffy/units.json
 scripts/assemble-context.sh
 scripts/association-allowed.sh
+scripts/benchmark-hermes-startup.sh
 scripts/build-hub-payload.py
+scripts/build-luffy-runner-image.sh
 scripts/capture-hermes-loop.py
+scripts/cooldown-check.sh
 scripts/distill-memory.sh
 scripts/hermes-pin.sh
 scripts/hub-ingest-run.py
@@ -147,7 +156,25 @@ assets/brand-options/three-artifacts.html
 ## git diff
 
 ```
-(no unstaged/uncommitted diff)
+diff --git a/scripts/run-hermes-review.sh b/scripts/run-hermes-review.sh
+index c8f1d54..6a2e075 100755
+--- a/scripts/run-hermes-review.sh
++++ b/scripts/run-hermes-review.sh
+@@ -66,6 +66,14 @@ ensure_hermes() {
+   pin="$("$PIN_HELPER" resolve 2>/dev/null | tr -d '\n' || true)"
+   printf '%s\n' "${pin:-floating}" >"$OUT_DIR/hermes-pin.txt" || true
+ 
++  # F8: prebaked Docker/custom runner (image sets LUFFY_HERMES_PREBAKED=1 or /.hermes-pin)
++  if [[ "${LUFFY_HERMES_PREBAKED:-}" == "1" || -f /root/.hermes-pin || -f "${HOME}/.hermes-pin" ]] \
++    && command -v hermes >/dev/null 2>&1; then
++    notice "hermes prebaked runner: $(command -v hermes)"
++    hermes --version 2>/dev/null || true
++    return
++  fi
++
+   if command -v hermes >/dev/null 2>&1; then
+     head="$(_hermes_install_head || true)"
+     if [[ -z "$pin" ]]; then
 ```
 
 ## existing knowledge files
@@ -157,26 +184,26 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] artifact compos deterministic every inner llm-driven orchestr record
 - [DEV.md#Architecture] assemble-contextsh contractfencessizehtml distill-memorysh hermes-pinsh hub-ingest-runpy marker normalize-reviewpy one-shot
 - [DEV.md#Architecture] branch config default domain luffy luffy-hermes-home memory prompt
-- [DEV.md#Design decisions] 400000 45-minute allowlist author-associ cancel-in-progres concurrency control costabuse
+- [DEV.md#Design decisions] 400000 45-minute 900s @luffy allowlist author-associ bypass cancel-in-progres
 - [DEV.md#Design decisions] --commit --force-commit --skip-setup action cache default float install
 - [DEV.md#Design decisions] comment delet luffy luffy-review luffyreplaceprevious=0 marker match prior
 - [DEV.md#Design decisions] always-publish comment crash failure hermesmodel low-confidence openrouter produce
+- [DEV.md#Design decisions] agentic assembl beyond capture-hermes-looppy completion default inspect luffytoolset
+- [DEV.md#Design decisions] activity agenttool hermestuitoolprogress=verbose later level observability pythonunbuffered=1 recoverable
+- [DEV.md#Design decisions] directory disposable explicitly hermeshome memory memorymd preserv through
 - [DEV.md#Pitfalls] 403 cannot classic clone default dispatch githubtoken ingest
 - [DEV.md#Pitfalls] content cross-repo githubtoken itself luffy luffyhubtoken publish requir
 - [DEV.md#Pitfalls] again agent comment common embedd f18 github honour
 - [DEV.md#Pitfalls] 100000 budget default exceed growth maxmemorybyt memorymd otherwise
 - [DEV.md#Pitfalls] backlog broken cache class count dishonest historical sparse-checkout
+- [DEV.md#Pitfalls] advertise alone anthropicclaude-opus-5 anyone default diverg either explicitly
+- [DEV.md#Pitfalls] --version accept behaviour binary check contain degrad ensureherm
+- [DEV.md#Pitfalls] <sha> default defaulthermescommit duplicat fallback hardcod overrid script
 - [DEV.md#Patterns] apikey-style assignment choke-point driven generic ghpousr… githubpat… helper
 - [DEV.md#Patterns] adding again agent cannot contract-failure ensurecontract fallback normalize-reviewpy
 - [DEV.md#Patterns] acros added apart comment drift duplicated-but-align intentionally normalize-reviewpy
 - [DEV.md#Patterns] agentsoulmd delegat enforc guarantee intent mechanically model never
-- [DEV.md#Patterns] absent assert assertion both-sid broken-output fallback githubtokenredact includ
-- [memory/DEV.md#Architecture] central doubl every flatten history ingest latestjson memorymd
-- [memory/DEV.md#Architecture] build-hub-payloadpy commit default direct hub-ingest-runpy luffy-run memory optional
-- [memory/DEV.md#Architecture] cross-repo cross-run hermeshome memory per-job preload preload-hub-memorysh review
-- [memory/DEV.md#Architecture] behaviour default direct|dispatch|both disable env-configurable luffyhubmode luffyhubpublish=0 luffyhubrepo
-- [agent/DEV.md#Design decisions] added agentsoulmd already chang contract explicitly import invent
-- [agent/DEV.md#Design decisions] approve attempt ig
+- [DEV.md#Patterns] absent assert assertion both-sid broken-output fallback githubtokenredact inc
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -189,8 +216,8 @@ assets/brand-options/three-artifacts.html
 - Dual workspace separates trust domains: `luffy/` holds SOUL + prompts + scripts from the default branch, `workspace/` holds only the PR head, `.luffy-hermes-home/` holds Hermes config + growing memory.
 
 ## Design decisions
-- Cost/abuse controls are layered: author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout.
-- Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (default known-good SHA; `latest`/`main`/`floating`/empty = float), emits `install.sh` args (`--skip-setup --commit … --force-commit`), and supplies the Actions cache key 
+- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after successful Luffy comment; failures do not start the window; `@luffy review force` bypasses), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout.
+- Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (defa
 … [truncated; do not restate] …
 
 ### memory/DEV.md
@@ -211,16 +238,18 @@ assets/brand-options/three-artifacts.html
 
 ### USAGE.md
 
+## Common commands
+- Inspect the effective Hermes pin locally without network: `scripts/hermes-pin.sh resolve` (empty output = floating), `scripts/hermes-pin.sh default` (baked-in known-good SHA), `scripts/hermes-pin.sh install-args` (exact `install.sh` args), `scripts/hermes-pin.sh cache-suffix` (Actions cache key suffix).
+- Check whether an installed tree satisfies the pin: `scripts/hermes-pin.sh matches <git-head-sha>` — exit 0 means acceptable (short/full SHA prefixes both count).
+- Per-run pin actually used is recorded at `.luffy-out/hermes-pin.txt` and shipped in the trace artifact — read it before blaming the model for a behaviour change.
+
 ## Setup
 - Install on each target repo by copying `agent/`, `scripts/`, and `.github/workflows/luffy-pr-review.yml` onto that repo's **default branch** (workflow only runs from default branch).
 - Required secret: `OPENROUTER_API_KEY`. For cross-repo hub memory also add `LUFFY_HUB_TOKEN` (PAT with contents write on the hub).
-- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
+- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
 - Trigger a review by commenting `@luffy review this pr` (or `@luffy review`) on the PR.
 
 ## Debugging
-- Local dry-run (needs authenticated `gh`, network, and `.env` with `OPENROUTER_API_KEY`): `./scripts/review-local.sh owner/repo 123`; add `POST_COMMENT=1` to actually comment on the PR.
-- Two artifacts per run: `luffy-out-pr<N>-run<id>` (full `.luffy-out/` + memory snapshot, 14 days) and `luffy-trace-pr<N>-run<id>` (structured redacted trace, 90 days).
-- Fetch a trace with `gh run download <run-id> -R owner/repo -n luffy-trace-pr<N>-run<run-id>`.
-- Trace layout under `traces/pr{N}-run{RUN_ID}-a{ATTEMPT}/`: `meta.json`, `trace.json`, `prompt.md`, `context.md`, `pr.json`/`pr.diff`, `review.raw.md` (Hermes stdout) vs `review.md` (posted body), `hermes.stderr`, `timings.json`, `memory-before.md`/`memory-after.md` — diff raw vs normalized to isolate contract violations, and before/after memory to veri
+- Local dry-run (needs authenticated `gh`, network, and `.env` with `OPEN
 … [truncated; do not restate] …
 

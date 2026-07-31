@@ -2,14 +2,27 @@
   "units": [
     {
       "kind": "dev",
+      "path": "docker/luffy-runner",
+      "action": "merge",
+      "section": "Design decisions",
+      "content": "- F8 prebaked runner: `ensure_hermes` in `scripts/run-hermes-review.sh` short-circuits the whole install/cache path when `LUFFY_HERMES_PREBAKED=1` **or** a `/root/.hermes-pin` / `$HOME/.hermes-pin` marker file exists *and* `hermes` is already on PATH — it just logs `command -v hermes` + `hermes --version` and returns.\n- The pin file is still resolved and written to `$OUT_DIR/hermes-pin.txt` *before* the prebaked check, so traces record the intended pin even on runs that never invoke `install.sh`.\n- Image is built from `docker/luffy-runner/Dockerfile` via `scripts/build-luffy-runner-image.sh`, published by `.github/workflows/build-luffy-runner.yml`, and its startup win is measured with `scripts/benchmark-hermes-startup.sh` — the image is the artifact that must carry the marker file, otherwise runners silently fall back to the slow cold-install path.",
+      "evidence": [
+        "# F8: prebaked Docker/custom runner (image sets LUFFY_HERMES_PREBAKED=1 or /.hermes-pin)",
+        "if [[ \"${LUFFY_HERMES_PREBAKED:-}\" == \"1\" || -f /root/.hermes-pin || -f \"${HOME}/.hermes-pin\" ]]",
+        "F8 | Prebaked Hermes runner image + startup benchmark | M | Shipped (docker/ + build workflow + benchmark script)"
+      ],
+      "confidence": "high"
+    },
+    {
+      "kind": "dev",
       "path": ".",
       "action": "merge",
       "section": "Patterns",
-      "content": "- `scripts/hermes-pin.sh` is a pure, network-free resolver with a 5-verb CLI (`resolve`, `install-args`, `matches <head>`, `cache-suffix`, `default`); every consumer (workflow step, `run-hermes-review.sh`) calls it instead of re-deriving pin logic, so the pin lives in exactly one place.\n- Pin comparison is prefix-tolerant in both directions (`head == pin*` or `pin == head*`), so short and full SHAs interoperate; no pin means `matches` always succeeds (floating mode is a no-op gate).\n- `cache-suffix` truncates the pin to 12 chars (or prints `latest` when floating) purely to keep the Actions cache key readable — cache keys are derived, never hand-written.\n- `ensure_hermes` in `run-hermes-review.sh` verifies an already-present binary before trusting it: probe `~/.hermes/hermes-agent`, `$HERMES_INSTALL_DIR`, `~/.local/share/hermes-agent` for a `.git` HEAD; on mismatch it reinstalls rather than silently reviewing with the wrong build.\n- After any install the script re-exports PATH, sources `~/.bashrc`, runs `hash -r`, then probes `~/.local/bin/hermes`, `~/.hermes/bin/hermes`, `~/.hermes/hermes` — installer layout is treated as unstable, so the binary is located by search, not assumption.",
+      "content": "- Gate helpers follow a stdout-contract pattern: `scripts/cooldown-check.sh` prints `allowed=`, `reason=`, `age_s=`, `remaining_s=` key=value lines that the workflow parses straight into `$GITHUB_OUTPUT`, and signals decisions through exit codes — `0` allow, `2` cooldown active (skip paid run), `1` hard error.\n- Exit `1` is deliberately **fail-open**: the workflow logs `::warning::F19 cooldown check failed (rc=$RC); fail-open allow` and sets `allowed=true`, so a GitHub API hiccup never blocks reviews (the trade-off is it can also leak a paid run).\n- \"Successful review\" is inferred from the posted comment, not from job state: body must contain the `<!-- luffy-review pr=N` marker **and** match none of the `FAIL_SNIPPETS` (missing secret, config error, \"luffy failed to produce a review\", …), which is what makes failure stubs retryable immediately.\n- The script is designed for hermetic tests: `LUFFY_COOLDOWN_FIXTURE` supplies a JSON array of `{created_at, body}` comments (no network) and `NOW_EPOCH` pins the clock — see `tests/test_cooldown_check.py`.",
       "evidence": [
-        "scripts/hermes-pin.sh resolve → print effective pin (empty if floating)",
-        "if [[ \"$head\" == \"$pin\"* || \"$pin\" == \"$head\"* ]]; then",
-        "for d in \"${HOME}/.hermes/hermes-agent\" \"${HERMES_INSTALL_DIR:-}\" \"${HOME}/.local/share/hermes-agent\""
+        "#   0  allow run\n#   2  cooldown active (skip paid review)\n#   1  hard error (workflow should soft-fail open → allow)",
+        "FAIL_SNIPPETS = (\"luffy failed to produce a review\", \"missing required secret\", …)",
+        "LUFFY_COOLDOWN_FIXTURE     path to JSON array of {created_at,body} comments (tests; no network)"
       ],
       "confidence": "high"
     },
@@ -18,45 +31,45 @@
       "path": ".",
       "action": "merge",
       "section": "Pitfalls",
-      "content": "- Default model diverges by layer: `scripts/run-hermes-review.sh` falls back to `anthropic/claude-opus-5` while the ops docs advertise `openai/gpt-5-mini` as the default. Anyone reasoning about cost from the docs alone will be wrong for local/dry runs — set `LUFFY_MODEL` explicitly instead of relying on either default.\n- Pin verification degrades to a substring check: when the install tree has no `.git`, `ensure_hermes` accepts the binary if `hermes --version` merely contains the pin's first 8 chars. A cached install without git metadata can therefore pass the pin gate on weak evidence — check `hermes-pin.txt` in the trace when a run's behaviour looks off for the pinned SHA.\n- `DEFAULT_HERMES_COMMIT` is hardcoded in `scripts/hermes-pin.sh` and duplicated as the workflow env fallback (`vars.LUFFY_HERMES_COMMIT || <sha>`); bumping the pin means editing both or the workflow will keep overriding the script default.",
+      "content": "- `gh api --paginate` can emit **several concatenated JSON arrays** (one per page), so a plain `json.loads` on its output fails; `cooldown-check.sh` walks the buffer with `json.JSONDecoder().raw_decode` and extends a single list. Reuse that loop for any new paginated `gh api --jq` consumer instead of assuming one array.\n- A non-integer `LUFFY_COOLDOWN_SECONDS` is treated as **disabled** (`reason=disabled_invalid`, warning only) rather than an error — a typo in the repo variable silently removes the spend guard.\n- Clock skew is clamped, not trusted: a comment timestamp newer than `now` yields `age=0`, which means a bad clock maximises the cooldown rather than bypassing it.",
       "evidence": [
-        "MODEL=\"${LUFFY_MODEL:-${OPENROUTER_MODEL:-anthropic/claude-opus-5}}\"",
-        "Optional variable: `LUFFY_MODEL` (default in scripts: `openai/gpt-5-mini`)",
-        "if [[ -n \"$ver\" && \"$ver\" == *\"${pin:0:8}\"* ]]; then"
+        "# gh --paginate may emit multiple JSON arrays\ndec = json.JSONDecoder()",
+        "echo \"::warning::LUFFY_COOLDOWN_SECONDS='${RAW_CD}' not an integer; treating as disabled\"",
+        "if age < 0:\n    age = 0"
       ],
       "confidence": "high"
-    },
-    {
-      "kind": "dev",
-      "path": ".",
-      "action": "merge",
-      "section": "Design decisions",
-      "content": "- The review step is agentic, not a single completion: Hermes runs with `LUFFY_TOOLSETS` (default `terminal`) so the reviewer can inspect files under `WORKSPACE_ROOT` beyond the assembled diff, and `capture-hermes-loop.py` records the tool loop.\n- Observability is forced on at the env level (`HERMES_TUI_TOOL_PROGRESS=verbose`, `PYTHONUNBUFFERED=1`) so agent/tool activity is recoverable from logs even for a run that later fails.\n- `HERMES_HOME` is seeded per run but `MEMORY.md` is explicitly preserved through seeding — the home directory is disposable, the memory file is not.",
-      "evidence": [
-        "TOOLSETS=\"${LUFFY_TOOLSETS:-terminal}\"",
-        "export HERMES_TUI_TOOL_PROGRESS=\"${HERMES_TUI_TOOL_PROGRESS:-verbose}\"",
-        "# Seed HERMES_HOME (preserve growing MEMORY.md)"
-      ],
-      "confidence": "medium"
     },
     {
       "kind": "usage",
       "path": ".",
       "action": "merge",
-      "section": "Common commands",
-      "content": "- Inspect the effective Hermes pin locally without network: `scripts/hermes-pin.sh resolve` (empty output = floating), `scripts/hermes-pin.sh default` (baked-in known-good SHA), `scripts/hermes-pin.sh install-args` (exact `install.sh` args), `scripts/hermes-pin.sh cache-suffix` (Actions cache key suffix).\n- Check whether an installed tree satisfies the pin: `scripts/hermes-pin.sh matches <git-head-sha>` — exit 0 means acceptable (short/full SHA prefixes both count).\n- Float a run off the pin for a one-off experiment: `LUFFY_HERMES_COMMIT=latest scripts/hermes-pin.sh resolve` (also accepts `main`, `floating`, or empty).\n- Per-run pin actually used is recorded at `.luffy-out/hermes-pin.txt` and shipped in the trace artifact — read it before blaming the model for a behaviour change.",
+      "section": "Debugging",
+      "content": "- Reproduce a cooldown decision offline (no `gh`, no network): `LUFFY_COOLDOWN_FIXTURE=/tmp/comments.json NOW_EPOCH=1753963200 bash scripts/cooldown-check.sh 1` — fixture is a JSON array of `{created_at, body}` objects; read the `allowed=`/`reason=`/`remaining_s=` lines and the exit code (0 allow, 2 skip, 1 error).\n- Force an allow while debugging without touching repo variables: `LUFFY_COOLDOWN_FORCE=1 bash scripts/cooldown-check.sh <pr>` (prints `reason=force`); on a real PR the operator-facing equivalents are `@luffy review force` and `workflow_dispatch`.\n- When a trigger comment produces a rocket reaction and no review, check the job summary section \"Luffy cooldown (F19)\" for the remaining seconds before suspecting the gate or the model.",
       "evidence": [
-        "usage: $0 resolve|install-args|matches <head>|cache-suffix|default",
-        "printf '%s\\n' \"${pin:-floating}\" >\"$OUT_DIR/hermes-pin.txt\"",
-        "Trace includes `hermes-pin.txt`."
+        "LUFFY_COOLDOWN_FORCE=1     always allow (operator override)",
+        "NOW_EPOCH                  optional fixed clock for tests",
+        "echo \"### Luffy cooldown (F19)\""
       ],
-      "confidence": "high"
+      "confidence": "medium"
+    },
+    {
+      "kind": "usage",
+      "path": "docker",
+      "action": "merge",
+      "section": "Common commands",
+      "content": "- Build the prebaked Hermes runner image locally: `bash scripts/build-luffy-runner-image.sh` (source `docker/luffy-runner/Dockerfile`); CI equivalent is the **Build Luffy Runner** workflow (`.github/workflows/build-luffy-runner.yml`).\n- Measure the startup win the image is supposed to deliver: `bash scripts/benchmark-hermes-startup.sh` — compare against a cold-install job before switching `runs-on`.\n- To make a custom/self-hosted runner skip Hermes installation entirely, export `LUFFY_HERMES_PREBAKED=1` or drop a `.hermes-pin` marker at `/root/.hermes-pin` or `$HOME/.hermes-pin` with `hermes` already on PATH.",
+      "evidence": [
+        "docker/luffy-runner/Dockerfile",
+        "?? scripts/build-luffy-runner-image.sh\n?? scripts/benchmark-hermes-startup.sh",
+        "?? .github/workflows/build-luffy-runner.yml"
+      ],
+      "confidence": "medium"
     }
   ],
-  "summary": "The session's new durable content is the implementation-level contract of the F7 Hermes pin (hermes-pin.sh subcommand API, prefix/version-string match semantics, 12-char cache suffix) and the ensure_hermes bootstrap in run-hermes-review.sh (install-dir probing, PATH re-resolution, reinstall-on-mismatch), plus the agent-run env contract (LUFFY_TOOLSETS=terminal, verbose loop capture) and a real doc/script default-model divergence.",
+  "summary": "Two genuinely new areas beyond the claim index: (1) the uncommitted F8 prebaked-runner escape hatch in ensure_hermes plus the docker/ image + benchmark tooling, and (2) the mechanism-level contract of scripts/cooldown-check.sh (exit codes, fail-open, success-vs-failure comment detection, fixture/clock injection, gh --paginate multi-array pitfall). Existing F19/F7 design-level claims were not restated.",
   "session_ids": [
     "dogfood-luffy-session"
   ],
   "model": "anthropic/claude-opus-5",
-  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T174533-1c0b41/extract.raw.md"
+  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T175144-078abc/extract.raw.md"
 }

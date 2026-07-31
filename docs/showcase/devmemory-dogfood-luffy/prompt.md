@@ -46,7 +46,7 @@ Respond with **only** the JSON object (fence optional).
 
 # Luffy dogfood session — knowledge extract source
 
-Generated for devmemory extract. Product: Luffy PR review agent.
+Generated for devmemory extract. Product: Luffy PR review agent. Focus: F19 cooldown.
 
 ## Architecture
 # Luffy architecture
@@ -126,6 +126,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 3 (F13–F17):** sparse count bugfix, stable Hermes cache key, honest fail reaction, deny 😕, drop dead install copy  
 - **Sprint 4 (F18):** secret redaction on posted review body  
 - **Sprint 5 (F7):** pin Hermes install via `LUFFY_HERMES_COMMIT` + `scripts/hermes-pin.sh` (cache key v4)
+- **Sprint 6 (F19):** per-PR re-trigger cooldown after successful review
 
 ## Central hub memory (cross-repo)
 
@@ -197,6 +198,7 @@ Requires: `gh` authenticated, network for Hermes install + OpenRouter.
 - Diff size cap (`MAX_DIFF_BYTES`, default 400000)
 - Job timeout 45 minutes
 - Re-runs **replace** prior Luffy comments on the same PR (marker `<!-- luffy-review pr=N`); set `LUFFY_REPLACE_PREVIOUS=0` to stack
+- **Per-PR cooldown (F19):** default 900s after a *successful* Luffy comment — skip paid run (rocket reaction). Override `vars.LUFFY_COOLDOWN_SECONDS` (`0`/`off` disables). Bypass: `@luffy review force` or workflow_dispatch
 
 ## Memory
 
@@ -266,9 +268,9 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 | 13 | **F17** | Drop dead `RUNNER_TEMP` Hermes tree copy after cold install | XS | Faster cold path | **Shipped** |
 | 14 | **F18** | Redact secrets in **posted** review (`normalize-review.py` choke-point) | XS | 🔥 Trust — no keys on PR comments | **Shipped** |
 | 15 | **F7** | Pin Hermes install (`scripts/hermes-pin.sh` + `LUFFY_HERMES_COMMIT` + cache key `v4-<pin>`) | S | 🔥 Repro CI | **Shipped** |
-| 16 | F19 | Per-PR re-trigger cooldown (skip paid run after recent success) | S | Cost/abuse | Next |
-| 17 | F20 | `scripts/install-luffy.sh` copy pack to target repo | S | Adoption | Later |
-| 18 | F8 | Docker image with Hermes preinstalled | M | Fastest CI | Later |
+| 16 | **F19** | Per-PR re-trigger cooldown (`scripts/cooldown-check.sh`, default 900s) | S | 🔥 Cost/abuse | **Shipped** |
+| 17 | F20 | `scripts/install-luffy.sh` copy pack to target repo | S | Adoption | Next |
+| 18 | **F8** | Prebaked Hermes runner image + startup benchmark | M | 🔥 Fast CI startup | **Shipped** (docker/ + build workflow + benchmark script) |
 | 19 | F9 | Inline GitHub review comments | L | Product | Later |
 | 20 | F10 | Reusable workflow_call packaging | M | Multi-repo DX | Later |
 
@@ -291,6 +293,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 ### Sprint 5 (shipped)
 
 **F7** pin Hermes via `LUFFY_HERMES_COMMIT` (default known-good SHA in `scripts/hermes-pin.sh` + workflow env); install uses `install.sh --skip-setup --commit … --force-commit`; Actions cache key `luffy-hermes-bin-*-v4-<pin>`; set var to `latest`/`main` to float. Trace includes `hermes-pin.txt`.
+
+### Sprint 6 (shipped)
+
+**F19** per-PR re-trigger cooldown: after a *successful* Luffy PR comment, further `@luffy review` within `LUFFY_COOLDOWN_SECONDS` (default **900**) skips Hermes/OpenRouter (rocket reaction + job summary). Failures do not start the window. Bypass: `@luffy review force`, `workflow_dispatch`, or set cooldown to `0`/`off`.
 
 ### readme-kit (shipped)
 
@@ -356,8 +362,11 @@ Follow the template in the user prompt exactly.
 ## Scripts inventory
 assemble-context.sh
 association-allowed.sh
+benchmark-hermes-startup.sh
 build-hub-payload.py
+build-luffy-runner-image.sh
 capture-hermes-loop.py
+cooldown-check.sh
 distill-memory.sh
 hermes-pin.sh
 hub-ingest-run.py
@@ -372,247 +381,256 @@ save-trace.sh
 sparse-pr-paths.sh
 write-failure-review.sh
 
-## Hermes pin (F7)
+## F19 cooldown-check.sh
 #!/usr/bin/env bash
-# F7: resolve Hermes install pin + install.sh args (no network).
-#
-# Env:
-#   LUFFY_HERMES_COMMIT  full/short SHA, or empty/"latest"/"main" for floating tip
+# F19: per-PR re-trigger cooldown — skip paid OpenRouter runs after a recent success.
 #
 # Usage:
-#   scripts/hermes-pin.sh resolve     → print effective pin (empty if floating)
-#   scripts/hermes-pin.sh install-args → print args for: bash -s -- <args>
-#   scripts/hermes-pin.sh matches <head> → exit 0 if installed HEAD matches pin
-#   scripts/hermes-pin.sh cache-suffix → pin or "latest" (safe for cache keys)
+#   scripts/cooldown-check.sh <pr_number>
 #
-# Default pin: known-good NousResearch/hermes-agent commit (update intentionally).
+# Env:
+#   REPO / GITHUB_REPOSITORY   owner/repo (required unless LUFFY_COOLDOWN_FIXTURE set)
+#   GH_TOKEN / GITHUB_TOKEN    for gh api
+#   LUFFY_COOLDOWN_SECONDS     window in seconds (default 900). 0 / empty / off = disabled
+#   LUFFY_COOLDOWN_FORCE=1     always allow (operator override)
+#   LUFFY_COOLDOWN_FIXTURE     path to JSON array of {created_at,body} comments (tests; no network)
+#   NOW_EPOCH                  optional fixed clock for tests
+#
+# Exit:
+#   0  allow run
+#   2  cooldown active (skip paid review)
+#   1  hard error (workflow should soft-fail open → allow)
+#
+# Prints key=value lines to stdout for Actions outputs (allowed, reason, age_s, remaining_s).
 set -euo pipefail
 
-# Upstream tip pinned for reproducible CI (2026-07-31; NousResearch/hermes-agent main).
-# Bump intentionally after smoke-testing a new SHA; set LUFFY_HERMES_COMMIT=latest to float.
-DEFAULT_HERMES_COMMIT="53559aaf86b84dadae83cd9bb605ca476f9a0606"
+PR_NUMBER="${1:-${PR_NUMBER:-}}"
+REPO="${REPO:-${GITHUB_REPOSITORY:-}}"
+FORCE="${LUFFY_COOLDOWN_FORCE:-0}"
+RAW_CD="${LUFFY_COOLDOWN_SECONDS-900}"
+FIXTURE="${LUFFY_COOLDOWN_FIXTURE:-}"
 
-resolve_pin() {
-  local raw="${LUFFY_HERMES_COMMIT-${DEFAULT_HERMES_COMMIT}}"
-  # Explicit empty / latest / main → floating (install tracks install.sh default branch)
-  if [[ -z "$raw" || "$raw" == "latest" || "$raw" == "main" || "$raw" == "floating" ]]; then
-    printf ''
-    return
-  fi
-  printf '%s' "$raw"
+emit() {
+  # shellcheck disable=SC2059
+  printf '%s\n' "$@"
 }
 
-install_args() {
-  local pin
-  pin="$(resolve_pin)"
-  # Non-interactive CI-friendly install
-  printf '%s' "--skip-setup"
-  if [[ -n "$pin" ]]; then
-    # --force-commit: re-pin even if cached tree is newer than pin
-    printf ' --commit %s --force-commit' "$pin"
-  fi
-  printf '\n'
+allow() {
+  local reason="${1:-ok}"
+  emit "allowed=true"
+  emit "reason=${reason}"
+  emit "age_s="
+  emit "remaining_s=0"
+  exit 0
 }
 
-# Exit 0 if installed git HEAD matches pin (prefix or full). No pin → always match.
-matches() {
-  local head="${1:-}"
-  local pin
-  pin="$(resolve_pin)"
-  if [[ -z "$pin" ]]; then
-    return 0
-  fi
-  if [[ -z "$head" ]]; then
-    return 1
-  fi
-  # Normalize: match if either is a prefix of the other (short vs full SHA)
-  if [[ "$head" == "$pin"* || "$pin" == "$head"* ]]; then
-    return 0
-  fi
-  return 1
+deny() {
+  local reason="$1" age="${2:-}" remaining="${3:-}"
+  emit "allowed=false"
+  emit "reason=${reason}"
+  emit "age_s=${age}"
+  emit "remaining_s=${remaining}"
+  exit 2
 }
 
-cache_suffix() {
-  local pin
-  pin="$(resolve_pin)"
-  if [[ -z "$pin" ]]; then
-    printf 'latest\n'
-  else
-    # Short form keeps GH cache key readable
-    printf '%s\n' "${pin:0:12}"
-  fi
-}
+# Force override
+if [[ "$FORCE" == "1" || "$FORCE" == "true" || "$FORCE" == "yes" ]]; then
+  allow "force"
+fi
 
-cmd="${1:-resolve}"
-case "$cmd" in
-  resolve) resolve_pin; printf '\n' ;;
-  install-args) install_args ;;
-  matches) matches "${2:-}" ;;
-  cache-suffix) cache_suffix ;;
-  default) printf '%s\n' "$DEFAULT_HERMES_COMMIT" ;;
-  *)
-    echo "usage: $0 resolve|install-args|matches <head>|cache-suffix|default" >&2
-    exit 2
+# Disable cooldown
+case "${RAW_CD}" in
+  '' | 0 | off | OFF | false | FALSE | disabled | DISABLED)
+    allow "disabled"
     ;;
 esac
 
-## run-hermes-review pin section (head)
-#!/usr/bin/env bash
-# Run Hermes one-shot review with detailed agent-loop capture.
-#
-# Env:
-#   OPENROUTER_API_KEY
-#   LUFFY_ROOT, HERMES_HOME, WORKSPACE_ROOT
-#   OUT_DIR, PROMPT_PATH (or meta.env)
-#   LUFFY_MODEL / OPENROUTER_MODEL  (default: anthropic/claude-opus-5)
-#   LUFFY_TOOLSETS  (optional hermes -t value; default: terminal for workspace tools)
-#   LUFFY_HERMES_COMMIT  pin SHA (default in hermes-pin.sh); empty/latest/main = floating
-#   PR_NUMBER
-set -euo pipefail
+# Integer seconds
+if ! [[ "$RAW_CD" =~ ^[0-9]+$ ]]; then
+  echo "::warning::LUFFY_COOLDOWN_SECONDS='${RAW_CD}' not an integer; treating as disabled" >&2
+  allow "disabled_invalid"
+fi
+COOLDOWN_S="$RAW_CD"
 
-log() { echo "$*" >&2; }
-notice() { echo "::notice::$*" >&2; log "$*"; }
-die() { echo "::error::$*" >&2; exit 1; }
+[[ -n "$PR_NUMBER" ]] || {
+  echo "usage: $0 <pr_number>" >&2
+  exit 1
+}
 
-: "${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is required}"
-
-LUFFY_ROOT="${LUFFY_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-OUT_DIR="${OUT_DIR:-$LUFFY_ROOT/.luffy-out}"
-HERMES_HOME="${HERMES_HOME:-$LUFFY_ROOT/.luffy-hermes-home}"
-WORKSPACE_ROOT="${WORKSPACE_ROOT:-$LUFFY_ROOT}"
-MODEL="${LUFFY_MODEL:-${OPENROUTER_MODEL:-anthropic/claude-opus-5}}"
-TOOLSETS="${LUFFY_TOOLSETS:-terminal}"
-PIN_HELPER="$LUFFY_ROOT/scripts/hermes-pin.sh"
-
-mkdir -p "$OUT_DIR" "$HERMES_HOME/memories" "$HERMES_HOME/logs"
-
-if [[ -f "$OUT_DIR/meta.env" ]]; then
-  # shellcheck disable=SC1091
-  source "$OUT_DIR/meta.env"
+# Fetch comment list as JSON array
+COMMENTS_JSON='[]'
+if [[ -n "$FIXTURE" ]]; then
+  [[ -f "$FIXTURE" ]] || {
+    echo "fixture not found: $FIXTURE" >&2
+    exit 1
+  }
+  COMMENTS_JSON="$(cat "$FIXTURE")"
+else
+  [[ -n "$REPO" ]] || {
+    echo "REPO or GITHUB_REPOSITORY required" >&2
+    exit 1
+  }
+  export GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+  command -v gh >/dev/null 2>&1 || {
+    echo "gh CLI required" >&2
+    exit 1
+  }
+  # Paginate issue comments; soft failures bubble as exit 1 for caller soft-open
+  COMMENTS_JSON="$(
+    gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+      --jq '[.[] | {created_at, body}]' 2>/dev/null \
+      | python3 -c '
+import sys, json
+chunks = []
+buf = sys.stdin.read().strip()
+if not buf:
+    print("[]")
+    raise SystemExit(0)
+# gh --paginate may emit multiple JSON arrays
+dec = json.JSONDecoder()
+idx = 0
+while idx < len(buf):
+    while idx < len(buf) and buf[idx].isspace():
+        idx += 1
+    if idx >= len(buf):
+        break
+    obj, end = dec.raw_decode(buf, idx)
+    if isinstance(obj, list):
+        chunks.extend(obj)
+    idx = end
+print(json.dumps(chunks))
+'
+  )" || {
+    echo "warn: failed to list comments for cooldown" >&2
+    exit 1
+  }
 fi
 
-PROMPT_PATH="${PROMPT_PATH:-$OUT_DIR/prompt.md}"
-PR_NUMBER="${PR_NUMBER:-unknown}"
-[[ -f "$PROMPT_PATH" ]] || die "Missing prompt: $PROMPT_PATH"
+export COMMENTS_JSON PR_NUMBER COOLDOWN_S
+export NOW_EPOCH="${NOW_EPOCH:-}"
 
-export HERMES_HOME
-export OPENROUTER_API_KEY
-export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
-# Encourage verbose file logging for agent/tool activity
-export HERMES_TUI_TOOL_PROGRESS="${HERMES_TUI_TOOL_PROGRESS:-verbose}"
-export PYTHONUNBUFFERED=1
+python3 - <<'PY'
+import json, os, re, sys
+from datetime import datetime, timezone
 
-# ---------------------------------------------------------------------------
-# F7: Ensure Hermes (pinned install; path cached by workflow when possible)
-# ---------------------------------------------------------------------------
-_hermes_install_head() {
-  local d
-  for d in \
-    "${HOME}/.hermes/hermes-agent" \
-    "${HERMES_INSTALL_DIR:-}" \
-    "${HOME}/.local/share/hermes-agent"; do
-    [[ -n "$d" && -d "$d/.git" ]] || continue
-    git -C "$d" rev-parse HEAD 2>/dev/null && return 0
-  done
-  return 1
-}
+pr = os.environ["PR_NUMBER"]
+cooldown = int(os.environ["COOLDOWN_S"])
+now_raw = os.environ.get("NOW_EPOCH") or ""
+if now_raw:
+    now = int(now_raw)
+else:
+    now = int(datetime.now(tz=timezone.utc).timestamp())
 
-ensure_hermes() {
-  export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
-  chmod +x "$PIN_HELPER" 2>/dev/null || true
+comments = json.loads(os.environ.get("COMMENTS_JSON") or "[]")
+marker = f"<!-- luffy-review pr={pr}"
 
-  local pin head
-  pin="$("$PIN_HELPER" resolve 2>/dev/null | tr -d '\n' || true)"
-  printf '%s\n' "${pin:-floating}" >"$OUT_DIR/hermes-pin.txt" || true
+# Failure / non-success stubs must NOT start the cooldown (allow retry).
+FAIL_SNIPPETS = (
+    "luffy failed to produce a review",
+    "missing required secret",
+    "openrouter_api_key is not set",
+    "openrouter_api_key not set",
+    "config error",
+    "review agent run failed",
+    "failure path only",
+    "check workflow logs, hermes install",
+    "missing openrouter",
+)
 
-  if command -v hermes >/dev/null 2>&1; then
-    head="$(_hermes_install_head || true)"
-    if [[ -z "$pin" ]]; then
-      notice "hermes (cached/present, floating): $(command -v hermes)"
-      hermes --version 2>/dev/null || true
-      return
-    fi
-    if "$PIN_HELPER" matches "$head"; then
-      notice "hermes (cached/present, pin=$pin head=${head:-unknown}): $(command -v hermes)"
-      hermes --version 2>/dev/null || true
-      return
-    fi
-    # Version string may still mention short pin when git dir missing
-    local ver
-    ver="$(hermes --version 2>/dev/null || true)"
-    if [[ -n "$ver" && "$ver" == *"${pin:0:8}"* ]]; then
-      notice "hermes version matches pin ${pin:0:8}: $(command -v hermes)"
-      return
-    fi
-    notice "hermes present but pin mismatch (want $pin head=${head:-n/a}); reinstalling..."
-  else
-    notice "Installing Hermes Agent (cold, pin=${pin:-floating})..."
-  fi
+def is_success_review(body: str) -> bool:
+    if not body or marker not in body:
+        return False
+    low = body.lower()
+    return not any(s in low for s in FAIL_SNIPPETS)
 
-  local args
-  # shellcheck disable=SC2207
-  args=( $("$PIN_HELPER" install-args) )
-  notice "hermes install.sh args: ${args[*]}"
-  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- "${args[@]}"
-  export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
-  # shellcheck disable=SC1091
-  [[ -f "${HOME}/.bashrc" ]] && source "${HOME}/.bashrc" || true
-  hash -r 2>/dev/null || true
-  for candidate in \
-    "${HOME}/.local/bin/hermes" \
-    "${HOME}/.hermes/bin/hermes" \
-    "${HOME}/.hermes/hermes"; do
-    if [[ -x "$candidate" ]]; then
-      export PATH="$(dirname "$candidate"):${PATH}"
-      break
-    fi
-  done
-  command -v hermes >/dev/null 2>&1 || die "hermes not found after install"
-  head="$(_hermes_install_head || true)"
-  notice "hermes installed: $(command -v hermes) head=${head:-unknown} pin=${pin:-floating}"
-  hermes --version 2>/dev/null || true
-}
+def parse_created(ts: str) -> int | None:
+    if not ts:
+        return None
+    # GitHub: 2026-07-31T12:00:00Z
+    try:
+        if ts.endswith("Z"):
+            ts = ts[:-1] + "+00:00"
+        return int(datetime.fromisoformat(ts).timestamp())
+    except Exception:
+        return None
 
-ensure_hermes
+latest_ok = None  # (epoch, body snippet)
+for c in comments:
+    body = c.get("body") or ""
+    if not is_success_review(body):
+        continue
+    ep = parse_created(c.get("created_at") or "")
+    if ep is None:
+        continue
+    if latest_ok is None or ep > latest_ok[0]:
+        latest_ok = (ep, body[:80])
 
-# ---------------------------------------------------------------------------
-# Seed HERMES_HOME (preserve growing MEMORY.md)
+if latest_ok is None:
+    print("allowed=true")
+    print("reason=no_recent_success")
+    print("age_s=")
+    print("remaining_s=0")
+    sys.exit(0)
 
-## Workflow Hermes pin bits
-6:# Optional: LUFFY_HERMES_COMMIT (pin Hermes; default in scripts/hermes-pin.sh; latest|main = floating)
-44:    # F7: pin Hermes for repro; vars.LUFFY_HERMES_COMMIT overrides (latest|main = floating)
-46:      LUFFY_HERMES_COMMIT: ${{ vars.LUFFY_HERMES_COMMIT || '53559aaf86b84dadae83cd9bb605ca476f9a0606' }}
-182:      # F2/F14/F7: cache Hermes install keyed by pin (save only on miss)
-183:      - name: Resolve Hermes cache suffix
-185:        id: hermes_pin
-190:            SUF="$(LUFFY_HERMES_COMMIT="${LUFFY_HERMES_COMMIT:-}" luffy/scripts/hermes-pin.sh cache-suffix | tr -d '\n')"
-192:            RAW="${LUFFY_HERMES_COMMIT:-}"
-200:          echo "::notice::Hermes cache pin suffix=$SUF commit=${LUFFY_HERMES_COMMIT:-default}"
-202:      - name: Restore Hermes install cache
-204:        id: hermes_cache
-205:        uses: actions/cache@v4
-211:          key: luffy-hermes-bin-${{ runner.os }}-v4-${{ steps.hermes_pin.outputs.suffix }}
-239:          HERMES_HOME: ${{ github.workspace }}/.luffy-hermes-home
-246:          # F7: job-level env already sets default; re-export for pipeline scripts
-247:          LUFFY_HERMES_COMMIT: ${{ env.LUFFY_HERMES_COMMIT }}
-324:          HERMES_HOME: ${{ github.workspace }}/.luffy-hermes-home
-368:      # F14/F7: only write cache on miss (pin-keyed). Exact hits skip save.
-369:      - name: Save Hermes install cache
-372:          steps.hermes_cache.outputs.cache-hit != 'true'
-374:        uses: actions/cache/save@v4
-379:          key: luffy-hermes-bin-${{ runner.os }}-v4-${{ steps.hermes_pin.outputs.suffix }}
+age = now - latest_ok[0]
+if age < 0:
+    age = 0
+if age < cooldown:
+    remaining = cooldown - age
+    print("allowed=false")
+    print(f"reason=cooldown_active")
+    print(f"age_s={age}")
+    print(f"remaining_s={remaining}")
+    sys.exit(2)
 
-## Current DEV.md
-# DEV — engineering knowledge
+print("allowed=true")
+print("reason=cooldown_expired")
+print(f"age_s={age}")
+print("remaining_s=0")
+sys.exit(0)
+PY
 
-> How this repository is built.
-
-## Architecture
-
-- Luffy is a gated GitHub Actions control plane, not a chat bot: `@luffy review this pr` → gate + per-PR concurrency → dual checkout → restore Hermes memory → assemble context → `hermes -z` → normalize → PR comment → distill memory → cache/artifacts.
-- Orchestration is deterministic shell (`scripts/run-luffy-review.sh` composes stages and records timings); only the inner review step is LLM-driven, so every run leaves reproducible artifacts.
-- Stage → script map: assemble-context.sh (gh pr meta + diff + prompt, no LLM), run-hermes-review.sh (Hermes one-shot over `WORKSPACE_ROOT`; F7 pin via hermes-pin.sh), normalize-review.py (contract/fences/size/HTML marker + secret redact), distill-memory.sh, post-review-comment.sh, save-trace.sh, publish-run-to-hub.sh, hub-ingest-run.py.
-- Dual workspace separates trust domains: `luffy/` holds SOUL + prompts + scripts from the default branch, `workspace/` 
+## Workflow cooldown + gate bits
+7:# Optional: LUFFY_COOLDOWN_SECONDS (F19 default 900; 0/off disables). Bypass: @luffy review force | workflow_dispatch
+71:            echo "matched=true" >> "$GITHUB_OUTPUT"
+78:            echo "matched=false" >> "$GITHUB_OUTPUT"
+82:            echo "matched=false" >> "$GITHUB_OUTPUT"
+88:          allowed="$(printf '%s' "${ALLOWED_ASSOCIATIONS:-}" | tr '[:lower:]' '[:upper:]' | tr -d ' ')"
+89:          if [[ -n "$allowed" ]]; then
+91:            IFS=',' read -ra parts <<<"$allowed"
+96:              echo "matched=false" >> "$GITHUB_OUTPUT"
+98:              echo "::notice::Skipping Luffy: author_association=$assoc not in allowlist ($allowed)"
+102:          echo "matched=true" >> "$GITHUB_OUTPUT"
+123:        if: steps.gate.outputs.matched == 'true'
+134:      # F19: skip paid OpenRouter run if a successful Luffy review landed recently on this PR
+136:        if: steps.gate.outputs.matched == 'true'
+137:        id: cooldown
+143:          LUFFY_COOLDOWN_SECONDS: ${{ vars.LUFFY_COOLDOWN_SECONDS || '900' }}
+149:          echo "allowed=true" >> "$GITHUB_OUTPUT"
+155:            echo "::notice::F19 cooldown: bypassed (workflow_dispatch)"
+158:          # Force: @luffy review force | @luffy review this pr force | body contains "force"
+159:          if printf '%s' "${COMMENT_BODY:-}" | grep -Eiq '@luffy[[:space:]]+review([[:space:]]+this[[:space:]]+pr)?[[:space:]]+force\b|[[:space:]]force[[:space:]]*$'; then
+160:            echo "reason=force_comment" >> "$GITHUB_OUTPUT"
+161:            echo "::notice::F19 cooldown: bypassed (@luffy … force)"
+165:          SCRIPT="$LUFFY_ROOT/scripts/cooldown-check.sh"
+170:            echo "::warning::F19 cooldown-check.sh missing; allowing run"
+176:          OUT="$(bash "$SCRIPT" "$PR_NUMBER" 2>/tmp/luffy-cooldown.err)"
+179:          if [[ -s /tmp/luffy-cooldown.err ]]; then
+180:            cat /tmp/luffy-cooldown.err >&2 || true
+182:          # Parse key=value from script stdout into GITHUB_OUTPUT (last write wins for allowed/reason)
+189:            # Ensure allowed=false is set even if parse missed
+190:            echo "allowed=false" >> "$GITHUB_OUTPUT"
+192:            echo "::notice::F19 cooldown active — skipping paid review (retry in ~${REM:-?}s, or comment '@luffy review force')"
+194:              echo "### Luffy cooldown (F19)"
+196:              echo "- Remaining: ~${REM:-?}s (override: \`vars.LUFFY_COOLDOWN_SECONDS\`, or \`@luffy review force\`)"
+201:            echo "::warning::F19 cooldown check failed (rc=$RC); fail-open allow"
+202:            echo "allowed=true" >> "$GITHUB_OUTPUT"
+206:          echo "::notice::F19 cooldown: allow ($(printf '%s\n' "$OUT" | awk -F= '/^reason=/{print $2}' | tail -1))"
+208:      - name: React cooldown skip
+209:        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'false' && github.event_name == 'issue_comment'
+222:        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true'
+240:          # which produces "0\n0" and breaks integer compare / forces full monorepo clone.
+258:        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.sparse.outputs.use_sparse == 't
 
 … [session truncated] …
 
@@ -635,6 +653,8 @@ readme-kit/themes
 readme-kit/src
 readme-kit/src/render
 readme-kit/src/assets
+docker
+docker/luffy-runner
 memory
 memory/repos
 memory/repos/Mr-Ashish--odoo
@@ -648,16 +668,20 @@ agent
 
 ### git status
 ```
-(clean)
+M scripts/run-hermes-review.sh
+?? .github/workflows/build-luffy-runner.yml
+?? docker/
+?? scripts/benchmark-hermes-startup.sh
+?? scripts/build-luffy-runner-image.sh
 ```
 
 ### recent log
 ```
+e015fd2 feat(cost): per-PR re-trigger cooldown after successful review (F19)
+5b836d5 docs(knowledge): dogfood F7 Hermes pin into DEV/USAGE + showcase
 34841d9 feat(ops): pin Hermes install for reproducible CI (F7)
 fc672e8 feat(security): redact secrets in posted PR reviews (F18)
 0cfa72c Add colocated DEV/USAGE from devmemory dogfood on Luffy
-dea239c brand: use Three.js orbital core as README hero artifact
-6a938b1 feat(brand): Three.js square artifact gallery (not banners)
 ```
 
 ### tree (sample)
@@ -686,6 +710,7 @@ readme-kit/src/render/badges.mjs
 readme-kit/src/render/document.mjs
 readme-kit/src/assets/hero-options.mjs
 readme-kit/src/assets/hero-svg.mjs
+docker/luffy-runner/Dockerfile
 memory/DEV.md
 memory/README.md
 memory/index.json
@@ -693,6 +718,7 @@ memory/repos/Mr-Ashish--odoo/MEMORY.md
 memory/repos/Mr-Ashish--odoo/latest.json
 memory/repos/Mr-Ashish--luffy-pr-review-agent/MEMORY.md
 memory/repos/Mr-Ashish--luffy-pr-review-agent/latest.json
+tests/test_cooldown_check.py
 tests/test_gate_helpers.py
 tests/test_hermes_pin.py
 tests/test_hub_ingest.py
@@ -741,8 +767,11 @@ docs/showcase/devmemory-dogfood-luffy/timings.json
 docs/showcase/devmemory-dogfood-luffy/units.json
 scripts/assemble-context.sh
 scripts/association-allowed.sh
+scripts/benchmark-hermes-startup.sh
 scripts/build-hub-payload.py
+scripts/build-luffy-runner-image.sh
 scripts/capture-hermes-loop.py
+scripts/cooldown-check.sh
 scripts/distill-memory.sh
 scripts/hermes-pin.sh
 scripts/hub-ingest-run.py
@@ -786,7 +815,25 @@ assets/brand-options/three-artifacts.html
 
 ### git diff
 ```
-(no unstaged/uncommitted diff)
+diff --git a/scripts/run-hermes-review.sh b/scripts/run-hermes-review.sh
+index c8f1d54..6a2e075 100755
+--- a/scripts/run-hermes-review.sh
++++ b/scripts/run-hermes-review.sh
+@@ -66,6 +66,14 @@ ensure_hermes() {
+   pin="$("$PIN_HELPER" resolve 2>/dev/null | tr -d '\n' || true)"
+   printf '%s\n' "${pin:-floating}" >"$OUT_DIR/hermes-pin.txt" || true
+ 
++  # F8: prebaked Docker/custom runner (image sets LUFFY_HERMES_PREBAKED=1 or /.hermes-pin)
++  if [[ "${LUFFY_HERMES_PREBAKED:-}" == "1" || -f /root/.hermes-pin || -f "${HOME}/.hermes-pin" ]] \
++    && command -v hermes >/dev/null 2>&1; then
++    notice "hermes prebaked runner: $(command -v hermes)"
++    hermes --version 2>/dev/null || true
++    return
++  fi
++
+   if command -v hermes >/dev/null 2>&1; then
+     head="$(_hermes_install_head || true)"
+     if [[ -z "$pin" ]]; then
 ```
 
 ### existing knowledge + claim index (do not repeat / paraphrase these claims)
@@ -795,26 +842,26 @@ assets/brand-options/three-artifacts.html
 - [DEV.md#Architecture] artifact compos deterministic every inner llm-driven orchestr record
 - [DEV.md#Architecture] assemble-contextsh contractfencessizehtml distill-memorysh hermes-pinsh hub-ingest-runpy marker normalize-reviewpy one-shot
 - [DEV.md#Architecture] branch config default domain luffy luffy-hermes-home memory prompt
-- [DEV.md#Design decisions] 400000 45-minute allowlist author-associ cancel-in-progres concurrency control costabuse
+- [DEV.md#Design decisions] 400000 45-minute 900s @luffy allowlist author-associ bypass cancel-in-progres
 - [DEV.md#Design decisions] --commit --force-commit --skip-setup action cache default float install
 - [DEV.md#Design decisions] comment delet luffy luffy-review luffyreplaceprevious=0 marker match prior
 - [DEV.md#Design decisions] always-publish comment crash failure hermesmodel low-confidence openrouter produce
+- [DEV.md#Design decisions] agentic assembl beyond capture-hermes-looppy completion default inspect luffytoolset
+- [DEV.md#Design decisions] activity agenttool hermestuitoolprogress=verbose later level observability pythonunbuffered=1 recoverable
+- [DEV.md#Design decisions] directory disposable explicitly hermeshome memory memorymd preserv through
 - [DEV.md#Pitfalls] 403 cannot classic clone default dispatch githubtoken ingest
 - [DEV.md#Pitfalls] content cross-repo githubtoken itself luffy luffyhubtoken publish requir
 - [DEV.md#Pitfalls] again agent comment common embedd f18 github honour
 - [DEV.md#Pitfalls] 100000 budget default exceed growth maxmemorybyt memorymd otherwise
 - [DEV.md#Pitfalls] backlog broken cache class count dishonest historical sparse-checkout
+- [DEV.md#Pitfalls] advertise alone anthropicclaude-opus-5 anyone default diverg either explicitly
+- [DEV.md#Pitfalls] --version accept behaviour binary check contain degrad ensureherm
+- [DEV.md#Pitfalls] <sha> default defaulthermescommit duplicat fallback hardcod overrid script
 - [DEV.md#Patterns] apikey-style assignment choke-point driven generic ghpousr… githubpat… helper
 - [DEV.md#Patterns] adding again agent cannot contract-failure ensurecontract fallback normalize-reviewpy
 - [DEV.md#Patterns] acros added apart comment drift duplicated-but-align intentionally normalize-reviewpy
 - [DEV.md#Patterns] agentsoulmd delegat enforc guarantee intent mechanically model never
-- [DEV.md#Patterns] absent assert assertion both-sid broken-output fallback githubtokenredact includ
-- [memory/DEV.md#Architecture] central doubl every flatten history ingest latestjson memorymd
-- [memory/DEV.md#Architecture] build-hub-payloadpy commit default direct hub-ingest-runpy luffy-run memory optional
-- [memory/DEV.md#Architecture] cross-repo cross-run hermeshome memory per-job preload preload-hub-memorysh review
-- [memory/DEV.md#Architecture] behaviour default direct|dispatch|both disable env-configurable luffyhubmode luffyhubpublish=0 luffyhubrepo
-- [agent/DEV.md#Design decisions] added agentsoulmd already chang contract explicitly import invent
-- [agent/DEV.md#Design decisions] approve attempt ig
+- [DEV.md#Patterns] absent assert assertion both-sid broken-output fallback githubtokenredact inc
 … [claim index truncated; do not restate] …
 
 ### knowledge excerpts
@@ -827,8 +874,8 @@ assets/brand-options/three-artifacts.html
 - Dual workspace separates trust domains: `luffy/` holds SOUL + prompts + scripts from the default branch, `workspace/` holds only the PR head, `.luffy-hermes-home/` holds Hermes config + growing memory.
 
 ## Design decisions
-- Cost/abuse controls are layered: author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout.
-- Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (default known-good SHA; `latest`/`main`/`floating`/empty = float), emits `install.sh` args (`--skip-setup --commit … --force-commit`), and supplies the Actions cache key 
+- Cost/abuse controls are layered: **F19 per-PR cooldown** (`scripts/cooldown-check.sh`, default 900s after successful Luffy comment; failures do not start the window; `@luffy review force` bypasses), author-association allowlist (default `OWNER,MEMBER,COLLABORATOR,CONTRIBUTOR`, override with repo var `LUFFY_ALLOWED_ASSOCIATIONS`, empty disables the gate), concurrency cancel-in-progress per PR, `MAX_DIFF_BYTES` (default 400000) diff cap, and a 45-minute job timeout.
+- Hermes install is pinned for repro (F7): `scripts/hermes-pin.sh` resolves `LUFFY_HERMES_COMMIT` (defa
 … [truncated; do not restate] …
 
 ### memory/DEV.md
@@ -849,17 +896,19 @@ assets/brand-options/three-artifacts.html
 
 ### USAGE.md
 
+## Common commands
+- Inspect the effective Hermes pin locally without network: `scripts/hermes-pin.sh resolve` (empty output = floating), `scripts/hermes-pin.sh default` (baked-in known-good SHA), `scripts/hermes-pin.sh install-args` (exact `install.sh` args), `scripts/hermes-pin.sh cache-suffix` (Actions cache key suffix).
+- Check whether an installed tree satisfies the pin: `scripts/hermes-pin.sh matches <git-head-sha>` — exit 0 means acceptable (short/full SHA prefixes both count).
+- Per-run pin actually used is recorded at `.luffy-out/hermes-pin.txt` and shipped in the trace artifact — read it before blaming the model for a behaviour change.
+
 ## Setup
 - Install on each target repo by copying `agent/`, `scripts/`, and `.github/workflows/luffy-pr-review.yml` onto that repo's **default branch** (workflow only runs from default branch).
 - Required secret: `OPENROUTER_API_KEY`. For cross-repo hub memory also add `LUFFY_HUB_TOKEN` (PAT with contents write on the hub).
-- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
+- Optional repo variables: `LUFFY_MODEL` (script default `openai/gpt-5-mini`; showcase runs used `anthropic/claude-opus-5`), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
 - Trigger a review by commenting `@luffy review this pr` (or `@luffy review`) on the PR.
 
 ## Debugging
-- Local dry-run (needs authenticated `gh`, network, and `.env` with `OPENROUTER_API_KEY`): `./scripts/review-local.sh owner/repo 123`; add `POST_COMMENT=1` to actually comment on the PR.
-- Two artifacts per run: `luffy-out-pr<N>-run<id>` (full `.luffy-out/` + memory snapshot, 14 days) and `luffy-trace-pr<N>-run<id>` (structured redacted trace, 90 days).
-- Fetch a trace with `gh run download <run-id> -R owner/repo -n luffy-trace-pr<N>-run<run-id>`.
-- Trace layout under `traces/pr{N}-run{RUN_ID}-a{ATTEMPT}/`: `meta.json`, `trace.json`, `prompt.md`, `context.md`, `pr.json`/`pr.diff`, `review.raw.md` (Hermes stdout) vs `review.md` (posted body), `hermes.stderr`, `timings.json`, `memory-before.md`/`memory-after.md` — diff raw vs normalized to isolate contract violations, and before/after memory to veri
+- Local dry-run (needs authenticated `gh`, network, and `.env` with `OPEN
 … [truncated; do not restate] …
 
 
