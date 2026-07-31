@@ -44,10 +44,15 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 22 (F33):** webhook HMAC + bearer auth on Modal doorbell (`webhook_auth.py`)
 - **Sprint 23 (F9):** path-anchored inline PR comments on first changed line (`post-inline-comments.py`)
 - **Sprint 24 (F34):** Modal webhook fail-closed by default (`LUFFY_WEBHOOK_ALLOW_OPEN=1` for dev)
+- **Sprint 25 (F9b):** inline comments prefer `path:LINE` when that line is a changed `+` line
 
-## Inline comments (F9)
+## Inline comments (F9 / F9b)
 
-After the formal F23 review, Luffy may post a second COMMENT review with **inline** notes on the first *added* line of each finding’s file (from `pr.diff`).
+After the formal F23 review, Luffy may post a second COMMENT review with **inline** notes. Anchors (F9b):
+
+1. `` `path:LINE` `` / line hint from the finding when LINE is a changed `+` line → **exact**
+2. else nearest changed line on that file → **nearest**
+3. else first added line → **first** (F9)
 
 | Var | Default | Meaning |
 |-----|---------|---------|
@@ -55,7 +60,7 @@ After the formal F23 review, Luffy may post a second COMMENT review with **inlin
 | `LUFFY_INLINE_SEVERITY` | `critical,high,blocking` | Comma list; `all` = no filter |
 | `LUFFY_INLINE_MAX` | `6` | Cap per run |
 
-Offline plan: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff`.
+Offline plan: `python3 scripts/post-inline-comments.py plan --review review.md --diff pr.diff` (see `anchor` / `line_hint` in JSON).
 
 ## Repo-local memory (F28 default)
 

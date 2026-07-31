@@ -130,6 +130,100 @@ class PostInlineCommentsTests(unittest.TestCase):
         text = (ROOT / "scripts" / "install-luffy.sh").read_text()
         self.assertIn("post-inline-comments.py", text)
 
+    def test_f9b_exact_line_hint(self):
+        """path:LINE in File cell pins to that added line when present in diff."""
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            review = d / "review.md"
+            diff = d / "pr.diff"
+            review.write_text(
+                """## Luffy Review — PR #1
+
+**Verdict:** REQUEST CHANGES
+**Score:** 40/100
+
+### Blocking
+- None
+
+### Key findings
+
+| Severity | File | Issue | Trigger scenario |
+|----------|------|-------|------------------|
+| critical | `src/a.py:12` | boom | x |
+
+### Security audit
+No
+""",
+                encoding="utf-8",
+            )
+            # new file lines: 10 context, 11 +, 12 +, 13 +
+            diff.write_text(
+                """diff --git a/src/a.py b/src/a.py
+--- a/src/a.py
++++ b/src/a.py
+@@ -8,3 +10,4 @@
+ context
++line eleven
++line twelve
++line thirteen
+""",
+                encoding="utf-8",
+            )
+            r = _run(
+                [
+                    "plan",
+                    "--review",
+                    str(review),
+                    "--diff",
+                    str(diff),
+                    "--severity",
+                    "all",
+                ]
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            data = json.loads(r.stdout)
+            self.assertEqual(data["count"], 1)
+            c = data["comments"][0]
+            self.assertEqual(c["path"], "src/a.py")
+            self.assertEqual(c["line"], 12)
+            self.assertEqual(c["anchor"], "exact")
+            self.assertEqual(c["line_hint"], 12)
+
+    def test_f9b_nearest_when_hint_not_added(self):
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            review = d / "review.md"
+            diff = d / "pr.diff"
+            review.write_text(
+                """### Key findings
+
+| Severity | File | Issue | Trigger scenario |
+|----------|------|-------|------------------|
+| high | `src/b.py:20` | near miss | y |
+""",
+                encoding="utf-8",
+            )
+            diff.write_text(
+                """diff --git a/src/b.py b/src/b.py
+--- a/src/b.py
++++ b/src/b.py
+@@ -1,1 +10,3 @@
+ context
++add10
++add11
+""",
+                encoding="utf-8",
+            )
+            r = _run(
+                ["plan", "--review", str(review), "--diff", str(diff), "--severity", "*"]
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            c = json.loads(r.stdout)["comments"][0]
+            # hunk starts +10 with 1 context then 2 adds → added lines {11,12};
+            # nearest to hint 20 is 12
+            self.assertEqual(c["line"], 12)
+            self.assertEqual(c["anchor"], "nearest")
+            self.assertEqual(c["line_hint"], 20)
 
 if __name__ == "__main__":
     unittest.main()

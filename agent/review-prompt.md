@@ -68,7 +68,10 @@ For each finding (0–N; omit table if none):
 
 | Severity | File | Issue | Trigger scenario |
 |----------|------|-------|------------------|
-| critical/high/medium | `path` | short title | when/how it breaks |
+| critical/high/medium | `path:LINE` | short title | when/how it breaks |
+
+- Prefer `` `path:LINE` `` when LINE is a **new (`+`) line you saw in the diff** (F9b inline anchors).
+- Do **not** invent line numbers; if unsure, use `` `path` `` only.
 
 If none: `None — no high-confidence defects in new code.`
 
@@ -114,6 +117,6 @@ If none: `None`
 
 ## Rules
 1. Cite paths and symbols with backticks.
-2. Do not invent line numbers you did not see.
+2. Do not invent line numbers you did not see. When you *did* see a `+` line, prefer `` `path:LINE` `` in Key findings / Blocking so inline comments land accurately (F9b).
 3. Do not demand docstrings/type-hints/import tidy as “blocking”.
 4. Final message = the Markdown review only (no surrounding explanation).

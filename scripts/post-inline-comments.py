@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""F9 (minimal): post path-anchored inline GitHub PR review comments.
+"""F9/F9b: post path-anchored inline GitHub PR review comments.
 
-Maps Key findings (+ Blocking bullets) to the first *added* line in pr.diff
-for each file, then submits a COMMENT review with inline comments.
+Maps Key findings (+ Blocking bullets) onto lines in pr.diff:
+  F9  — first *added* line per file (fallback)
+  F9b — prefer path:line / L### hints when that line is a changed `+` line
+        (else nearest changed line, else first)
 
 Usage:
   python3 scripts/post-inline-comments.py plan \\
@@ -42,31 +44,73 @@ SEVERITY_RANK = {
     "blocking": 0,
 }
 
+# path:123 or path#L123 (optional backticks already stripped)
+_PATH_LINE_RE = re.compile(
+    r"^(?P<path>.+?)(?::|#L)(?P<line>\d{1,7})$",
+    re.I,
+)
+# standalone line hints in free text
+_LINE_HINT_RE = re.compile(
+    r"(?:^|[\s(`])(?:L|line\s*)(\d{1,7})(?:\b|$)",
+    re.I,
+)
+
 
 def read_text(p: Path) -> str:
     return p.read_text(encoding="utf-8", errors="replace") if p.is_file() else ""
 
 
-def normalize_path(raw: str) -> str:
+def split_path_line(raw: str) -> tuple[str, int | None]:
+    """Return (path, line_hint) from a File cell like `foo.py:42` or `foo.py`."""
     s = (raw or "").strip().strip("`").strip()
-    s = s.split()[0] if s else ""
-    # drop leading a/ b/ from diff style
+    if not s:
+        return "", None
+    # take first token (ignore trailing notes)
+    s = s.split()[0]
     if s.startswith(("a/", "b/")):
         s = s[2:]
-    return s
+    m = _PATH_LINE_RE.match(s)
+    if m:
+        return m.group("path"), int(m.group("line"))
+    return s, None
 
 
-def parse_findings(review_md: str) -> list[dict[str, str]]:
+def normalize_path(raw: str) -> str:
+    path, _ = split_path_line(raw)
+    return path
+
+
+def extract_line_hint(*parts: str, path_cell: str = "") -> int | None:
+    """F9b: pull a line number from path cell or free text (issue/trigger)."""
+    _, from_path = split_path_line(path_cell)
+    if from_path is not None and from_path > 0:
+        return from_path
+    blob = " ".join(p for p in parts if p)
+    # Prefer path:line embedded in text
+    for m in re.finditer(r"[\w./+-]+\.(?:py|ts|tsx|js|jsx|go|rs|java|rb|md|sh|yml|yaml):(\d{1,7})", blob):
+        n = int(m.group(1))
+        if n > 0:
+            return n
+    m2 = _LINE_HINT_RE.search(blob)
+    if m2:
+        n = int(m2.group(1))
+        if n > 0:
+            return n
+    return None
+
+
+def parse_findings(review_md: str) -> list[dict[str, Any]]:
     """Parse Key findings table + Blocking bullets into finding dicts."""
-    findings: list[dict[str, str]] = []
+    findings: list[dict[str, Any]] = []
 
-    # Key findings table
+    # Key findings table — optional 5th Line column; File may be path:line
     m = re.search(
         r"^### Key findings\s*\n(.*?)(?=^### |\Z)",
         review_md,
         re.M | re.S,
     )
     body = m.group(1) if m else ""
+    header_has_line = False
     for line in body.splitlines():
         line = line.strip()
         if not line.startswith("|") or re.match(r"^\|\s*-+", line):
@@ -74,19 +118,34 @@ def parse_findings(review_md: str) -> list[dict[str, str]]:
         cells = [c.strip() for c in line.strip("|").split("|")]
         if len(cells) < 3:
             continue
-        if cells[0].lower() in {"severity", "sev", "level"}:
+        head0 = cells[0].lower()
+        if head0 in {"severity", "sev", "level"}:
+            header_has_line = any(c.lower() in {"line", "ln", "lineno"} for c in cells)
             continue
+        path_cell = cells[1]
+        path = normalize_path(path_cell)
+        issue = cells[2][:500]
+        trigger = cells[3][:300] if len(cells) > 3 else ""
+        line_hint = extract_line_hint(issue, trigger, path_cell=path_cell)
+        if header_has_line and len(cells) >= 5:
+            try:
+                col = int(re.sub(r"[^\d]", "", cells[4]) or "0")
+                if col > 0:
+                    line_hint = col
+            except ValueError:
+                pass
         findings.append(
             {
                 "severity": cells[0].lower(),
-                "file": normalize_path(cells[1]),
-                "issue": cells[2][:500],
-                "trigger": cells[3][:300] if len(cells) > 3 else "",
+                "file": path,
+                "issue": issue,
+                "trigger": trigger,
+                "line_hint": line_hint,
                 "source": "findings",
             }
         )
 
-    # Blocking bullets: **`path` — text** or **path — text**
+    # Blocking bullets: **`path` — text** or **path:42 — text**
     bm = re.search(
         r"^### Blocking\s*\n(.*?)(?=^### |\Z)",
         review_md,
@@ -98,25 +157,24 @@ def parse_findings(review_md: str) -> list[dict[str, str]]:
         if not s.startswith(("- ", "* ")):
             continue
         s = re.sub(r"^[-*]\s+", "", s)
-        # **`path` — issue** or **path — issue**
         mm = re.match(
             r"\*\*[`']?([^`'*]+?)[`']?\s*[—–-]\s*(.+?)\*\*",
             s,
         )
         if not mm:
-            # path at start without bold close
-            mm = re.match(r"[`']?([^\s`']+\.[a-zA-Z0-9]+)[`']?\s*[—–-]\s*(.+)", s)
+            mm = re.match(r"[`']?([^\s`']+\.[a-zA-Z0-9:]+(?:#L\d+)?)[`']?\s*[—–-]\s*(.+)", s)
         if not mm:
             continue
-        path = normalize_path(mm.group(1))
+        path_cell = mm.group(1)
+        path = normalize_path(path_cell)
         issue = mm.group(2).strip()[:500]
-        # skip if already covered by findings table for same path+issue prefix
         findings.append(
             {
                 "severity": "blocking",
                 "file": path,
                 "issue": issue,
                 "trigger": "",
+                "line_hint": extract_line_hint(issue, path_cell=path_cell),
                 "source": "blocking",
             }
         )
@@ -124,9 +182,9 @@ def parse_findings(review_md: str) -> list[dict[str, str]]:
     return findings
 
 
-def first_added_lines(diff_text: str) -> dict[str, int]:
-    """Map path → first new-file line number that has an added (+) line."""
-    result: dict[str, int] = {}
+def added_lines_by_path(diff_text: str) -> dict[str, list[int]]:
+    """Map path → sorted unique new-file line numbers that have an added (+) line."""
+    result: dict[str, list[int]] = {}
     current: str | None = None
     new_line = 0
     in_hunk = False
@@ -144,9 +202,9 @@ def first_added_lines(diff_text: str) -> dict[str, int]:
             if path.startswith("b/"):
                 path = path[2:]
             current = path
+            result.setdefault(current, [])
             continue
         if raw.startswith("@@"):
-            # @@ -a,b +c,d @@
             mm = re.search(r"\+(\d+)(?:,\d+)?", raw)
             if mm:
                 new_line = int(mm.group(1))
@@ -157,16 +215,59 @@ def first_added_lines(diff_text: str) -> dict[str, int]:
         if not in_hunk or current is None:
             continue
         if raw.startswith("+") and not raw.startswith("+++"):
-            if current not in result:
-                result[current] = new_line
+            result.setdefault(current, []).append(new_line)
             new_line += 1
         elif raw.startswith("-") and not raw.startswith("---"):
-            # removed line — does not advance new file line
             pass
         else:
-            # context line
             new_line += 1
+
+    for p, lst in list(result.items()):
+        # unique preserve order
+        seen: set[int] = set()
+        uniq: list[int] = []
+        for n in lst:
+            if n not in seen:
+                seen.add(n)
+                uniq.append(n)
+        result[p] = uniq
     return result
+
+
+def first_added_lines(diff_text: str) -> dict[str, int]:
+    """Map path → first new-file line number that has an added (+) line."""
+    return {p: lines[0] for p, lines in added_lines_by_path(diff_text).items() if lines}
+
+
+def resolve_path(path: str, known: dict[str, Any]) -> str | None:
+    if path in known:
+        return path
+    for dp in known:
+        if dp.endswith("/" + path) or dp.endswith(path) or path.endswith(dp):
+            return dp
+    return None
+
+
+def resolve_anchor_line(
+    path: str,
+    hint: int | None,
+    added: dict[str, list[int]],
+) -> tuple[int | None, str]:
+    """Pick comment line + how it was chosen (exact|nearest|first).
+
+    F9b: only pin to a line that exists as a changed `+` line (GitHub requires
+    the line to be part of the diff for multi-line-safe single-line comments).
+    """
+    lines = added.get(path) or []
+    if not lines:
+        return None, "none"
+    if hint is not None and hint in lines:
+        return hint, "exact"
+    if hint is not None:
+        # nearest changed line (same file)
+        nearest = min(lines, key=lambda n: (abs(n - hint), n))
+        return nearest, "nearest"
+    return lines[0], "first"
 
 
 def severity_allowed(sev: str, allow: set[str]) -> bool:
@@ -183,34 +284,38 @@ def plan_comments(
     severities: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     allow = severities if severities is not None else set()
-    lines = first_added_lines(diff_text)
+    added = added_lines_by_path(diff_text)
     findings = parse_findings(review_md)
 
     # Prefer higher severity; one comment per file (first wins after sort)
-    findings.sort(key=lambda f: SEVERITY_RANK.get(f["severity"], 9))
+    findings.sort(key=lambda f: SEVERITY_RANK.get(str(f["severity"]), 9))
 
     planned: list[dict[str, Any]] = []
     seen_files: set[str] = set()
     for f in findings:
-        if not severity_allowed(f["severity"], allow):
+        if not severity_allowed(str(f["severity"]), allow):
             continue
-        path = f["file"]
+        path = str(f.get("file") or "")
         if not path or path in seen_files:
             continue
-        # resolve path: exact or suffix match against diff paths
-        line = lines.get(path)
-        if line is None:
-            for dp, ln in lines.items():
-                if dp.endswith("/" + path) or dp.endswith(path) or path.endswith(dp):
-                    path = dp
-                    line = ln
-                    break
+        resolved = resolve_path(path, added)
+        if resolved is None:
+            continue
+        path = resolved
+        hint = f.get("line_hint")
+        if isinstance(hint, str) and hint.isdigit():
+            hint = int(hint)
+        if not isinstance(hint, int):
+            hint = None
+        line, anchor = resolve_anchor_line(path, hint, added)
         if line is None:
             continue
         seen_files.add(path)
-        body = f"**{f['severity'].upper()}** — {f['issue']}"
+        body = f"**{str(f['severity']).upper()}** — {f['issue']}"
         if f.get("trigger"):
             body += f"\n\n_Trigger:_ {f['trigger']}"
+        if hint is not None:
+            body += f"\n\n_Anchor:_ L{hint} → L{line} ({anchor})"
         body += "\n\n<!-- luffy-inline -->"
         planned.append(
             {
@@ -220,6 +325,8 @@ def plan_comments(
                 "body": body[:65000],
                 "severity": f["severity"],
                 "source": f["source"],
+                "line_hint": hint,
+                "anchor": anchor,
             }
         )
         if len(planned) >= max_n:
