@@ -5,9 +5,9 @@
 # Optional: LUFFY_MODEL (default anthropic/claude-opus-5), LUFFY_HUB_TOKEN, LUFFY_HUB_REPO
 # Optional: LUFFY_HERMES_COMMIT (pin Hermes; default in scripts/hermes-pin.sh; latest|main = floating)
 # Optional: LUFFY_COOLDOWN_SECONDS (F19 default 900; 0/off disables). Bypass: @luffy review force | workflow_dispatch
-# Optional: LUFFY_RUNNER_IMAGE — if set (e.g. ghcr.io/mr-ashish/luffy-hermes-runner:53559aaf86b8),
-#   job runs in that prebaked container (F8). Build via workflow "Build Luffy Hermes runner".
-#   Also set secrets/vars as needed for package pull; image should set LUFFY_HERMES_PREBAKED=1.
+# Optional: LUFFY_RUNNER_IMAGE — non-empty image ref runs the job in that container (F8 prebaked
+#   Hermes). Build/publish via workflow "Build Luffy Hermes runner". Leave unset for
+#   ubuntu-latest + Actions Hermes cache. Image should ship LUFFY_HERMES_PREBAKED=1 + /root/.hermes-pin.
 
 name: Luffy PR Review
 
@@ -44,10 +44,11 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
+    # F8: optional prebaked container (null when var unset/empty → host runner + Hermes cache)
+    container: ${{ vars.LUFFY_RUNNER_IMAGE != '' && vars.LUFFY_RUNNER_IMAGE || null }}
     timeout-minutes: 90
     # F7: pin Hermes for repro; vars.LUFFY_HERMES_COMMIT overrides (latest|main = floating)
-    # F8: prebaked image via workflow "Build Luffy Hermes runner"; set LUFFY_HERMES_PREBAKED=1
-    # on a container/self-hosted runner that already has Hermes (see docker/luffy-runner/).
+    # F8: prebaked image (LUFFY_RUNNER_IMAGE) or self-hosted with /root/.hermes-pin + hermes on PATH.
     # Default: ubuntu-latest + Actions cache of ~/.local+~/.hermes (F2/F14).
     env:
       LUFFY_HERMES_COMMIT: ${{ vars.LUFFY_HERMES_COMMIT || '53559aaf86b84dadae83cd9bb605ca476f9a0606' }}
@@ -272,9 +273,25 @@ jobs:
           fetch-depth: 1
           ref: refs/pull/${{ steps.gate.outputs.pr_number }}/head
 
+      # F8: skip Hermes install cache when runner image already has hermes
+      - name: Detect prebaked Hermes
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true'
+        id: prebaked
+        run: |
+          set -euo pipefail
+          export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
+          if { [[ "${LUFFY_HERMES_PREBAKED:-}" == "1" ]] || [[ -f /root/.hermes-pin ]] || [[ -f "${HOME}/.hermes-pin" ]]; } \
+            && command -v hermes >/dev/null 2>&1; then
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::F8 prebaked Hermes detected ($(command -v hermes)); skipping install cache"
+            hermes --version 2>/dev/null || true
+          else
+            echo "yes=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # F2/F14/F7: cache Hermes install keyed by pin (save only on miss)
       - name: Resolve Hermes cache suffix
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true'
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.prebaked.outputs.yes != 'true'
         id: hermes_pin
         run: |
           set -euo pipefail
@@ -293,7 +310,7 @@ jobs:
           echo "::notice::Hermes cache pin suffix=$SUF commit=${LUFFY_HERMES_COMMIT:-default}"
 
       - name: Restore Hermes install cache
-        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true'
+        if: steps.gate.outputs.matched == 'true' && steps.cooldown.outputs.allowed == 'true' && steps.prebaked.outputs.yes != 'true'
         id: hermes_cache
         uses: actions/cache@v4
         continue-on-error: true
@@ -463,6 +480,7 @@ jobs:
         if: >
           steps.gate.outputs.matched == 'true' &&
           steps.cooldown.outputs.allowed == 'true' &&
+          steps.prebaked.outputs.yes != 'true' &&
           always() &&
           steps.hermes_cache.outputs.cache-hit != 'true'
         continue-on-error: true

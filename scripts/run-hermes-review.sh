@@ -66,6 +66,14 @@ ensure_hermes() {
   pin="$("$PIN_HELPER" resolve 2>/dev/null | tr -d '\n' || true)"
   printf '%s\n' "${pin:-floating}" >"$OUT_DIR/hermes-pin.txt" || true
 
+  # F8: prebaked Docker/custom runner (image sets LUFFY_HERMES_PREBAKED=1 or /.hermes-pin)
+  if [[ "${LUFFY_HERMES_PREBAKED:-}" == "1" || -f /root/.hermes-pin || -f "${HOME}/.hermes-pin" ]] \
+    && command -v hermes >/dev/null 2>&1; then
+    notice "hermes prebaked runner: $(command -v hermes)"
+    hermes --version 2>/dev/null || true
+    return
+  fi
+
   if command -v hermes >/dev/null 2>&1; then
     head="$(_hermes_install_head || true)"
     if [[ -z "$pin" ]]; then

@@ -59,6 +59,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 
 **F19** per-PR re-trigger cooldown: after a *successful* Luffy PR comment, further `@luffy review` within `LUFFY_COOLDOWN_SECONDS` (default **900**) skips Hermes/OpenRouter (rocket reaction + job summary). Failures do not start the window. Bypass: `@luffy review force`, `workflow_dispatch`, or set cooldown to `0`/`off`.
 
+### Sprint 7 (shipped)
+
+**F8** prebaked Hermes runner: `docker/luffy-runner/Dockerfile` + `scripts/build-luffy-runner-image.sh` + GHCR publish workflow; optional `vars.LUFFY_RUNNER_IMAGE` as job `container`; `ensure_hermes` short-circuits on `LUFFY_HERMES_PREBAKED=1` or `~/.hermes-pin`; startup benchmark under `docs/benchmarks/`.
+
 ### readme-kit (shipped)
 
 YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser removed.

@@ -18,6 +18,7 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 4 (F18):** secret redaction on posted review body  
 - **Sprint 5 (F7):** pin Hermes install via `LUFFY_HERMES_COMMIT` + `scripts/hermes-pin.sh` (cache key v4)
 - **Sprint 6 (F19):** per-PR re-trigger cooldown after successful review
+- **Sprint 7 (F8):** prebaked Hermes runner image (`docker/luffy-runner/`, `vars.LUFFY_RUNNER_IMAGE`)
 
 ## Central hub memory (cross-repo)
 

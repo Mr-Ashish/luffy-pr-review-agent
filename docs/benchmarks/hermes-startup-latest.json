@@ -1,0 +1,19 @@
+{
+  "benchmark": "luffy-hermes-startup",
+  "at": "2026-07-31T12:23:37Z",
+  "hermes_pin": "53559aaf86b84dadae83cd9bb605ca476f9a0606",
+  "runner_image": "ghcr.io/mr-ashish/luffy-hermes-runner:53559aaf86b8",
+  "tarball_bytes": 0,
+  "seconds": {
+    "warm_present": 0.489,
+    "tarball_restore": 50.998,
+    "docker_prebake": "n/a",
+    "cold_install": "skipped"
+  },
+  "notes": {
+    "warm_present": "hermes --version when already installed (CI cache hit path)",
+    "tarball_restore": "unpack packed ~/.local+~/.hermes (proxy for Actions cache restore)",
+    "docker_prebake": "docker run prebaked image hermes --version (F8)",
+    "cold_install": "isolated HOME full install.sh (CI cold miss)"
+  }
+}

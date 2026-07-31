@@ -1,0 +1,60 @@
+# F8: Build & publish prebaked Hermes runner image to GHCR.
+# Speeds Luffy PR review jobs when vars.LUFFY_RUNNER_IMAGE points at this image.
+name: Build Luffy Hermes runner
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "docker/luffy-runner/**"
+      - "scripts/hermes-pin.sh"
+      - "scripts/build-luffy-runner-image.sh"
+      - ".github/workflows/build-luffy-runner.yml"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      LUFFY_HERMES_COMMIT: ${{ vars.LUFFY_HERMES_COMMIT || '53559aaf86b84dadae83cd9bb605ca476f9a0606' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve pin
+        id: pin
+        run: |
+          set -euo pipefail
+          chmod +x scripts/hermes-pin.sh scripts/build-luffy-runner-image.sh
+          PIN="$(LUFFY_HERMES_COMMIT="${LUFFY_HERMES_COMMIT:-}" scripts/hermes-pin.sh resolve | tr -d '\n')"
+          if [[ -z "$PIN" ]]; then
+            PIN="$(scripts/hermes-pin.sh default | tr -d '\n')"
+          fi
+          SHORT="${PIN:0:12}"
+          echo "pin=$PIN" >> "$GITHUB_OUTPUT"
+          echo "short=$SHORT" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${{ github.repository_owner }}/luffy-hermes-runner" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        env:
+          HERMES_COMMIT: ${{ steps.pin.outputs.pin }}
+          LUFFY_RUNNER_IMAGE_BASE: ${{ steps.pin.outputs.image }}
+          PUSH: "1"
+        run: |
+          set -euo pipefail
+          # owner may be mixed case; GHCR wants lowercase
+          BASE="$(echo "${LUFFY_RUNNER_IMAGE_BASE}" | tr '[:upper:]' '[:lower:]')"
+          export LUFFY_RUNNER_IMAGE_BASE="$BASE"
+          export HERMES_COMMIT
+          ./scripts/build-luffy-runner-image.sh
