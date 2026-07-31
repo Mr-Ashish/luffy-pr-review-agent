@@ -2,72 +2,31 @@
   "units": [
     {
       "kind": "dev",
-      "path": ".",
+      "path": "ui",
       "action": "merge",
       "section": "Design decisions",
-      "content": "- **F41 iteration budget** is the third leg of the cost-control triad and is deliberately distinct from the other two: F41 caps *tool-calling turns* (thrash containment), F36 caps *wall-clock* (1500s hard kill), F29 is a *soft $ check after* the run finishes. A thrashing agentic review can burn OpenRouter spend while still finishing inside the F36 timeout, which is the gap F41 closes.\n- Default `max_turns` is **40** and its product source of truth is split across two files that must stay in sync: `scripts/max_turns.py` (resolve/detect logic + default) and `agent/config.yaml` (`agent.max_turns: 40`). Hermes' own default is 500, so the cap is only in effect because Luffy overrides it explicitly.\n- `0` / `off` is a supported value meaning \"no cap\" — treat unset and disabled as different states when reading a run's config.\n- `scripts/run-hermes-review.sh` enforces the budget on three surfaces per run: passes `--max-turns`, rewrites the `HERMES_HOME` config, and writes `hermes-max-turns.env` for downstream consumers (mirrors how F38 path-skip writes `ops-signals.env`).\n- Knob surfaces are per-host: GitHub Actions uses `vars.LUFFY_MAX_TURNS`, Modal uses env `LUFFY_MAX_TURNS`; `scripts/max_turns.py` is included in the install pack so adopted repos get the same resolver.\n- Design was lifted from Hermes' own conversation loop (`agent.max_turns` / `--max-turns` / `HERMES_MAX_ITERATIONS` in NousResearch/hermes-agent); the running list of such borrowings lives in `docs/experiments/hermes-inspired-roi.md`.",
+      "content": "- | H5 | Session/search memory over past PR traces (FTS5 pattern) | M | Better repo memory than append-only distill | backlog |.\n- | H10 | Soft skill nudge mid-loop (“prefer fewer tools”) | M | Hermes skill nudge pattern; needs hermes hooks | backlog |.",
       "evidence": [
-        "Hermes defaults to 500 tool-calling turns",
-        "scripts/max_turns.py resolve/detect (default 40; 0/off disables)",
-        "run-hermes-review.sh passes --max-turns, rewrites HERMES_HOME config, writes hermes-max-turns.env",
-        "Complements F36 (time kill) and F29 (soft $ after finish)"
+        "dogfood-luffy-session"
       ],
-      "confidence": "high"
-    },
-    {
-      "kind": "dev",
-      "path": ".",
-      "action": "merge",
-      "section": "Pitfalls",
-      "content": "- Budget-exhaustion detection is **log-string matching**, not an exit code: `run-hermes-review.sh` / `scripts/max_turns.py` look for `Iteration budget exhausted`, `max_iterations_reached`, and `Reached maximum iterations`. A Hermes upgrade that rewords any of these silently degrades `signals.max_turns_hit` to false while the run still gets truncated — re-check the three patterns whenever the Hermes pin moves.\n- `run-bundle.loop` (not the raw Hermes log) is the intended operator surface for loop behaviour: read `tool_call_turns`, `message_count`, `step_count`, `max_turns` from the bundle rather than re-parsing stdout.",
-      "evidence": [
-        "Detection patterns: Iteration budget exhausted, max_iterations_reached, Reached maximum iterations",
-        "run-bundle.loop is the structured surface for operators"
-      ],
-      "confidence": "high"
-    },
-    {
-      "kind": "dev",
-      "path": "agent",
-      "action": "merge",
-      "section": "Design decisions",
-      "content": "- `agent/config.yaml` carries `agent.max_turns: 40` (F41): the agent config is one half of the iteration-budget source of truth, the other being `scripts/max_turns.py`. Editing the default here alone is not enough — the resolver's default and this value are asserted together (`tests/test_max_turns.py`).\n- The cap is applied to the *disposable* `HERMES_HOME` config that `run-hermes-review.sh` rewrites per run, so `agent/config.yaml` is the template, not the live file the agent reads.",
-      "evidence": [
-        "agent/config.yaml agent.max_turns: 40",
-        "run-hermes-review.sh passes --max-turns, rewrites HERMES_HOME config"
-      ],
-      "confidence": "high"
-    },
-    {
-      "kind": "dev",
-      "path": "ui/review-console",
-      "action": "merge",
-      "section": "Architecture",
-      "content": "- F41 extends the bundle contract the console consumes in two independent ways: `signals.max_turns_hit` joins the existing flag set (so it also lights a header chip and appears in the Ops signals panel), while a separate `bundle.loop` object carries the metrics `tool_call_turns`, `message_count`, `step_count`, `max_turns`.\n- Those metrics render in two places: an **Agent loop (F41)** panel in the Overview tab, and measures on the **Loop** tab — i.e. `loop` is a first-class bundle section alongside `signals`, not a sub-field of it.",
-      "evidence": [
-        "pack-run-for-ui.py emits signals.max_turns_hit + loop metrics (tool_call_turns, message_count, step_count, max_turns)",
-        "Run Console Overview Ops signals + Agent loop panel; Loop tab measures"
-      ],
-      "confidence": "high"
+      "confidence": "medium"
     },
     {
       "kind": "usage",
       "path": ".",
       "action": "merge",
-      "section": "Debugging",
-      "content": "- Inspect/resolve the F41 budget without a run: `python3 scripts/max_turns.py resolve` (shows the effective cap after env/config precedence, default 40) and `python3 scripts/max_turns.py detect` (tests whether a log looks budget-exhausted).\n- Set the cap per host: repo variable `LUFFY_MAX_TURNS` for GitHub Actions, env `LUFFY_MAX_TURNS` for Modal; use `0` or `off` to disable the cap entirely when debugging a long legitimate review.\n- After a suspected truncation, check `hermes-max-turns.env` in the run output and `signals.max_turns_hit` / `loop.tool_call_turns` in `run-bundle.json` before blaming the model or the F36 timeout.\n- F41 regression gate: `pytest` (204 passing at 50c4712), `bash -n scripts/run-hermes-review.sh`, and `cd ui/review-console && npm run pack-fixture && npm run build` — the shell syntax check and fixture re-pack are what catch the config-rewrite and bundle-shape halves.",
+      "section": "Common commands",
+      "content": "- `hermes-pin.sh`",
       "evidence": [
-        "scripts/max_turns.py resolve/detect (default 40; 0/off disables)",
-        "Workflow vars.LUFFY_MAX_TURNS, Modal LUFFY_MAX_TURNS default 40",
-        "pytest 204 passed / bash -n run-hermes-review.sh / npm run pack-fixture && npm run build green"
+        "dogfood-luffy-session"
       ],
-      "confidence": "high"
+      "confidence": "medium"
     }
   ],
-  "summary": "F41 adds a Hermes iteration budget (max_turns, default 40) to Luffy reviews with a two-file source of truth, log-string exhaustion detection, and a new run-bundle.loop surface consumed by the Run Console. Durable knowledge not yet recorded: the SoT/sync constraint, the three detection strings, the CLI/workflow knobs, and how the loop metrics reach the console.",
+  "summary": "offline heuristic extract (2 units)",
   "session_ids": [
     "dogfood-luffy-session"
   ],
-  "model": "anthropic/claude-opus-5",
-  "raw_path": "/Users/ashishmishra/Documents/experiments/pr-review-agent/.devmemory/out/run-20260731T210947-7428e6/extract.raw.md"
+  "model": "anthropic/claude-opus-5+offline-fallback",
+  "raw_path": null
 }

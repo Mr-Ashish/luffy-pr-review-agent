@@ -1,0 +1,16 @@
+# DEV — engineering knowledge
+
+> How this part of the system is built.
+
+## Design decisions
+
+- **Run Console** loads a single `run-bundle.json` (F31 pack) — operators never need raw Hermes logs for first triage.
+- **Ops signals (F40+)** surface gates as chips + Overview rows: path-skip, timeout, over-budget, diff-truncated, max-turns (F41), model-tier (F42).
+- **F42 model tier** chips (`model-cheap` / `model-full`) come from pack `signals` filled by `model-tier.env`; Overview shows mode/tier/reason + effective model id.
+- Agent loop panel (F41) is separate from cost model tier: turns thrash vs which OpenRouter model was selected.
+- Browser is not a kitchen: **Run** tab copies `trigger-review.sh` / Modal commands; review work stays in GHA/Modal.
+
+## Pitfalls
+
+- Fixture re-pack (`npm run pack-fixture`) must stay green after pack-run signal shape changes or Overview types drift.
+- Empty `signals.flags` means either a clean paid run *or* tier mode was `off` — check `signals.model_tier_mode` before assuming auto-tier ran.

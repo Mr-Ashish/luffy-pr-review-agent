@@ -1,33 +1,33 @@
-# Agent loop · `run-20260731T210947-7428e6`
+# Agent loop · `run-20260731T211755-5b5f81`
 
-- **model:** `anthropic/claude-opus-5`
+- **model:** `anthropic/claude-opus-5+offline-fallback`
 - **hermes_rc:** 0
-- **units:** 5
-- **at:** 2026-07-31T15:40:36Z
+- **units:** 2
+- **at:** 2026-07-31T15:47:58Z
 
 ## Summary
 
-F41 adds a Hermes iteration budget (max_turns, default 40) to Luffy reviews with a two-file source of truth, log-string exhaustion detection, and a new run-bundle.loop surface consumed by the Run Console. Durable knowledge not yet recorded: the SoT/sync constraint, the three detection strings, the CLI/workflow knobs, and how the loop metrics reach the console.
+offline heuristic extract (2 units)
 
 ## Usage
 
 ```json
 {
-  "estimated_cost_usd": 0.30107875,
-  "cost_status": "estimated",
-  "cost_source": "provider_models_api",
-  "input_tokens": 2,
-  "output_tokens": 3556,
-  "cache_read_tokens": 0,
-  "cache_write_tokens": 33947,
-  "reasoning_tokens": 237,
-  "total_tokens": 37505,
+  "estimated_cost_usd": null,
+  "cost_status": null,
+  "cost_source": null,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cache_read_tokens": null,
+  "cache_write_tokens": null,
+  "reasoning_tokens": null,
+  "total_tokens": null,
   "api_calls": 1,
-  "model": "anthropic/claude-opus-5",
-  "provider": "openrouter",
-  "session_id": "20260731_210948_aa63de",
-  "completed": true,
-  "failed": false,
+  "model": null,
+  "provider": null,
+  "session_id": null,
+  "completed": false,
+  "failed": true,
   "service_tier": null
 }
 ```
@@ -36,11 +36,11 @@ F41 adds a Hermes iteration budget (max_turns, default 40) to Luffy reviews with
 
 ```json
 {
-  "assemble_s": 0.135,
-  "extract_s": 44.789,
-  "normalize_s": 0.004,
-  "apply_s": 4.253,
-  "total_s": 49.187
+  "assemble_s": 0.143,
+  "extract_s": 2.779,
+  "normalize_s": 0.0,
+  "apply_s": 0.807,
+  "total_s": 3.738
 }
 ```
 

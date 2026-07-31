@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T15:39:47Z
+- **assembled_at:** 2026-07-31T15:47:55Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+d3c1c2d feat(cost): F42 auto model tier by PR size (H7)
+776fc4c docs(knowledge): dogfood F41 max_turns + showcase
 50c4712 feat(cost): F41 Hermes max_turns iteration budget + loop metrics
 8bd5ded docs(knowledge): dogfood F40 ops signals + showcase
 903f6df feat(ui): F40 ops signals in run-bundle + Run Console
-81d2b63 docs(knowledge): dogfood F39 Modal parity + showcase
-19fbe7e feat(modal): F39 host parity — path-skip + report-verdict
 ```
 
 ## tree (sample)
@@ -90,6 +90,7 @@ tests/test_local_memory.py
 tests/test_max_turns.py
 tests/test_memory_health.py
 tests/test_modal_parity.py
+tests/test_model_tier.py
 tests/test_normalize_review.py
 tests/test_ops_footer.py
 tests/test_pack_run_for_ui.py
@@ -127,6 +128,7 @@ docs/experiments/2026-07-31-f38-path-skip.md
 docs/experiments/2026-07-31-f39-modal-parity.md
 docs/experiments/2026-07-31-f40-ops-signals.md
 docs/experiments/2026-07-31-f41-max-turns.md
+docs/experiments/2026-07-31-f42-model-tier.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-f9c-suggestions.md
@@ -187,6 +189,7 @@ scripts/install-luffy.sh
 scripts/max_turns.py
 scripts/memory-health.sh
 scripts/modal_parity.py
+scripts/model_tier.py
 scripts/normalize-review.py
 scripts/ops_footer.py
 scripts/pack-run-for-ui.py
@@ -219,9 +222,6 @@ assets/luffy-mark.svg
 assets/twemoji-anchor.png
 assets/twemoji-pirate-flag.png
 assets/twemoji-ship.png
-assets/brand-options/README.md
-assets/brand-options/RECOMMENDATION.md
-assets/brand-options/SELECTED-orbital-core.png
 ```
 
 ## git diff
@@ -274,6 +274,7 @@ assets/brand-options/SELECTED-orbital-core.png
 ## Architecture
 - The console renders `bundle.signals` in two places: header **chips** (shown only when at least one flag is set) and an **Ops signals (F40)** panel in the Overview tab — so a clean run stays visually quiet and any degraded run is visible without opening a tab.
 - Phase tracker state: Phase 2 (standalone review console shell) is **superseded** by the full Run Console; F40 ("ops signals in console", phase 4d) is done, while **4c live progress streaming remains pending** — treat streaming as the next console workstream, not signals.
+- Those metrics render in two places: an **Agent loop (F41)** panel in the Overview tab, and measures on the **Loop** tab — i.e. `loop` is a first-class bundle section alongside `signals`, not a sub-field of it.
 
 ### readme-kit/DEV.md
 
@@ -347,21 +348,21 @@ assets/brand-options/SELECTED-orbital-core.png
 
 ## Run console
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
-- **F40/F41 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns + `flags[]`) and `loop` metrics (tool_call_turns, message_count, max_turns). Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip writes `ops-signals.env`; F41 writes `hermes-max-turns.env`.
+- **F40/F41/F42 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns / model-tier + `flags[]`) and `loop` metrics. Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip → `ops-signals.env`; F41 → `hermes-max-turns.env`; F42 → `model-tier.env`.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
 
 ## Trigger a review (F32)
+--path README.md --diff-bytes 400
 --review docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/review.md \
 --diff docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/pr.diff
 --review review.md --diff pr.diff --repo owner/name --pr 3 --commit "$HEAD_SHA"
---header "X-Hub-Signature-256: sha256=…"
 
 ## Common commands
 - Install Luffy into another repo (self-contained pack): `./scripts/install-luffy.sh /path/to/target-repo` (`--force` overwrite; `--dry-run` preview).
 - Hub-managed thin install (F10, no agent/scripts copy): `./scripts/install-luffy.sh --caller /path/to/target-repo`.
 - Build prebaked Hermes runner image: `./scripts/build-luffy-runner-image.sh` (optional `PUSH=1`).
-- Benc
+- Benchmark Hermes startup
 … [truncated; do not restate] …
 
 ### docker/luffy-runner/USAGE.md
