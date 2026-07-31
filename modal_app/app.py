@@ -29,7 +29,7 @@ from typing import Any
 import modal
 
 APP_NAME = "luffy-pr-review"
-LUFFY_MODAL_VERSION = "0.6.0-f39"
+LUFFY_MODAL_VERSION = "0.6.1-f41"
 HERMES_PIN = "53559aaf86b84dadae83cd9bb605ca476f9a0606"
 # OpenRouter — keep Modal compute cheap AND LLM spend low
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
@@ -342,6 +342,8 @@ def review_pr(
         "LUFFY_REVIEW_TIMEOUT_SECONDS": os.environ.get(
             "LUFFY_REVIEW_TIMEOUT_SECONDS", "1500"
         ),
+        # F41: Hermes max_turns (script default 40 if unset; 0/off disables)
+        "LUFFY_MAX_TURNS": os.environ.get("LUFFY_MAX_TURNS", "40"),
         "PATH": os.environ.get(
             "PATH",
             "/root/.local/bin:/root/.hermes/bin:/usr/local/bin:/usr/bin:/bin",

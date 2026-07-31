@@ -52,8 +52,9 @@ See [ROI-FIXES.md](ROI-FIXES.md) for the ranked backlog.
 - **Sprint 30 (F9c):** GitHub apply-suggestion blocks from `### Code suggestions`
 - **Sprint 31 (F39):** Modal host parity (path-skip + report-verdict on bit 3)
 - **Sprint 32 (F40):** Ops signals in run-bundle + Run Console overview
+- **Sprint 33 (F41):** Hermes max_turns iteration budget (default 40) + loop metrics in run-bundle
 
-## Ops signals in Run Console (F40)
+## Ops signals in Run Console (F40/F41)
 
 Every auto-pack (`run-bundle.json`) includes a `signals` object:
 
@@ -63,8 +64,27 @@ Every auto-pack (`run-bundle.json`) includes a `signals` object:
 | `path_skip` | `ops-signals.env` / F38 stub text |
 | `over_budget` | review OVER BUDGET / F29 |
 | `diff_truncated` | `meta.env` DIFF_TRUNCATED / F27 |
+| `max_turns_hit` | `hermes-max-turns.env` / F41 iteration budget |
 
-Console: header chips + Overview **Ops signals (F40)**.
+Also `loop` metrics: `tool_call_turns`, `message_count`, `step_count`, `max_turns`.
+
+Console: header chips + Overview **Ops signals** + **Agent loop (F41)** panel.
+
+## Hermes max turns (F41)
+
+Cap Hermes tool-calling iterations (Hermes default **500** is far too high for CI).
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_MAX_TURNS` | `40` | Cap; `0`/`off` = unlimited Hermes default |
+
+```bash
+python3 scripts/max_turns.py resolve
+python3 scripts/max_turns.py detect .luffy-out/hermes-*.stderr
+```
+
+Wired in `run-hermes-review.sh` (`--max-turns` + `agent.config` rewrite + detect).
+Evidence: `hermes-max-turns.env`, job-summary **Luffy max turns (F41)**.
 
 ## Modal host parity (F39)
 
@@ -74,6 +94,7 @@ Console: header chips + Overview **Ops signals (F40)**.
 |------|--------------------|
 | F38 path-skip | Before clone; env `LUFFY_SKIP_PATH_GLOBS`; force `LUFFY_SKIP_PATHS_FORCE=1` |
 | F36 timeout | `LUFFY_REVIEW_TIMEOUT_SECONDS` (default 1500) |
+| F41 max_turns | `LUFFY_MAX_TURNS` (default 40; `0`/`off` disables) |
 | F22–F37 / F9 | `report-verdict.sh` after review (status, PR review, inline, labels) |
 
 Offline helper: `python3 scripts/modal_parity.py path-skip …`. App version `0.6.0-f39`.

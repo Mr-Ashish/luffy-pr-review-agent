@@ -9,6 +9,12 @@ model:
 terminal:
   backend: local
 
+# F41: cap Hermes tool-calling iterations (Hermes default is 500 — too high for CI).
+# run-hermes-review.sh rewrites this from vars.LUFFY_MAX_TURNS (default 40; 0/off disables).
+# Complements F36 wall-clock timeout: stops runaway tool loops before the timer.
+agent:
+  max_turns: 40
+
 # Verbose agent/tool logging → HERMES_HOME/logs/agent.log
 display:
   tool_progress: verbose

@@ -33,3 +33,5 @@
 
 - The path listing step fails open too: an API error records `path_skip_info = {"skip": False, "reason": "list_paths_error:…"}` and continues to the paid path — check that `reason` when a docs-only PR unexpectedly costs OpenRouter spend.
 - Because the helper is imported by file path from the `scripts/` directory inside the packaged app, the F10 pack must ship both `scripts/modal_parity.py` and `scripts/path-skip-check.py`; shipping only one silently disables the gate.
+
+- **F41:** Modal `review_pr` forwards `LUFFY_MAX_TURNS` (default 40) into the pipeline env so bit-3 matches GHA iteration budget.

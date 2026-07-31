@@ -515,6 +515,8 @@ jobs:
           LUFFY_MAX_COST_USD: ${{ vars.LUFFY_MAX_COST_USD }}
           # F36: hermes wall-clock timeout seconds (default 1500 in run-with-timeout.py)
           LUFFY_REVIEW_TIMEOUT_SECONDS: ${{ vars.LUFFY_REVIEW_TIMEOUT_SECONDS }}
+          # F41: Hermes max_turns (default 40 in max_turns.py / agent/config.yaml)
+          LUFFY_MAX_TURNS: ${{ vars.LUFFY_MAX_TURNS }}
           # F7: job-level env already sets default; re-export for pipeline scripts
           LUFFY_HERMES_COMMIT: ${{ env.LUFFY_HERMES_COMMIT }}
         run: |
@@ -542,6 +544,10 @@ jobs:
           # F36: empty timeout var → script default (1500s); 0/off disables
           if [[ -z "${LUFFY_REVIEW_TIMEOUT_SECONDS:-}" ]]; then
             unset LUFFY_REVIEW_TIMEOUT_SECONDS || true
+          fi
+          # F41: empty max-turns var → script default (40); 0/off disables
+          if [[ -z "${LUFFY_MAX_TURNS:-}" ]]; then
+            unset LUFFY_MAX_TURNS || true
           fi
           export PATH="${HOME}/.local/bin:${HOME}/.hermes/bin:${PATH}"
           chmod +x "$LUFFY_ROOT/scripts/"*.sh "$LUFFY_ROOT/scripts/"*.py 2>/dev/null || true

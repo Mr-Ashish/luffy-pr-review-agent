@@ -137,8 +137,18 @@
     "path_skip": false,
     "diff_truncated": false,
     "over_budget": false,
+    "max_turns_hit": false,
+    "max_turns": null,
     "flags": [],
     "any": false
+  },
+  "loop": {
+    "tool_call_turns": 9,
+    "message_count": 26,
+    "step_count": 26,
+    "max_turns": null,
+    "max_turns_enabled": false,
+    "max_turns_hit": false
   },
   "trace": {
     "meta": {

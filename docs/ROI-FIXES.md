@@ -185,6 +185,10 @@ Evidence from live e2e (Odoo monorepo + hub memory):
 
 **F40** ops signals in Run Console: `pack-run-for-ui.py` emits `signals` (timeout F36, path-skip F38, over-budget F29, diff-truncated F27 + `flags[]`). Path-skip steps write `ops-signals.env`. Console header chips + Overview **Ops signals (F40)** panel so operators answer “why free-skip / kill / overspend / incomplete?” without grepping artifacts.
 
+### Sprint 33 (shipped)
+
+**F41** Hermes max_turns iteration budget: default **40** tool-calling turns (`agent/config.yaml` + `scripts/max_turns.py` + `--max-turns` in `run-hermes-review.sh`). Hermes product default is 500 — unsafe for CI OpenRouter spend. Override `vars.LUFFY_MAX_TURNS` (`0`/`off` disables). Detects “Iteration budget exhausted” → `hermes-max-turns.env` + job summary. Pack/UI: `signals.max_turns_hit` + `loop` metrics. Complements F36 wall-clock and F29 soft $.
+
 ### readme-kit (shipped)
 
 YAML config (preferred) + JSON parity; `yaml` npm dep; dead hand-rolled parser removed.

@@ -69,7 +69,7 @@ export interface RunBundle {
     total_seconds?: number;
     stages?: { name: string; seconds: number; exit_code: number }[];
   };
-  /** F40: ops gates — timeout, path-skip, budget, truncation */
+  /** F40/F41: ops gates — timeout, path-skip, budget, truncation, max-turns */
   signals?: {
     any?: boolean;
     flags?: string[];
@@ -82,6 +82,17 @@ export interface RunBundle {
     diff_truncated?: boolean;
     over_budget?: boolean;
     budget_max_usd?: number;
+    max_turns_hit?: boolean;
+    max_turns?: number | string | null;
+  };
+  /** F41: Hermes agent-loop metrics */
+  loop?: {
+    tool_call_turns?: number | null;
+    message_count?: number | null;
+    step_count?: number | null;
+    max_turns?: number | string | null;
+    max_turns_enabled?: boolean;
+    max_turns_hit?: boolean;
   };
   memory: {
     health?: Record<string, string>;

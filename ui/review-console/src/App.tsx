@@ -286,6 +286,7 @@ export default function App() {
 
   const { run, pr, result, cost, timings, memory, trace, diff } = bundle;
   const signals = bundle.signals;
+  const loop = bundle.loop;
   const vClass = verdictClass(result.verdict);
 
   return (
@@ -464,6 +465,56 @@ export default function App() {
                         <dd>
                           Assembled PR diff hit MAX_DIFF_BYTES — findings may be
                           incomplete
+                        </dd>
+                      </>
+                    )}
+                    {signals.max_turns_hit && (
+                      <>
+                        <dt>Max turns (F41)</dt>
+                        <dd>
+                          Hermes iteration budget exhausted
+                          {signals.max_turns != null
+                            ? ` at ${signals.max_turns} turns`
+                            : ""}{" "}
+                          — raise <code>LUFFY_MAX_TURNS</code> or use a cheaper
+                          model
+                        </dd>
+                      </>
+                    )}
+                  </dl>
+                </div>
+              )}
+
+              {(loop?.tool_call_turns != null ||
+                loop?.message_count != null ||
+                loop?.max_turns != null) && (
+                <div className="block">
+                  <h3>Agent loop (F41)</h3>
+                  <dl className="dl">
+                    {loop.tool_call_turns != null && (
+                      <>
+                        <dt>Tool-call turns</dt>
+                        <dd className="mono">{loop.tool_call_turns}</dd>
+                      </>
+                    )}
+                    {loop.message_count != null && (
+                      <>
+                        <dt>Messages</dt>
+                        <dd className="mono">{loop.message_count}</dd>
+                      </>
+                    )}
+                    {loop.step_count != null && (
+                      <>
+                        <dt>Steps</dt>
+                        <dd className="mono">{loop.step_count}</dd>
+                      </>
+                    )}
+                    {loop.max_turns != null && (
+                      <>
+                        <dt>Max turns cap</dt>
+                        <dd className="mono">
+                          {loop.max_turns}
+                          {loop.max_turns_hit ? " · HIT" : ""}
                         </dd>
                       </>
                     )}
@@ -742,6 +793,41 @@ export default function App() {
           {tab === "loop" && (
             <>
               <p className="section-title">Agent loop</p>
+              {(loop?.tool_call_turns != null ||
+                loop?.message_count != null ||
+                loop?.max_turns != null) && (
+                <div className="measures">
+                  {loop.tool_call_turns != null && (
+                    <div className="measure">
+                      <div className="lbl">Tool-call turns</div>
+                      <div className="val mono">{loop.tool_call_turns}</div>
+                    </div>
+                  )}
+                  {loop.message_count != null && (
+                    <div className="measure">
+                      <div className="lbl">Messages</div>
+                      <div className="val mono">{loop.message_count}</div>
+                    </div>
+                  )}
+                  {loop.step_count != null && (
+                    <div className="measure">
+                      <div className="lbl">Steps</div>
+                      <div className="val mono">{loop.step_count}</div>
+                    </div>
+                  )}
+                  {loop.max_turns != null && (
+                    <div className="measure">
+                      <div className="lbl">Max turns (F41)</div>
+                      <div
+                        className={`val mono${loop.max_turns_hit ? " bad" : ""}`}
+                      >
+                        {loop.max_turns}
+                        {loop.max_turns_hit ? " HIT" : ""}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {trace.agent_loop_md ? (
                 <pre className="scroll-code">{trace.agent_loop_md}</pre>
               ) : (

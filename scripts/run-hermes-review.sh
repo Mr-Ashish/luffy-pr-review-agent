@@ -9,6 +9,7 @@
 #   LUFFY_TOOLSETS  (optional hermes -t value; default: terminal for workspace tools)
 #   LUFFY_HERMES_COMMIT  pin SHA (default in hermes-pin.sh); empty/latest/main = floating
 #   LUFFY_REVIEW_TIMEOUT_SECONDS  F36 wall-clock for hermes (default 1500; 0/off disables)
+#   LUFFY_MAX_TURNS  F41 Hermes tool-iteration cap (default 40; 0/off = Hermes default ~500)
 #   PR_NUMBER
 set -euo pipefail
 
@@ -175,6 +176,59 @@ case "$TIMEOUT_SECS" in
 esac
 printf '%s\n' "$TIMEOUT_SECS" >"$OUT_DIR/hermes-timeout-seconds.txt" || true
 
+# F41: Hermes max_turns iteration budget (complements F36 wall-clock)
+MAX_TURNS_HELPER="$LUFFY_ROOT/scripts/max_turns.py"
+MAX_TURNS_RAW="$(
+  python3 "$MAX_TURNS_HELPER" resolve "${LUFFY_MAX_TURNS-}" 2>/dev/null || echo 40
+)"
+MAX_TURNS_ARGS=()
+MAX_TURNS_ENABLED=0
+MAX_TURNS_VAL=""
+if [[ "$MAX_TURNS_RAW" != "off" && -n "$MAX_TURNS_RAW" ]]; then
+  case "$MAX_TURNS_RAW" in
+    *[!0-9]*) MAX_TURNS_RAW=40 ;;
+  esac
+  if [[ "$MAX_TURNS_RAW" -gt 0 ]]; then
+    MAX_TURNS_ENABLED=1
+    MAX_TURNS_VAL="$MAX_TURNS_RAW"
+    MAX_TURNS_ARGS=(--max-turns "$MAX_TURNS_VAL")
+    export HERMES_MAX_ITERATIONS="$MAX_TURNS_VAL"
+    # Ensure HERMES_HOME config matches CLI (agent.config copy may lag installer)
+    python3 - <<'PY' "$HERMES_HOME/config.yaml" "$MAX_TURNS_VAL"
+from pathlib import Path
+import re, sys
+path, n = Path(sys.argv[1]), sys.argv[2]
+text = path.read_text(encoding="utf-8") if path.is_file() else ""
+block = f"agent:\n  max_turns: {n}\n"
+if re.search(r"(?m)^agent:\s*$", text):
+    text2, cnt = re.subn(
+        r"(?m)^(agent:\s*\n(?:[ \t]+.+\n)*)",
+        block,
+        text,
+        count=1,
+    )
+    if cnt:
+        text = text2
+    else:
+        text = text.rstrip() + "\n\n" + block
+elif re.search(r"(?m)^agent:\s*\n", text):
+    text = re.sub(
+        r"(?ms)^agent:.*?(?=^[a-zA-Z_]|\Z)",
+        block,
+        text,
+        count=1,
+    )
+else:
+    text = text.rstrip() + "\n\n" + block
+path.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
+PY
+  fi
+fi
+{
+  echo "max_turns_enabled=$MAX_TURNS_ENABLED"
+  echo "max_turns=${MAX_TURNS_VAL:-off}"
+} >"$OUT_DIR/hermes-max-turns.env" || true
+
 _hermes_wrap() {
   # Run hermes under F36 timeout when enabled; else bare exec.
   if [[ "${TIMEOUT_SECS}" -gt 0 && -f "$TIMEOUT_HELPER" ]]; then
@@ -184,7 +238,7 @@ _hermes_wrap() {
   fi
 }
 
-notice "Hermes review · model=$MODEL toolsets=$TOOLSETS workspace=$WORKSPACE_ROOT hermes_home=$HERMES_HOME timeout=${TIMEOUT_SECS}s"
+notice "Hermes review · model=$MODEL toolsets=$TOOLSETS workspace=$WORKSPACE_ROOT hermes_home=$HERMES_HOME timeout=${TIMEOUT_SECS}s max_turns=${MAX_TURNS_VAL:-off}"
 
 TIMED_OUT=0
 set +e
@@ -197,6 +251,7 @@ set +e
     --model "$MODEL" \
     -t "$TOOLSETS" \
     --usage-file "$USAGE_FILE" \
+    ${MAX_TURNS_ARGS[@]+"${MAX_TURNS_ARGS[@]}"} \
     >"$RAW_OUT" 2>"$STDERR_FILE"
 )
 RC=$?
@@ -227,6 +282,7 @@ if [[ $TIMED_OUT -eq 0 && ( $RC -ne 0 || ! -s "$RAW_OUT" ) ]]; then
     _hermes_wrap hermes chat -q "$PROMPT" \
       --provider openrouter \
       --model "$MODEL" \
+      ${MAX_TURNS_ARGS[@]+"${MAX_TURNS_ARGS[@]}"} \
       >"$RAW_OUT" 2>>"$STDERR_FILE"
   )
   RC=$?
@@ -273,12 +329,51 @@ export LUFFY_PROVIDER=openrouter
 chmod +x "$LUFFY_ROOT/scripts/capture-hermes-loop.py" 2>/dev/null || true
 python3 "$LUFFY_ROOT/scripts/capture-hermes-loop.py" || notice "capture-hermes-loop soft-failed"
 
+# F41: detect Hermes iteration-budget exhaustion (logs / stderr / agent-loop)
+MAX_TURNS_HIT=0
+if [[ -f "$MAX_TURNS_HELPER" ]]; then
+  _detect_paths=()
+  [[ -f "$STDERR_FILE" ]] && _detect_paths+=("$STDERR_FILE")
+  [[ -f "$OUT_DIR/hermes-run.log" ]] && _detect_paths+=("$OUT_DIR/hermes-run.log")
+  [[ -f "$LOOP_DIR/agent-loop.md" ]] && _detect_paths+=("$LOOP_DIR/agent-loop.md")
+  [[ -f "$LOOP_DIR/agent.log" ]] && _detect_paths+=("$LOOP_DIR/agent.log")
+  if [[ ${#_detect_paths[@]} -gt 0 ]]; then
+    if python3 "$MAX_TURNS_HELPER" detect "${_detect_paths[@]}" >/dev/null 2>&1; then
+      : # hit=0 (exit 0)
+    else
+      _drc=$?
+      if [[ $_drc -eq 2 ]]; then
+        MAX_TURNS_HIT=1
+      fi
+    fi
+  fi
+fi
+{
+  echo "max_turns_enabled=$MAX_TURNS_ENABLED"
+  echo "max_turns=${MAX_TURNS_VAL:-off}"
+  echo "max_turns_hit=$MAX_TURNS_HIT"
+} >"$OUT_DIR/hermes-max-turns.env" || true
+if [[ "$MAX_TURNS_HIT" -eq 1 ]]; then
+  notice "F41 Hermes max_turns hit (cap=${MAX_TURNS_VAL:-?}) — iteration budget exhausted"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    {
+      echo "### Luffy max turns (F41)"
+      echo "- **Iteration budget exhausted** at \`${MAX_TURNS_VAL:-?}\` tool-calling turns"
+      echo "- Raise \`vars.LUFFY_MAX_TURNS\` or use a faster/cheaper model; \`0\`/\`off\` disables the cap"
+      echo
+    } >>"$GITHUB_STEP_SUMMARY" || true
+  fi
+fi
+
 if [[ ! -s "$RAW_OUT" ]]; then
   _fail_summary="Luffy failed to produce a review (hermes exit ${RC}). Check workflow logs, Hermes install, and OpenRouter credits/key."
   _fail_blocking="Review agent run failed — re-trigger with \`@luffy review this pr\` after fixing CI/OpenRouter."
   if [[ $TIMED_OUT -eq 1 ]]; then
     _fail_summary="Luffy review **timed out** after ${TIMEOUT_SECS}s wall-clock (F36). Hermes was killed to stop runaway OpenRouter spend. Re-trigger with a cheaper model or raise \`LUFFY_REVIEW_TIMEOUT_SECONDS\`."
     _fail_blocking="Agent loop exceeded \`LUFFY_REVIEW_TIMEOUT_SECONDS=${TIMEOUT_SECS}\` — increase the var, use a faster model (\`vars.LUFFY_MODEL\`), or re-run with a smaller PR diff."
+  elif [[ "$MAX_TURNS_HIT" -eq 1 ]]; then
+    _fail_summary="Luffy review hit the **Hermes iteration budget** (F41, max_turns=${MAX_TURNS_VAL:-?}). The agent loop stopped before producing a full review to cap OpenRouter spend. Raise \`LUFFY_MAX_TURNS\` or simplify the PR."
+    _fail_blocking="Agent loop exhausted \`LUFFY_MAX_TURNS=${MAX_TURNS_VAL:-?}\` tool turns — increase the var, disable with \`0\`/\`off\`, or re-run with a smaller diff / cheaper model."
   fi
   cat >"$RAW_OUT" <<EOF
 ## 🏴‍☠️ Luffy Review — PR #${PR_NUMBER}

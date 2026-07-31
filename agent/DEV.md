@@ -24,3 +24,5 @@
 - Same anchoring applies to `**Score:** <int>[/100]` and `**Confidence:** low|medium|high` — score/confidence are parsed only for reporting, and a missed match yields empty strings rather than an error.
 - `UNKNOWN` is deliberately non-blocking (reaction `eyes`, status `success`, review_event `COMMENT`), so a broken prompt contract looks like a healthy neutral review instead of failing loudly. Verify the posted body still carries the bold verdict line after any prompt/template edit.
 - F23 dual-channel: the full Markdown is still the issue comment (F12 replace via `<!-- luffy-review pr=N`); the formal PR Review body is intentionally short so the Reviews panel is not a second full dump. Marker `<!-- luffy-pr-review pr=N` tags Luffy-owned PR reviews.
+
+- **F41 max_turns:** `agent/config.yaml` sets `agent.max_turns: 40` (Hermes default 500 is unsafe for CI). Override with `LUFFY_MAX_TURNS`; `scripts/max_turns.py` resolves/detects budget hits.

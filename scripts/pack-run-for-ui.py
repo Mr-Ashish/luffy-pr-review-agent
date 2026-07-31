@@ -128,13 +128,14 @@ def collect_signals(
     meta_env: str | None = None,
     usage: dict | None = None,
 ) -> dict:
-    """F40: ops signals for Run Console overview (timeout, path-skip, budget, truncation).
+    """F40/F41: ops signals for Run Console overview.
 
     Sources (files preferred, review text as soft fallback):
       hermes-timeout.env / hermes-timeout-seconds.txt  → timeout (F36)
       path-skip / ops-signals.env PATH_SKIP=1          → path_skip (F38)
       meta.env DIFF_TRUNCATED / review banner (F27)    → diff_truncated
       review OVER BUDGET / usage + env max (F29)       → over_budget
+      hermes-max-turns.env / iteration budget logs     → max_turns_hit (F41)
     """
     signals: dict = {
         "timeout": False,
@@ -142,6 +143,8 @@ def collect_signals(
         "path_skip": False,
         "diff_truncated": False,
         "over_budget": False,
+        "max_turns_hit": False,
+        "max_turns": None,
         "flags": [],  # short chip labels for UI
     }
     te = _parse_env_file(dir_path / "hermes-timeout.env")
@@ -217,6 +220,38 @@ def collect_signals(
         except (TypeError, ValueError):
             pass
 
+    # F41 max_turns / iteration budget
+    mt = _parse_env_file(dir_path / "hermes-max-turns.env")
+    if mt.get("max_turns") and mt.get("max_turns") not in ("off", "0", ""):
+        try:
+            signals["max_turns"] = int(mt["max_turns"])
+        except ValueError:
+            signals["max_turns"] = mt["max_turns"]
+    if mt.get("max_turns_hit") in ("1", "true", "yes"):
+        signals["max_turns_hit"] = True
+    # Soft: review / logs mention iteration budget
+    if not signals["max_turns_hit"] and (
+        "iteration budget" in low
+        or ("max_turns" in low and "f41" in low)
+        or "max iterations" in low
+        or "max_iterations_reached" in low
+    ):
+        signals["max_turns_hit"] = True
+    # Also scan agent-loop md if present
+    if not signals["max_turns_hit"]:
+        al = dir_path / "agent-loop" / "agent-loop.md"
+        if al.is_file():
+            try:
+                chunk = al.read_text(encoding="utf-8", errors="replace")[:80_000].lower()
+            except OSError:
+                chunk = ""
+            if (
+                "iteration budget exhausted" in chunk
+                or "max_iterations_reached" in chunk
+                or "reached maximum iterations" in chunk
+            ):
+                signals["max_turns_hit"] = True
+
     flags: list[str] = []
     if signals["path_skip"]:
         flags.append("path-skip")
@@ -226,9 +261,37 @@ def collect_signals(
         flags.append("over-budget")
     if signals["diff_truncated"]:
         flags.append("diff-truncated")
+    if signals["max_turns_hit"]:
+        flags.append("max-turns")
     signals["flags"] = flags
     signals["any"] = bool(flags)
     return signals
+
+
+def collect_loop(dir_path: Path) -> dict:
+    """F41: structured agent-loop metrics for Run Console (Hermes iteration observability)."""
+    loop_json = read_json(dir_path / "agent-loop" / "agent-loop.json") or {}
+    mt = _parse_env_file(dir_path / "hermes-max-turns.env")
+    steps = loop_json.get("steps") if isinstance(loop_json, dict) else None
+    step_count = len(steps) if isinstance(steps, list) else None
+    max_turns_val: int | str | None = None
+    if mt.get("max_turns") and mt.get("max_turns") not in ("off", ""):
+        try:
+            max_turns_val = int(mt["max_turns"])
+        except ValueError:
+            max_turns_val = mt["max_turns"]
+    return {
+        "tool_call_turns": loop_json.get("tool_call_turns")
+        if isinstance(loop_json, dict)
+        else None,
+        "message_count": loop_json.get("message_count")
+        if isinstance(loop_json, dict)
+        else None,
+        "step_count": step_count,
+        "max_turns": max_turns_val,
+        "max_turns_enabled": mt.get("max_turns_enabled") in ("1", "true", "yes"),
+        "max_turns_hit": mt.get("max_turns_hit") in ("1", "true", "yes"),
+    }
 
 
 def _resolve_review_md(dir_path: Path) -> str:
@@ -324,6 +387,15 @@ def pack(dir_path: Path, *, comment_url: str = "", host: str = "gha") -> dict:
         meta_env=meta_env,
         usage=usage if isinstance(usage, dict) else {},
     )
+    loop = collect_loop(dir_path)
+    # Prefer loop metrics for max_turns display even when not hit
+    if loop.get("max_turns") is not None and signals.get("max_turns") is None:
+        signals["max_turns"] = loop["max_turns"]
+    if loop.get("max_turns_hit"):
+        signals["max_turns_hit"] = True
+        if "max-turns" not in signals.get("flags", []):
+            signals.setdefault("flags", []).append("max-turns")
+            signals["any"] = True
 
     # Artifact inventory from meta or directory listing
     artifacts = []
@@ -419,7 +491,8 @@ def pack(dir_path: Path, *, comment_url: str = "", host: str = "gha") -> dict:
             "health": memory_health,
             "after_md": memory,
         },
-        "signals": signals,  # F40: timeout / path-skip / budget / truncation
+        "signals": signals,  # F40/F41: timeout / path-skip / budget / truncation / max-turns
+        "loop": loop,  # F41: agent-loop metrics (tool turns, max_turns cap)
         "trace": {
             "meta": meta,
             "trace_json": trace if isinstance(trace, dict) else {},

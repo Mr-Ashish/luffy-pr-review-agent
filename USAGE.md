@@ -5,7 +5,7 @@
 ## Run console
 
 - **F31 auto-pack:** every review writes `.luffy-out/run-bundle.json` (and `traces/<id>/run-bundle.json`) — download the `luffy-out` or `luffy-trace` Actions artifact and load it in the console. Soft-fail only.
-- **F40 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated + `flags[]`). Overview shows **Ops signals (F40)**; header chips when any flag is set. Path-skip writes `ops-signals.env` for durable pack.
+- **F40/F41 signals:** bundle includes `signals` (timeout / path-skip / over-budget / diff-truncated / max-turns + `flags[]`) and `loop` metrics (tool_call_turns, message_count, max_turns). Overview shows **Ops signals** + **Agent loop (F41)**; header chips when any flag is set. Path-skip writes `ops-signals.env`; F41 writes `hermes-max-turns.env`.
 - Manual pack (showcase / older runs): `python3 scripts/pack-run-for-ui.py --dir path/to/run-or-showcase -o run-bundle.json` (`--host gha|modal|local`, `--memory-health path`, `--also path`, `--soft`).
 - UI: `cd ui/review-console && npm install && npm run pack-fixture && npm run dev` → http://localhost:5177 → **Load bundle** for any `run-bundle.json`.
 - Tabs: Overview, **Run** (F32 trigger), PR, Result, Findings, Diff, Trace, Agent loop, Cost, Memory, Artifacts, Raw review
@@ -61,6 +61,24 @@ python3 scripts/apply-verdict-labels.py plan --verdict REQUEST_CHANGES --pipelin
 
 Pipeline failures always map to `luffy:error` even if the body says APPROVE.
 Filter boards with `label:luffy:request-changes`.
+
+### Hermes max turns (F41)
+
+Cap Hermes tool-calling iterations so a runaway agent loop cannot burn unbounded
+OpenRouter spend (Hermes default is 500 turns — far too high for CI PR review).
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_MAX_TURNS` | `40` | Cap; `0`/`off` disables (Hermes ~500 default) |
+
+```bash
+python3 scripts/max_turns.py resolve          # → 40
+LUFFY_MAX_TURNS=off python3 scripts/max_turns.py resolve   # → off
+python3 scripts/max_turns.py detect hermes.stderr          # exit 2 if budget hit
+```
+
+On hit: job-summary **Luffy max turns (F41)**, `hermes-max-turns.env`, run-bundle
+`signals.max_turns_hit` + `loop` metrics. Complements F36 wall-clock timeout.
 
 ### Review timeout (F36)
 
@@ -164,7 +182,7 @@ devmemory extract --fixture sample-auth-module --apply
 - Required secret: `OPENROUTER_API_KEY`.
 - **Memory (F28):** each target repo owns review memory under **`.luffy/`** (committed slim pack: `MEMORY.md` + `runs/{trace}/`). Install seeds `.luffy/MEMORY.md`. Fat debug traces stay Actions artifacts only.
 - Optional hub memory: set repo var `LUFFY_MEMORY_MODE=both` or `hub`, and/or `LUFFY_HUB_PUBLISH=1`, plus secret `LUFFY_HUB_TOKEN` (PAT with contents write on the hub). Default mode is `local` (hub off).
-- Optional repo variables: `LUFFY_MODEL` (script default `anthropic/claude-opus-5` — F26 SoT in `run-hermes-review.sh`; override e.g. `openai/gpt-5-mini` for cheaper runs), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_RUNNER_IMAGE` (optional prebaked Hermes container image, F8), `LUFFY_MAX_COST_USD` (F29 soft budget USD; `0`/`off`/unset disables), `LUFFY_MEMORY_MODE` (`local`|`hub`|`both`), `LUFFY_MEMORY_PATH` (default `.luffy`), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_HUB_PUBLISH`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
+- Optional repo variables: `LUFFY_MODEL` (script default `anthropic/claude-opus-5` — F26 SoT in `run-hermes-review.sh`; override e.g. `openai/gpt-5-mini` for cheaper runs), `LUFFY_HERMES_COMMIT` (pin Hermes SHA; default in `scripts/hermes-pin.sh`; `latest`/`main` = floating tip), `LUFFY_COOLDOWN_SECONDS` (default 900; `0`/`off` disables re-trigger cooldown), `LUFFY_RUNNER_IMAGE` (optional prebaked Hermes container image, F8), `LUFFY_MAX_COST_USD` (F29 soft budget USD; `0`/`off`/unset disables), `LUFFY_MAX_TURNS` (F41 Hermes iteration cap; default 40; `0`/`off` disables), `LUFFY_MEMORY_MODE` (`local`|`hub`|`both`), `LUFFY_MEMORY_PATH` (default `.luffy`), `LUFFY_HUB_REPO`, `LUFFY_HUB_MODE`, `LUFFY_HUB_PUBLISH`, `LUFFY_ALLOWED_ASSOCIATIONS`, `LUFFY_REPLACE_PREVIOUS`, `MAX_DIFF_BYTES`, `MAX_MEMORY_BYTES`.
 - Trigger a review by commenting `@luffy review this pr` (or `@luffy review`) on the PR.
 
 ### Repo-local memory commands

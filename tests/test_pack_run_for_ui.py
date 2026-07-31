@@ -76,6 +76,49 @@ class PackRunForUiTests(unittest.TestCase):
             self.assertIn("path-skip", sig["flags"])
             self.assertIn("diff-truncated", sig["flags"])
 
+    def test_f41_max_turns_and_loop_metrics(self):
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "run"
+            src.mkdir()
+            loop = src / "agent-loop"
+            loop.mkdir()
+            (src / "review.md").write_text(
+                "## Luffy Review — PR #2\n\n**Verdict:** COMMENT\n\n"
+                "### Summary\nHit F41 max_turns iteration budget.\n",
+                encoding="utf-8",
+            )
+            (src / "hermes-max-turns.env").write_text(
+                "max_turns_enabled=1\nmax_turns=40\nmax_turns_hit=1\n",
+                encoding="utf-8",
+            )
+            (loop / "agent-loop.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "tool_call_turns": 40,
+                        "message_count": 82,
+                        "steps": [{"step": i} for i in range(5)],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            out = Path(td) / "bundle.json"
+            r = _run(["--dir", str(src), "-o", str(out), "--host", "gha"])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            bundle = json.loads(out.read_text())
+            sig = bundle["signals"]
+            self.assertTrue(sig["max_turns_hit"])
+            self.assertEqual(sig["max_turns"], 40)
+            self.assertIn("max-turns", sig["flags"])
+            self.assertTrue(sig["any"])
+            loop_b = bundle["loop"]
+            self.assertEqual(loop_b["tool_call_turns"], 40)
+            self.assertEqual(loop_b["message_count"], 82)
+            self.assertEqual(loop_b["step_count"], 5)
+            self.assertEqual(loop_b["max_turns"], 40)
+            self.assertTrue(loop_b["max_turns_hit"])
+
     def test_also_writes_second_path(self):
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "a.json"
