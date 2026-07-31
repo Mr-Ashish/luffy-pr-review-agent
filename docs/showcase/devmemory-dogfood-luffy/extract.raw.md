@@ -1,6 +1,6 @@
 ```json
 {
-  "summary": "The F51 session's durable content is mostly already merged into agent/DEV.md and USAGE.md by the prior devmemory run; two bullets were dropped in that merge and remain unrecorded: the three-surface sync contract for tool-depth wording, and the shallow-read evidence that 0→1 tool recovery is not real inspection.",
+  "summary": "The session delivered durable knowledge on the F51 tool-depth enhancement layered on F49's soft re-prompt, establishing a synchronized contract across three sources (build_reprompt_suffix, agent/review-prompt.md Workspace section, agent/SOUL.md Scope) that mandates deep inspection of diffs and changed symbols, forbidding shallow head-only file reads. It also emphasized distinguishing recovered tool turns from real inspection based on line coverage and confirmed the rubric-driven tuning approach for this contract via scored PR evals.",
   "session_ids": ["dogfood-luffy-session"],
   "units": [
     {
@@ -8,10 +8,10 @@
       "path": "agent",
       "action": "merge",
       "section": "Design decisions",
-      "content": "- **F51/H26 tool depth** is not a new gate — it is prompt wording that must stay in sync across three surfaces: `build_reprompt_suffix` (the F49 soft re-prompt suffix), the **Workspace** section of `agent/review-prompt.md`, and the **Scope** section of `agent/SOUL.md`. Editing only one leaves a re-prompted attempt with depth guidance the first attempt never saw (or vice versa), so treat the three as a single contract.\n- It shifts the objective from *whether* the reviewer used tools (F45/F49) to *how deeply* it looked, which is why it ships as prompt text plus an assertion in the existing tool-turns suite rather than a new post-review gate script.",
+      "content": "- F51 tool depth (H26) layers on top of the F49 soft re-prompt: F49 fixed whether the model used tools, F51 fixes how deeply it looked.\n- The re-prompt suffix and reviewer contract now require reading actual diff hunks plus `rg` and line-range reading of each changed symbol.\n- Head-only reads of large files (e.g., `head -80` on large modules) are explicitly forbidden.\n- This depth requirement is stated on three surfaces that must remain in sync: `build_reprompt_suffix` (F49 re-prompt text), the Workspace section of `agent/review-prompt.md`, and the Scope section of `agent/SOUL.md`.",
       "evidence": [
-        "Fix: build_reprompt_suffix + review-prompt Workspace + SOUL Scope require diff hunks / rg + line-range on changed symbols; forbid head-only large-file reads",
-        "F51: tool-depth nudge after F49 soft re-prompt (H26)"
+        "F51: tool-depth nudge after F49 soft re-prompt (H26)",
+        "Fix: build_reprompt_suffix + review-prompt Workspace + SOUL Scope require diff hunks / rg + line-range on changed symbols; forbid head-only large-file reads"
       ],
       "confidence": "high"
     },
@@ -20,11 +20,24 @@
       "path": "agent",
       "action": "merge",
       "section": "Pitfalls",
-      "content": "- A non-zero `tool_turns` after the F49 re-prompt is not evidence of real inspection: on odoo eval PR #6 the recovered attempt went 0→**1** tool call and spent it on `head -80` of a large `misc.py`, never reaching the changed `street_split` code around **L1925** — score 34/50 with depth dimension **D8=2**. When judging a re-prompted run, check *which lines* were read, not the `tool-turns-*` counters.",
+      "content": "- A non-zero tool-turn count is not evidence of real read: the F49 recovery case showed 0→1 tool turns, but the single call was `head -80` on a large module and the changed function was never read.\n- Treat \"tools used\" and \"changed symbol actually read\" as separate signals when triaging shallow reviews.",
       "evidence": [
-        "Evidence: odoo eval #6 F49 recovered 0→1 tools but only `head -80` on large misc.py; never read street_split ~L1925; score 34/50 D8=2"
+        "odoo eval #6 F49 recovered 0→1 tools but only `head -80` on large misc.py; never read street_split ~L1925"
       ],
       "confidence": "high"
+    },
+    {
+      "kind": "dev",
+      "path": ".",
+      "action": "merge",
+      "section": "Patterns",
+      "content": "- Prompt/contract changes are motivated by rubric evidence, not intuition: a low per-dimension score for tool depth in the 6-PR `luffy-eval` corpus on `Mr-Ashish/odoo` justified the F51 feature flag.\n- Each fix was validated by a live mini re-score of the same PR under the new build, illustrating an eval-driven tuning loop.",
+      "evidence": [
+        "score 34/50 D8=2",
+        "H27 live mini re-score #6 under F51",
+        "Corpus: 6 luffy-eval PRs on Mr-Ashish/odoo all scored"
+      ],
+      "confidence": "medium"
     }
   ]
 }

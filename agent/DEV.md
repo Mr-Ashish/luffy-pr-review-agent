@@ -28,6 +28,11 @@
 
 - It shifts the objective from *whether* the reviewer used tools (F45/F49) to *how deeply* it looked, which is why it ships as prompt text plus an assertion in the existing tool-turns suite rather than a new post-review gate script.
 
+- The depth requirement is stated on three surfaces that must stay in sync: `build_reprompt_suffix` (F49 re-prompt text), the **Workspace** section of `agent/review-prompt.md`, and the **Scope** section of `agent/SOUL.md`. Changing the wording in only one place leaves the other two contradicting it.
+
+- F51 tool depth (H26) layers on top of the F49 soft re-prompt: F49 fixed whether the model used tools, F51 fixes how deeply it looked.
+- The re-prompt suffix and reviewer contract now require reading actual diff hunks plus `rg` and line-range reading of each changed symbol.
+
 ## Pitfalls
 
 - Same anchoring applies to `**Score:** <int>[/100]` and `**Confidence:** low|medium|high` — score/confidence are parsed only for reporting, and a missed match yields empty strings rather than an error.
@@ -49,3 +54,6 @@
 - Because the reprompt succeeds, the F45 tool-turns gate reports *skipped* rather than pass/fail on these runs — a skipped F45 plus `soul_blocked=0` is the healthy signature, so do not read "gate skipped" as "gate not wired up".
 
 - Prompt-only mitigations like F51 need a live re-score to be believed — the shipped commit only proves the wording and tests changed, not that depth improved.
+
+- A non-zero tool-turn count is not evidence of real read: the F49 recovery case showed 0→1 tool turns, but the single call was `head -80` on a large module and the changed function was never read.
+- Treat "tools used" and "changed symbol actually read" as separate signals when triaging shallow reviews.

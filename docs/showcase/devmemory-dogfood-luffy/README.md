@@ -1,12 +1,12 @@
-# Showcase · `run-20260731T225816-aeecec`
+# Showcase · `run-20260731T231211-40a2c5`
 
 Live dogfood run of **devmemory on itself**.
 
 | Field | Value |
 |-------|-------|
-| model | `anthropic/claude-opus-5` |
+| model | `openai/gpt-4.1-mini` |
 | hermes_rc | 0 |
-| units | 2 |
+| units | 3 |
 
 ## Files
 
