@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T14:57:39Z
+- **assembled_at:** 2026-07-31T15:03:26Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+72da566 feat(cost): F36 Hermes review wall-clock timeout
+c536e10 docs(knowledge): dogfood F35 ops footer + showcase
 0eb582f feat(ops): F35 PR comment deep-link footer (Actions + run-bundle)
 7524aa2 docs(knowledge): dogfood F9b precise anchors + showcase
 f94fd08 feat(trust): F9b precise inline anchors from path:LINE
-989ef7e docs(knowledge): dogfood F34 webhook fail-closed + showcase
-b263892 feat(trust): F34 webhook fail-closed by default
 ```
 
 ## tree (sample)
@@ -92,6 +92,7 @@ tests/test_pack_run_for_ui.py
 tests/test_parse_verdict.py
 tests/test_post_inline_comments.py
 tests/test_review_to_openui.py
+tests/test_run_with_timeout.py
 tests/test_trigger_review.py
 tests/test_usage_summary.py
 tests/test_webhook_auth.py
@@ -115,6 +116,7 @@ docs/experiments/2026-07-31-f32-trigger.md
 docs/experiments/2026-07-31-f33-webhook-auth.md
 docs/experiments/2026-07-31-f34-webhook-fail-closed.md
 docs/experiments/2026-07-31-f35-ops-footer.md
+docs/experiments/2026-07-31-f36-review-timeout.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-roi-fire.md
@@ -184,6 +186,7 @@ scripts/review-local.sh
 scripts/review-to-openui.py
 scripts/run-hermes-review.sh
 scripts/run-luffy-review.sh
+scripts/run-with-timeout.py
 scripts/save-trace.sh
 scripts/sparse-pr-paths.sh
 scripts/trigger-review.sh

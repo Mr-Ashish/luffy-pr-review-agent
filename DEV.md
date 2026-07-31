@@ -43,6 +43,11 @@
 
 - `scripts/webhook_auth.py` is **pure stdlib** (`hmac`/`hashlib`/`json` only) exposing `authorize_webhook()` + `github_hmac_hex()` plus a `sign|authorize` CLI, so the Modal image needs no extra dependency and the auth decision is unit-testable outside Modal (`tests/test_webhook_auth.py`).
 
+- **F36 review timeout:** `scripts/run-with-timeout.py` wraps `hermes -z` (and the chat fallback) as a child **process group** and kills it after a wall-clock limit, so a hung agent/OpenRouter loop cannot burn the full job cap (GHA 90m / Modal ~25m). Default `LUFFY_REVIEW_TIMEOUT_SECONDS=1500`; `0`/`off`/`false`/`no` disables.
+- The helper never rewrites the child's exit code except timeout→124 (`125` is reserved for invalid usage / empty command), so normal Hermes failures still surface unchanged upstream.
+- F36 and F29 are complementary, not overlapping: F29's soft `LUFFY_MAX_COST_USD` annotates a run that already *finished*, while F36 is the only mechanism that stops a run that never finishes.
+- Timeout evidence lands in the trace as `hermes-timeout.env` and `hermes-timeout-seconds.txt`, so a 124 can be distinguished from a model/contract failure after the fact.
+
 ## Pitfalls
 
 - `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403), so the hub publish default is `mode=direct` (clone hub → ingest → push `main`); the dispatch path needs a classic PAT on the target repo.

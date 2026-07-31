@@ -101,6 +101,11 @@ devmemory extract --fixture sample-auth-module --apply
 
 - Ops footer toggles (F35): set repo/env var `LUFFY_OPS_FOOTER=0` to suppress the italic ops line on posted reviews; set `LUFFY_CONSOLE_URL` to a hosted Run Console base URL to add a hosted console link next to the Actions run link (empty by default, so only the workflow-run link plus the `run-bundle.json` → `ui/review-console` Load-bundle tip are emitted).
 
+- Show the effective review timeout (resolves `LUFFY_REVIEW_TIMEOUT_SECONDS`, else the 1500s default): `python3 scripts/run-with-timeout.py resolve`.
+- Self-check the killer without spending on a model: `python3 scripts/run-with-timeout.py --seconds 2 -- sleep 10` → exits **124**.
+- Both `--seconds N -- cmd …` and the positional `N -- cmd …` forms are accepted; regression coverage is `tests/test_run_with_timeout.py`.
+- Override per repo with `vars.LUFFY_REVIEW_TIMEOUT_SECONDS`; set `0` or `off` to disable the timeout entirely.
+
 ## Setup
 
 - Install on each target repo's **default branch** (workflow only runs from default branch):
@@ -153,6 +158,10 @@ REPO=owner/name HERMES_HOME=/tmp/hh LUFFY_MEMORY_MODE=local bash scripts/preload
 - A neutral 👀 reaction plus `success` means the verdict line was parsed as `UNKNOWN` (or the review was a genuine COMMENT); inspect `review.md` in the trace artifact for a line starting with `**Verdict:**` before blaming the status code path.
 
 - To make Luffy gate merges, add `luffy/review` as a required status check — `REQUEST CHANGES` reports `failure` while `APPROVE`/`COMMENT` report `success`, and any pipeline failure (`pipeline_rc != 0`) reports `error` with 👎 regardless of the parsed verdict.
+
+- A review that comes back as a COMMENT failure stub with **no findings** is often an F36 timeout, not a bad model run: check the job summary for **Luffy review timeout (F36)** and the trace for `hermes-timeout.env` / `hermes-timeout-seconds.txt` before blaming the prompt or contract.
+- After a timeout there is intentionally no chat-fallback review body — do not read the missing fallback as a broken fallback path.
+- If long PRs legitimately need more wall time, raise `LUFFY_REVIEW_TIMEOUT_SECONDS` rather than disabling it; on Modal the 1500s default is already aligned with the `review_pr` hard cap, so a larger value will be cut off by the host instead.
 
 ## F22/F23 verdict signals
 

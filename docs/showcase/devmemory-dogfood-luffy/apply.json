@@ -1,11 +1,38 @@
 [
   {
+    "path": "DEV.md",
+    "kind": "dev",
+    "action": "merge",
+    "section": "Design decisions",
+    "bytes": 19449,
+    "applied": true,
+    "unit_path": "."
+  },
+  {
     "path": "USAGE.md",
     "kind": "usage",
     "action": "merge",
     "section": "Common commands",
-    "bytes": 13674,
+    "bytes": 14681,
     "applied": true,
     "unit_path": "."
+  },
+  {
+    "path": "USAGE.md",
+    "kind": "usage",
+    "action": "merge",
+    "section": "Troubleshooting",
+    "bytes": 15345,
+    "applied": true,
+    "unit_path": "."
+  },
+  {
+    "path": "modal_app/DEV.md",
+    "kind": "dev",
+    "action": "merge",
+    "section": "Design decisions",
+    "bytes": 3367,
+    "applied": true,
+    "unit_path": "modal_app"
   }
 ]

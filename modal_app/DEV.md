@@ -10,6 +10,8 @@
 - F34 deliberately reverses F33's behaviour rather than extending it: F33 allowed unauthenticated requests with a warning when no secret/token was configured; F34 makes that same state `auth=denied` so the production-safe posture is the default and misconfiguration is loud instead of silent.
 - The open-mode escape hatch is exposed on three surfaces that must stay in sync: env `LUFFY_WEBHOOK_ALLOW_OPEN=1`, the `allow_open=True` argument on the auth helper, and the `--allow-open` flag on `scripts/webhook_auth.py`. All three exist for dev/self-check only — none is a supported production configuration.
 
+- The F36 default of **1500s** is chosen to sit just under Modal's `review_pr` hard cap (~25m) rather than under the GHA job cap (90m) — the tighter host sets the shared default, so the same number is safe on both. Changing `DEFAULT_SECONDS` in `scripts/run-with-timeout.py` without re-checking the Modal function timeout would let a Modal run be killed by the platform instead of by the helper (losing the honest 124 stub and job-summary section).
+
 ## Architecture
 
 - Bit 4 (F32) splits the enqueue path into four units in `modal_app/app.py`: `parse_enqueue_payload` (normalize an incoming request into repo/pr/model/post_comment), `plan_enqueue` (pure plan, no side effects), `enqueue_review` (the spawn call), and `review_webhook` (the HTTP entrypoint). Parsing/planning are separable from spawning so the parser can be self-checked without any OpenRouter spend.

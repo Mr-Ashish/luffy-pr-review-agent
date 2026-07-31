@@ -1,12 +1,55 @@
+diff --git a/DEV.md b/DEV.md
+--- a/DEV.md
++++ b/DEV.md
+@@ -42,6 +42,11 @@
+ - Cost rendering is threshold-based, not fixed precision: `>= $0.01` → 2 decimals, `> 0` but smaller → 4 decimals, `0`/unknown → `$0`; cheap-model runs therefore show `$0.0034`-style values on the same line format.
+ 
+ - `scripts/webhook_auth.py` is **pure stdlib** (`hmac`/`hashlib`/`json` only) exposing `authorize_webhook()` + `github_hmac_hex()` plus a `sign|authorize` CLI, so the Modal image needs no extra dependency and the auth decision is unit-testable outside Modal (`tests/test_webhook_auth.py`).
++
++- **F36 review timeout:** `scripts/run-with-timeout.py` wraps `hermes -z` (and the chat fallback) as a child **process group** and kills it after a wall-clock limit, so a hung agent/OpenRouter loop cannot burn the full job cap (GHA 90m / Modal ~25m). Default `LUFFY_REVIEW_TIMEOUT_SECONDS=1500`; `0`/`off`/`false`/`no` disables.
++- The helper never rewrites the child's exit code except timeout→124 (`125` is reserved for invalid usage / empty command), so normal Hermes failures still surface unchanged upstream.
++- F36 and F29 are complementary, not overlapping: F29's soft `LUFFY_MAX_COST_USD` annotates a run that already *finished*, while F36 is the only mechanism that stops a run that never finishes.
++- Timeout evidence lands in the trace as `hermes-timeout.env` and `hermes-timeout-seconds.txt`, so a 124 can be distinguished from a model/contract failure after the fact.
+ 
+ ## Pitfalls
+ 
+
 diff --git a/USAGE.md b/USAGE.md
 --- a/USAGE.md
 +++ b/USAGE.md
-@@ -85,6 +85,8 @@
+@@ -101,6 +101,11 @@
  
- - Regenerate the Hermes startup comparison: `./scripts/benchmark-hermes-startup.sh` writes `docs/benchmarks/hermes-startup-latest.md` (cold Hermes install measured at ~1–2 min, which is what the cache/prebaked-image paths are traded against).
+ - Ops footer toggles (F35): set repo/env var `LUFFY_OPS_FOOTER=0` to suppress the italic ops line on posted reviews; set `LUFFY_CONSOLE_URL` to a hosted Run Console base URL to add a hosted console link next to the Actions run link (empty by default, so only the workflow-run link plus the `run-bundle.json` → `ui/review-console` Load-bundle tip are emitted).
  
-+- Ops footer toggles (F35): set repo/env var `LUFFY_OPS_FOOTER=0` to suppress the italic ops line on posted reviews; set `LUFFY_CONSOLE_URL` to a hosted Run Console base URL to add a hosted console link next to the Actions run link (empty by default, so only the workflow-run link plus the `run-bundle.json` → `ui/review-console` Load-bundle tip are emitted).
++- Show the effective review timeout (resolves `LUFFY_REVIEW_TIMEOUT_SECONDS`, else the 1500s default): `python3 scripts/run-with-timeout.py resolve`.
++- Self-check the killer without spending on a model: `python3 scripts/run-with-timeout.py --seconds 2 -- sleep 10` → exits **124**.
++- Both `--seconds N -- cmd …` and the positional `N -- cmd …` forms are accepted; regression coverage is `tests/test_run_with_timeout.py`.
++- Override per repo with `vars.LUFFY_REVIEW_TIMEOUT_SECONDS`; set `0` or `off` to disable the timeout entirely.
 +
  ## Setup
  
  - Install on each target repo's **default branch** (workflow only runs from default branch):
+@@ -154,6 +159,10 @@
+ 
+ - To make Luffy gate merges, add `luffy/review` as a required status check — `REQUEST CHANGES` reports `failure` while `APPROVE`/`COMMENT` report `success`, and any pipeline failure (`pipeline_rc != 0`) reports `error` with 👎 regardless of the parsed verdict.
+ 
++- A review that comes back as a COMMENT failure stub with **no findings** is often an F36 timeout, not a bad model run: check the job summary for **Luffy review timeout (F36)** and the trace for `hermes-timeout.env` / `hermes-timeout-seconds.txt` before blaming the prompt or contract.
++- After a timeout there is intentionally no chat-fallback review body — do not read the missing fallback as a broken fallback path.
++- If long PRs legitimately need more wall time, raise `LUFFY_REVIEW_TIMEOUT_SECONDS` rather than disabling it; on Modal the 1500s default is already aligned with the `review_pr` hard cap, so a larger value will be cut off by the host instead.
++
+ ## F22/F23 verdict signals
+ 
+ After each run Luffy derives a **verdict signal** from the posted review body:
+
+diff --git a/modal_app/DEV.md b/modal_app/DEV.md
+--- a/modal_app/DEV.md
++++ b/modal_app/DEV.md
+@@ -10,6 +10,8 @@
+ - F34 deliberately reverses F33's behaviour rather than extending it: F33 allowed unauthenticated requests with a warning when no secret/token was configured; F34 makes that same state `auth=denied` so the production-safe posture is the default and misconfiguration is loud instead of silent.
+ - The open-mode escape hatch is exposed on three surfaces that must stay in sync: env `LUFFY_WEBHOOK_ALLOW_OPEN=1`, the `allow_open=True` argument on the auth helper, and the `--allow-open` flag on `scripts/webhook_auth.py`. All three exist for dev/self-check only — none is a supported production configuration.
+ 
++- The F36 default of **1500s** is chosen to sit just under Modal's `review_pr` hard cap (~25m) rather than under the GHA job cap (90m) — the tighter host sets the shared default, so the same number is safe on both. Changing `DEFAULT_SECONDS` in `scripts/run-with-timeout.py` without re-checking the Modal function timeout would let a Modal run be killed by the platform instead of by the helper (losing the honest 124 stub and job-summary section).
++
+ ## Architecture
+ 
+ - Bit 4 (F32) splits the enqueue path into four units in `modal_app/app.py`: `parse_enqueue_payload` (normalize an incoming request into repo/pr/model/post_comment), `plan_enqueue` (pure plan, no side effects), `enqueue_review` (the spawn call), and `review_webhook` (the HTTP entrypoint). Parsing/planning are separable from spawning so the parser can be self-checked without any OpenRouter spend.
