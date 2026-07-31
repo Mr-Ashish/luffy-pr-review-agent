@@ -16,7 +16,7 @@
 | F51 | Tool depth | agent_quality | shipped |
 | F52 | Multi-lens | product | PR #2 merged |
 | F53 | Linked issue context | product | PR #3 merged |
-| F54 | Fix-it prompt per inline comment | product | this fire — `LUFFY_FIXIT_PROMPTS` |
+| F54 | Fix-it prompt per inline comment | product | **MERGED** PR #4 — `LUFFY_FIXIT_PROMPTS` |
 
 ## IN_PROGRESS
 
@@ -51,9 +51,9 @@
 - **left_count:** 13 (items 1,3–15 above; item 2 done)
 - **progress_pct:** ~46% of 15-item product backlog (7 product-ish of 15 if counting F52–F54 + partials ≈ 46)
 - **eta:** 6–10 more productive fires for top-5 remaining (toggles, recipes, filler, mermaid, incremental)
-- **active_worktrees:** f54-fixit-prompts
+- **active_worktrees:** none (F54 merged)
 - **federated_memory_note:** not started this fire; `.luffy` local + hub publish paths exist from prior work; FP outcomes / shared learning still gated
 
 ## Status line
 
-`features_built_count=11 types_built=agent_quality,product left_count=13 progress_pct=46 eta=6-10fires active_worktrees=1 federated_memory_note=deferred`
+`features_built_count=11 types_built=agent_quality,product left_count=13 progress_pct=46 eta=6-10fires active_worktrees=0 federated_memory_note=deferred`
