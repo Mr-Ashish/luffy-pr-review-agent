@@ -262,6 +262,24 @@ REGISTRY: list[ToggleSpec] = [
         "Max cases in auto suggested test plan",
         "F61",
     ),
+    ToggleSpec(
+        "fp_resolve",
+        "LUFFY_FP_RESOLVE",
+        "bool",
+        True,
+        "product",
+        "Mine author FP/resolve replies and inject + memory-update patterns (F62)",
+        "F62",
+    ),
+    ToggleSpec(
+        "fp_resolve_max",
+        "LUFFY_FP_RESOLVE_MAX",
+        "int",
+        24,
+        "product",
+        "Max FP/resolve patterns kept in prompt + MEMORY.md",
+        "F62",
+    ),
     # --- quality / agent ---
     ToggleSpec(
         "soul_scan",
