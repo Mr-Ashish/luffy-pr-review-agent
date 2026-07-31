@@ -15,6 +15,7 @@
 
 - **F61 suggested test plan:** `scripts/testplan_generation.py` builds prioritized (P0/P1/P2) concrete scenarios from `pr.json` + optional unified diff (symbol extract for Go/Py/JS/Rust). Assemble writes `testplan.md` and injects into the prompt; post-normalize soft-injects `### Suggested test plan` when the model omits/empties it. Toggle `LUFFY_TESTPLAN` / F55 keys `testplan`, `testplan_max_cases`. Pure code — judgment only refines.
 - **F62 FP resolve + memory:** `scripts/fp_resolve_memory.py` mines author replies on Luffy inline threads (and path-citing PR comments) for false-positive / resolved language, merges MEMORY.md `## FP patterns`, injects a trusted prompt table at assemble, and updates Hermes MEMORY after distill. Toggle `LUFFY_FP_RESOLVE` / `fp_resolve`, `fp_resolve_max`. Deterministic — judgment only re-raises with new evidence.
+- **F63 domain packs + auto-select:** packs `milvus` / `go` / `cpp` (plus path_globs on odoo/docs). `lens_recipes.select_pack_for_paths` scores globs; default `LUFFY_LENS_PACK=auto` picks domain pack from PR files at assemble. Explicit pack ids still win. Judgment stays model-side.
 
 - **F59 incremental review:** opt-in `LUFFY_INCREMENTAL=1`. `scripts/incremental_review.py` reads prior Luffy comment markers for `head=SHA`, then rewrites `pr.diff` to `base...head` compare patch. Markers gain `head=` via normalize `--head-sha`. Default off (full PR diff).
 
@@ -22,7 +23,7 @@
 
 - **F57 Mermaid architecture:** `scripts/mermaid_architecture.py` builds a flowchart from PR changed paths (grouped by package; adjacency edges only — not invented runtime deps). Assemble injects into prompt; post-normalize soft-injects if the model omitted `### Architecture diagram`. Toggle `LUFFY_MERMAID` / F55 keys `mermaid`, `mermaid_max_nodes`.
 
-- **F56 lens recipes / named packs:** `agent/packs/*.json` declare multi-lens recipes (default, security, docs, odoo, performance). `scripts/lens_recipes.py` loads + rewrites the Multi-lens pass/checklist in the assembled prompt. Active pack via `LUFFY_LENS_PACK` (F55 key `lens_pack`); opt-out `LUFFY_LENS_PACKS=0`. Judgment remains model-side; pack selection and checklist shape are code.
+- **F56 lens recipes / named packs:** `agent/packs/*.json` declare multi-lens recipes (default, security, docs, odoo, performance, **+ F63 milvus/go/cpp**). `scripts/lens_recipes.py` loads + rewrites the Multi-lens pass/checklist in the assembled prompt. Active pack via `LUFFY_LENS_PACK` (F55 key `lens_pack`, default **auto** since F63); opt-out `LUFFY_LENS_PACKS=0`. Judgment remains model-side; pack selection and checklist shape are code.
 
 - **F55 feature toggles:** `scripts/feature_toggles.py` is the single registry for product/quality/ops gates (`fixit_prompts`, `issue_context`, inline, labels, …). Precedence **env > `.luffy/toggles.json` (or `LUFFY_TOGGLES_FILE`) > default**. CLI `list|get|enabled|dump|product|shell` is the agent/operator tool surface; judgment stays out of the registry. New product flags add a `ToggleSpec` + tests, then wire consumers via `is_enabled()` / `get_value()`.
 

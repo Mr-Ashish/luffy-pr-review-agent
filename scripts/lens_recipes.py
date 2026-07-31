@@ -13,9 +13,10 @@ Usage:
   python3 scripts/lens_recipes.py resolve   # print active pack id
 
 Env:
-  LUFFY_LENS_PACK=default|security|docs|odoo|performance|...  (default: default)
+  LUFFY_LENS_PACK=default|security|docs|odoo|performance|milvus|go|cpp|auto|...
   LUFFY_LENS_PACKS=0|off to skip apply (keep template as-is)
   LUFFY_LENS_PACKS_DIR= override directory of pack JSON files
+  LUFFY_LENS_PACK=auto → pick pack from changed-file path_globs (F63)
 """
 
 from __future__ import annotations
@@ -121,8 +122,81 @@ def active_pack_id(raw: str | None = None) -> str:
     return v
 
 
-def resolve_active(packs_dir: Path | None = None) -> dict[str, Any]:
+# Path-glob weights for auto pack selection (F63). More specific packs score higher.
+_PACK_PRIORITY = {
+    "milvus": 100,
+    "odoo": 90,
+    "security": 40,
+    "performance": 40,
+    "cpp": 70,
+    "go": 60,
+    "docs": 50,
+    "default": 0,
+}
+
+
+def _glob_match(path: str, pattern: str) -> bool:
+    """Minimal glob: ** / * segments; case-sensitive path."""
+    import fnmatch
+
+    p = path.replace("\\", "/").lstrip("./")
+    pat = pattern.replace("\\", "/")
+    if fnmatch.fnmatch(p, pat):
+        return True
+    if fnmatch.fnmatch(Path(p).name, pat):
+        return True
+    return False
+
+
+def score_pack_for_paths(pack: dict[str, Any], paths: list[str]) -> int:
+    """Score how well a pack matches changed paths via path_globs."""
+    globs = pack.get("path_globs") or []
+    if not globs or not paths:
+        return 0
+    hits = 0
+    for path in paths:
+        if not path:
+            continue
+        for g in globs:
+            if _glob_match(str(path), str(g)):
+                hits += 1
+                break
+    if hits == 0:
+        return 0
+    base = int(_PACK_PRIORITY.get(str(pack.get("id") or ""), 10))
+    density = hits / max(1, len([p for p in paths if p]))
+    return base + hits * 3 + int(density * 20)
+
+
+def select_pack_for_paths(
+    paths: list[str],
+    packs_dir: Path | None = None,
+    *,
+    min_score: int = 15,
+) -> dict[str, Any]:
+    """Pick the best domain pack for changed paths; fall back to default."""
+    packs = list_packs(packs_dir)
+    best: dict[str, Any] | None = None
+    best_score = -1
+    for pack in packs:
+        if pack.get("id") == "default":
+            continue
+        sc = score_pack_for_paths(pack, paths)
+        if sc > best_score:
+            best_score = sc
+            best = pack
+    if best is None or best_score < min_score:
+        try:
+            return get_pack("default", packs_dir)
+        except KeyError:
+            return _builtin_default()
+    return best
+
+
+def resolve_active(packs_dir: Path | None = None, paths: list[str] | None = None) -> dict[str, Any]:
     pid = active_pack_id()
+    if pid in ("auto", "detect", "from_paths"):
+        return select_pack_for_paths(list(paths or []), packs_dir)
     try:
         return get_pack(pid, packs_dir)
     except KeyError:
@@ -248,13 +322,16 @@ def apply_file(
     out_path: Path | None = None,
     pack_id: str | None = None,
     packs_dir: Path | None = None,
+    paths: list[str] | None = None,
 ) -> dict[str, Any]:
     if not packs_enabled():
         return {"enabled": False, "pack": None, "path": str(prompt_path)}
-    if pack_id:
+    if pack_id and pack_id not in ("auto", "detect", "from_paths"):
         pack = get_pack(pack_id, packs_dir)
+    elif pack_id in ("auto", "detect", "from_paths"):
+        pack = select_pack_for_paths(list(paths or []), packs_dir)
     else:
-        pack = resolve_active(packs_dir)
+        pack = resolve_active(packs_dir, paths=paths)
     raw = prompt_path.read_text(encoding="utf-8")
     out = apply_to_prompt(raw, pack)
     dest = out_path or prompt_path
@@ -297,6 +374,11 @@ def main(argv: list[str] | None = None) -> int:
     pa.add_argument("--pack", dest="pack_id", default=None)
 
     sub.add_parser("resolve", help="print active pack id")
+
+    ps = sub.add_parser("select", help="auto-select pack from paths (F63)")
+    ps.add_argument("--paths", nargs="*", default=[], help="changed file paths")
+    ps.add_argument("--files", type=Path, default=None, help="files.txt one path per line")
+    ps.add_argument("--json", action="store_true")
 
     args = p.parse_args(argv)
     packs_dir = Path(args.packs_dir) if args.packs_dir else None
@@ -359,6 +441,31 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "resolve":
         print(active_pack_id())
+        return 0
+
+    if args.cmd == "select":
+        paths: list[str] = list(args.paths or [])
+        if args.files and Path(args.files).is_file():
+            paths.extend(
+                ln.strip()
+                for ln in Path(args.files).read_text(encoding="utf-8").splitlines()
+                if ln.strip() and not ln.strip().startswith("#")
+            )
+        pack = select_pack_for_paths(paths, packs_dir)
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "pack": pack["id"],
+                        "name": pack.get("name"),
+                        "score": score_pack_for_paths(pack, paths),
+                        "paths": paths[:40],
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(pack["id"])
         return 0
 
     return 2

@@ -14,5 +14,15 @@
   "extra_focus": [
     "Flag bare sudo() without a comment justifying why ACL must be bypassed.",
     "New public routes must declare auth and csrf appropriately."
+  ],
+  "path_globs": [
+    "**/addons/**",
+    "**/odoo/**",
+    "**/*_module/**",
+    "**/security/*.xml",
+    "**/security/*.csv",
+    "**/models/*.py",
+    "**/controllers/*.py",
+    "**/views/*.xml"
   ]
 }
