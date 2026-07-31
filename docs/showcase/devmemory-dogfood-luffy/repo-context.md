@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T15:08:15Z
+- **assembled_at:** 2026-07-31T15:14:38Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+974ba39 feat(cost): F38 path-glob free skip for docs-only PRs
+9633311 docs(knowledge): dogfood F37 verdict labels + showcase
 bbe2cfa feat(ops): F37 verdict-aware PR labels
 293d95a docs(experiments): streak 0 after F36 ship
 22c068b docs(knowledge): dogfood F36 review timeout + showcase
-72da566 feat(cost): F36 Hermes review wall-clock timeout
-c536e10 docs(knowledge): dogfood F35 ops footer + showcase
 ```
 
 ## tree (sample)
@@ -91,6 +91,7 @@ tests/test_normalize_review.py
 tests/test_ops_footer.py
 tests/test_pack_run_for_ui.py
 tests/test_parse_verdict.py
+tests/test_path_skip_check.py
 tests/test_post_inline_comments.py
 tests/test_review_to_openui.py
 tests/test_run_with_timeout.py
@@ -119,6 +120,7 @@ docs/experiments/2026-07-31-f34-webhook-fail-closed.md
 docs/experiments/2026-07-31-f35-ops-footer.md
 docs/experiments/2026-07-31-f36-review-timeout.md
 docs/experiments/2026-07-31-f37-verdict-labels.md
+docs/experiments/2026-07-31-f38-path-skip.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-roi-fire.md
@@ -179,6 +181,7 @@ scripts/normalize-review.py
 scripts/ops_footer.py
 scripts/pack-run-for-ui.py
 scripts/parse-verdict.py
+scripts/path-skip-check.py
 scripts/post-inline-comments.py
 scripts/post-review-comment.sh
 scripts/preload-hub-memory.sh
@@ -219,9 +222,6 @@ assets/brand-options/hero-F-cyber.svg
 assets/brand-options/hero-G-mark.svg
 assets/brand-options/hero-H-cinematic.svg
 assets/brand-options/index.json
-assets/brand-options/orbital-core-preview.png
-assets/brand-options/preview.html
-assets/brand-options/three-artifacts.html
 ```
 
 ## git diff

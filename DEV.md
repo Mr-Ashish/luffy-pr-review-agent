@@ -52,6 +52,12 @@
 - Pipeline failure always wins over the parsed verdict (`--pipeline-ok false` ⇒ `error`) — the label channel is deliberately not allowed to green-wash a broken run.
 - Labels are created on demand with hardcoded hex colors in `COLORS` (e.g. approve `0E8A16`), so adoption needs no manual label setup on the target repo; the label namespace is `{prefix}:` with prefix from `LUFFY_LABEL_PREFIX` (default `luffy`).
 
+- **F38 path-glob free skip** sits early in the pipeline — after the sparse path list, *before* dual checkout — so a docs-only PR never pays for the monorepo checkout or the Hermes/OpenRouter call.
+- It is a whole-PR gate, not a filter: the skip fires only when **every** changed path matches the skip globs; one code file re-enables the paid run.
+- Default is **off** (`vars.LUFFY_SKIP_PATH_GLOBS` empty). Operators opt in with the built-in `docs` preset or a comma glob list (e.g. `*.md,docs/**`); `off` is also accepted as a preset name.
+- Two escape hatches keep the gate overridable per run: comment `@luffy review force` and `workflow_dispatch` (env form `LUFFY_SKIP_PATHS_FORCE=1`).
+- The helper emits `key=value` stdout (`allowed`, `reason`, `matched_n`, `total_n`, `globs`, `sample`) rather than JSON, matching the other shell-composed stages.
+
 ## Pitfalls
 
 - `GITHUB_TOKEN` cannot call `repository_dispatch` (HTTP 403), so the hub publish default is `mode=direct` (clone hub → ingest → push `main`); the dispatch path needs a classic PAT on the target repo.

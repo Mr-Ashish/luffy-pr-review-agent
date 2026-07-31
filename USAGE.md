@@ -138,6 +138,10 @@ devmemory extract --fixture sample-auth-module --apply
 - Capture the intended API calls instead of executing them: `LUFFY_LABELS_FIXTURE=ops.json python3 scripts/apply-verdict-labels.py apply …`.
 - Disable / rename per target repo with repo variables `LUFFY_PR_LABELS=0` and `LUFFY_LABEL_PREFIX=<prefix>`; the run's outcome is echoed in the job summary section **Luffy PR labels (F37)**.
 
+- Enable free skip on a target repo: set repo variable `LUFFY_SKIP_PATH_GLOBS` to `docs` (preset) or a comma list such as `*.md,docs/**`. Unset/empty = feature off.
+- Self-check the gate before wiring it up (exit code is the answer): `python3 scripts/path-skip-check.py --path README.md --path docs/a.md --globs docs` → exit 2 (skip); `python3 scripts/path-skip-check.py --path src/x.py --path README.md --globs docs` → exit 0 (allow).
+- Batch form for a real PR path list: `python3 scripts/path-skip-check.py --paths-file pr-paths.txt` (paths come from `scripts/sparse-pr-paths.sh`).
+
 ## Setup
 
 - Install on each target repo's **default branch** (workflow only runs from default branch):
@@ -194,6 +198,9 @@ REPO=owner/name HERMES_HOME=/tmp/hh LUFFY_MEMORY_MODE=local bash scripts/preload
 - A review that comes back as a COMMENT failure stub with **no findings** is often an F36 timeout, not a bad model run: check the job summary for **Luffy review timeout (F36)** and the trace for `hermes-timeout.env` / `hermes-timeout-seconds.txt` before blaming the prompt or contract.
 - After a timeout there is intentionally no chat-fallback review body — do not read the missing fallback as a broken fallback path.
 - If long PRs legitimately need more wall time, raise `LUFFY_REVIEW_TIMEOUT_SECONDS` rather than disabling it; on Modal the 1500s default is already aligned with the `review_pr` hard cap, so a larger value will be cut off by the host instead.
+
+- Matching is `fnmatch`-based, so glob depth is literal: the `docs` preset ships both `docs/**` and `**/docs/**` because a top-level-only pattern will not match nested `pkg/docs/…`. Add both shapes when writing custom globs for a monorepo.
+- Extension globs in the preset are unanchored (`*.md`, `*.mdx`, `*.rst`, `*.txt`, `*.adoc`) — a `.txt` fixture inside `src/` counts as skippable, so audit `matched_n`/`sample` output before trusting the preset on a mixed repo.
 
 ## F22/F23 verdict signals
 

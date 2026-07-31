@@ -1,35 +1,41 @@
 diff --git a/DEV.md b/DEV.md
 --- a/DEV.md
 +++ b/DEV.md
-@@ -47,6 +47,10 @@
- - The helper never rewrites the child's exit code except timeout→124 (`125` is reserved for invalid usage / empty command), so normal Hermes failures still surface unchanged upstream.
- - F36 and F29 are complementary, not overlapping: F29's soft `LUFFY_MAX_COST_USD` annotates a run that already *finished*, while F36 is the only mechanism that stops a run that never finishes.
- - Timeout evidence lands in the trace as `hermes-timeout.env` and `hermes-timeout-seconds.txt`, so a 124 can be distinguished from a model/contract failure after the fact.
+@@ -51,6 +51,12 @@
+ - Exactly **one** managed label is applied per run and the other three managed labels from a prior run are removed, so a PR never carries two contradictory Luffy verdicts: `APPROVE→{prefix}:approve`, `REQUEST_CHANGES→{prefix}:request-changes`, `COMMENT→{prefix}:comment`, `UNKNOWN`/pipeline failure→`{prefix}:error`.
+ - Pipeline failure always wins over the parsed verdict (`--pipeline-ok false` ⇒ `error`) — the label channel is deliberately not allowed to green-wash a broken run.
+ - Labels are created on demand with hardcoded hex colors in `COLORS` (e.g. approve `0E8A16`), so adoption needs no manual label setup on the target repo; the label namespace is `{prefix}:` with prefix from `LUFFY_LABEL_PREFIX` (default `luffy`).
 +
-+- Exactly **one** managed label is applied per run and the other three managed labels from a prior run are removed, so a PR never carries two contradictory Luffy verdicts: `APPROVE→{prefix}:approve`, `REQUEST_CHANGES→{prefix}:request-changes`, `COMMENT→{prefix}:comment`, `UNKNOWN`/pipeline failure→`{prefix}:error`.
-+- Pipeline failure always wins over the parsed verdict (`--pipeline-ok false` ⇒ `error`) — the label channel is deliberately not allowed to green-wash a broken run.
-+- Labels are created on demand with hardcoded hex colors in `COLORS` (e.g. approve `0E8A16`), so adoption needs no manual label setup on the target repo; the label namespace is `{prefix}:` with prefix from `LUFFY_LABEL_PREFIX` (default `luffy`).
++- **F38 path-glob free skip** sits early in the pipeline — after the sparse path list, *before* dual checkout — so a docs-only PR never pays for the monorepo checkout or the Hermes/OpenRouter call.
++- It is a whole-PR gate, not a filter: the skip fires only when **every** changed path matches the skip globs; one code file re-enables the paid run.
++- Default is **off** (`vars.LUFFY_SKIP_PATH_GLOBS` empty). Operators opt in with the built-in `docs` preset or a comma glob list (e.g. `*.md,docs/**`); `off` is also accepted as a preset name.
++- Two escape hatches keep the gate overridable per run: comment `@luffy review force` and `workflow_dispatch` (env form `LUFFY_SKIP_PATHS_FORCE=1`).
++- The helper emits `key=value` stdout (`allowed`, `reason`, `matched_n`, `total_n`, `globs`, `sample`) rather than JSON, matching the other shell-composed stages.
  
  ## Pitfalls
  
-@@ -103,3 +107,5 @@
- - Gate helpers follow a stdout-contract pattern: `scripts/cooldown-check.sh` prints `allowed=`, `reason=`, `age_s=`, `remaining_s=` key=value lines that the workflow parses straight into `$GITHUB_OUTPUT`, and signals decisions through exit codes — `0` allow, `2` cooldown active (skip paid run), `1` hard error.
- - Exit `1` is deliberately **fail-open**: the workflow logs `::warning::F19 cooldown check failed (rc=$RC); fail-open allow` and sets `allowed=true`, so a GitHub API hiccup never blocks reviews (the trade-off is it can also leak a paid run).
- - The script is designed for hermetic tests: `LUFFY_COOLDOWN_FIXTURE` supplies a JSON array of `{created_at, body}` comments (no network) and `NOW_EPOCH` pins the clock — see `tests/test_cooldown_check.py`.
-+
-+- `scripts/apply-verdict-labels.py` follows the repo's plan/apply split: `plan` computes the label decision with no network, `apply` performs it. `LUFFY_LABELS_FIXTURE=path.json` makes `apply` **write the planned GitHub API operations to a file instead of invoking `gh`** — that seam is what lets `tests/test_apply_verdict_labels.py` cover the mutation path with no token and no live PR. Prefer this env-fixture pattern over mocking `subprocess` when adding new gh-calling scripts.
 
 diff --git a/USAGE.md b/USAGE.md
 --- a/USAGE.md
 +++ b/USAGE.md
-@@ -120,6 +120,10 @@
- - Both `--seconds N -- cmd …` and the positional `N -- cmd …` forms are accepted; regression coverage is `tests/test_run_with_timeout.py`.
- - Override per repo with `vars.LUFFY_REVIEW_TIMEOUT_SECONDS`; set `0` or `off` to disable the timeout entirely.
+@@ -138,6 +138,10 @@
+ - Capture the intended API calls instead of executing them: `LUFFY_LABELS_FIXTURE=ops.json python3 scripts/apply-verdict-labels.py apply …`.
+ - Disable / rename per target repo with repo variables `LUFFY_PR_LABELS=0` and `LUFFY_LABEL_PREFIX=<prefix>`; the run's outcome is echoed in the job summary section **Luffy PR labels (F37)**.
  
-+- Preview the F37 label decision without touching GitHub: `python3 scripts/apply-verdict-labels.py plan --verdict REQUEST_CHANGES --pipeline-ok true`.
-+- Capture the intended API calls instead of executing them: `LUFFY_LABELS_FIXTURE=ops.json python3 scripts/apply-verdict-labels.py apply …`.
-+- Disable / rename per target repo with repo variables `LUFFY_PR_LABELS=0` and `LUFFY_LABEL_PREFIX=<prefix>`; the run's outcome is echoed in the job summary section **Luffy PR labels (F37)**.
++- Enable free skip on a target repo: set repo variable `LUFFY_SKIP_PATH_GLOBS` to `docs` (preset) or a comma list such as `*.md,docs/**`. Unset/empty = feature off.
++- Self-check the gate before wiring it up (exit code is the answer): `python3 scripts/path-skip-check.py --path README.md --path docs/a.md --globs docs` → exit 2 (skip); `python3 scripts/path-skip-check.py --path src/x.py --path README.md --globs docs` → exit 0 (allow).
++- Batch form for a real PR path list: `python3 scripts/path-skip-check.py --paths-file pr-paths.txt` (paths come from `scripts/sparse-pr-paths.sh`).
 +
  ## Setup
  
  - Install on each target repo's **default branch** (workflow only runs from default branch):
+@@ -195,6 +199,9 @@
+ - After a timeout there is intentionally no chat-fallback review body — do not read the missing fallback as a broken fallback path.
+ - If long PRs legitimately need more wall time, raise `LUFFY_REVIEW_TIMEOUT_SECONDS` rather than disabling it; on Modal the 1500s default is already aligned with the `review_pr` hard cap, so a larger value will be cut off by the host instead.
+ 
++- Matching is `fnmatch`-based, so glob depth is literal: the `docs` preset ships both `docs/**` and `**/docs/**` because a top-level-only pattern will not match nested `pkg/docs/…`. Add both shapes when writing custom globs for a monorepo.
++- Extension globs in the preset are unanchored (`*.md`, `*.mdx`, `*.rst`, `*.txt`, `*.adoc`) — a `.txt` fixture inside `src/` counts as skippable, so audit `matched_n`/`sample` output before trusting the preset on a mixed repo.
++
+ ## F22/F23 verdict signals
+ 
+ After each run Luffy derives a **verdict signal** from the posted review body:

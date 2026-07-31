@@ -7,7 +7,7 @@
 
 ## Transcript / notes
 
-# Luffy dogfood session — F37 verdict labels
+# Luffy dogfood — F38 path-glob free skip
 
 ## ARCHITECTURE
 # Luffy architecture
@@ -20,11 +20,12 @@ Luffy is a gated GitHub Actions control plane that assembles a bounded PR contex
 
 ```text
 @luffy review this pr
-    → gate + concurrency
+    → gate + concurrency + cooldown (F19)
+    → sparse path list → path-glob free skip (F38, opt-in)
     → dual checkout (luffy/ + workspace/)
     → preload MEMORY (.luffy/ first, hub opt-in)
-    → assemble-context → hermes -z → normalize → PR comment
-    → distill MEMORY.md → save-trace (fat artifact)
+    → assemble-context → hermes -z (F36 timeout) → normalize → PR comment
+    → verdict signals (F22/F23/F9/F37) → distill MEMORY.md → save-trace
     → publish slim pack → target .luffy/ (default)
     → hub memory only if LUFFY_MEMORY_MODE=hub|both or LUFFY_HUB_PUBLISH=1
 ```
@@ -111,53 +112,23 @@ Host label: auto (`GITHUB_ACTIONS` → `gha`, Modal env → `modal`, else `local
 
 **F32 trigger:** `scripts/trigger-review.sh` (`print|local|modal`) + console **Run** tab. Modal bit 4 webhook/`enqueue_review` only **spawns** `review_pr` (never Hermes in the doorbell).
 
-## OPERATIONS (F37 + recent)
+## OPERATIONS F38
+## Path-glob free skip (F38)
+
+Skip paid review when **every** changed file matches skip globs (docs/changelog PRs).
+
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `LUFFY_SKIP_PATH_GLOBS` | empty (off) | `docs` = built-in docs preset; or comma globs e.g. `*.md,docs/**` |
+
+Force paid run: `@luffy review force` or `workflow_dispatch`. Fail-open on script errors.
+
+```bash
+python3 scripts/path-skip-check.py --path README.md --path docs/a.md --globs docs  # exit 2 skip
+python3 scripts/path-skip-check.py --path src/x.py --path README.md --globs docs   # exit 0 allow
+```
+
 ## Verdict PR labels (F37)
-
-After each run Luffy applies **one** managed label on the PR (creates labels if missing)
-and removes the other managed labels from a prior run:
-
-| Verdict / state | Label |
-|-----------------|-------|
-| APPROVE | `luffy:approve` |
-| REQUEST CHANGES | `luffy:request-changes` |
-| COMMENT | `luffy:comment` |
-| Pipeline fail / UNKNOWN | `luffy:error` |
-
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `LUFFY_PR_LABELS` | `1` | `0`/`off` disables |
-| `LUFFY_LABEL_PREFIX` | `luffy` | Prefix before `:` |
-
-```bash
-python3 scripts/apply-verdict-labels.py plan --verdict REQUEST_CHANGES
-python3 scripts/apply-verdict-labels.py apply --repo owner/name --pr 3 \
-  --verdict APPROVE --pipeline-ok true
-```
-
-Needs `issues: write` (already on the workflow). Soft-fail only.
-
-## Review timeout (F36)
-## Review timeout (F36)
-
-Hung Hermes/OpenRouter loops are killed after a wall-clock limit so spend cannot
-run until the full GHA job cap (90m).
-
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `LUFFY_REVIEW_TIMEOUT_SECONDS` | `1500` | Wall seconds for `hermes -z` (and chat fallback). `0`/`off` disables |
-
-On timeout: exit 124, partial model output discarded, chat fallback **skipped**
-(would double spend), posted review is an honest COMMENT failure stub, job
-summary section **Luffy review timeout (F36)**. Trace: `hermes-timeout.env`,
-`hermes-timeout-seconds.txt`.
-
-```bash
-python3 scripts/run-with-timeout.py resolve          # effective seconds
-python3 scripts/run-with-timeout.py --seconds 2 -- sleep 10   # exits 124
-```
-
-## Ops footer (F35)
 
 ## SOUL
 # Luffy — PR Review Agent
@@ -217,7 +188,7 @@ Respond with **only** a single Markdown document suitable for a GitHub PR commen
 No preamble (“Sure!”), no tool chatter, no wrapping the entire review in a code fence.
 Follow the template in the user prompt exactly.
 
-## Scripts inventory
+## Scripts
 __pycache__
 apply-verdict-labels.py
 assemble-context.sh
@@ -237,6 +208,7 @@ normalize-review.py
 ops_footer.py
 pack-run-for-ui.py
 parse-verdict.py
+path-skip-check.py
 post-inline-comments.py
 post-review-comment.sh
 preload-hub-memory.sh
@@ -255,57 +227,62 @@ usage-summary.py
 webhook_auth.py
 write-failure-review.sh
 
-## ROI Sprint 28 F37
-### Sprint 28 (shipped)
+## ROI Sprint 29
+### Sprint 29 (shipped)
 
-**F37** verdict PR labels: after F22/F23 signals, `apply-verdict-labels.py` ensures and applies one managed label — `luffy:approve` / `luffy:request-changes` / `luffy:comment` / `luffy:error` — and removes the other three. Pipeline failures always get `error` (never green-wash). Soft-fail; opt-out `vars.LUFFY_PR_LABELS=0`; prefix override `vars.LUFFY_LABEL_PREFIX`. Job summary **Luffy PR labels (F37)**. Completes trust/ops signal stack for boards and search.
+**F38** path-glob free skip: when `vars.LUFFY_SKIP_PATH_GLOBS` is set (`docs` preset or comma globs) and **every** changed path matches, skip Hermes/OpenRouter (no monorepo checkout). Default **off** (empty var). Force: `@luffy review force` / `workflow_dispatch`. Stub COMMENT + rocket + F37 labels; job summary **Luffy path skip (F38)**. Helper: `scripts/path-skip-check.py`.
 
 ### readme-kit (shipped)
 
-## apply-verdict-labels.py header
+## path-skip-check header
 #!/usr/bin/env python3
-"""F37: apply verdict-aware labels on a GitHub PR.
+"""F38: skip paid OpenRouter review when every changed path matches skip globs.
 
-Completes the trust/ops signal stack (F22 reaction+status, F23 review, F37 labels)
-so operators can filter boards, branch rules, and automations on Luffy outcomes.
+Cost control for monorepos: docs/changelog-only PRs should not burn Hermes.
+Default is **off** (empty globs) — operators opt in via env/repo var.
 
 Usage:
-  python3 scripts/apply-verdict-labels.py plan \\
-    --verdict REQUEST_CHANGES --pipeline-ok true
-
-  python3 scripts/apply-verdict-labels.py apply \\
-    --repo owner/name --pr 3 --verdict APPROVE --pipeline-ok true
+  python3 scripts/path-skip-check.py --paths-file pr-paths.txt
+  python3 scripts/path-skip-check.py --path a.md --path docs/x.md
 
 Env:
-  LUFFY_PR_LABELS=1 (default) | 0/off to skip
-  LUFFY_LABEL_PREFIX=luffy   (labels become {prefix}:approve etc.)
-  GH_TOKEN / GITHUB_TOKEN for apply
-  LUFFY_LABELS_FIXTURE=path.json  — write planned API ops instead of calling gh
+  LUFFY_SKIP_PATH_GLOBS   comma list, or preset name `docs` / `off`
+  LUFFY_SKIP_PATHS_FORCE=1  always allow (paid run)
+  LUFFY_SKIP_PATHS_FIXTURE  unused (paths come from CLI)
 
-Soft-fail: apply never raises; prints JSON result on stdout.
+Exit:
+  0  allow paid run
+  2  skip paid run (all paths matched)
+  1  hard error (caller should fail-open → allow)
+
+Stdout key=value:
+  allowed=true|false
+  reason=...
+  matched_n=N
+  total_n=N
+  globs=...
+  sample=path1,path2
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import os
-import re
-import subprocess
 import sys
-from typing import Any
-from urllib.parse import quote
+from fnmatch import fnmatch
+from pathlib import Path
+from typing import Iterable
 
 
-# Canonical label suffixes (prefix from env)
-LABEL_BY_VERDICT = {
-    "APPROVE": "approve",
-    "REQUEST_CHANGES": "request-changes",
-    "COMMENT": "comment",
-    "UNKNOWN": "error",
-}
-
-# GitHub label colors (hex without #)
-COLORS = {
-    "approve": "0E8A16",          # green
+# Convenience preset for docs/docs-adjacent PRs (no code).
+DOCS_PRESET: list[str] = [
+    "*.md",
+    "*.mdx",
+    "*.markdown",
+    "*.rst",
+    "*.txt",
+    "*.adoc",
+    "docs/**",
+    "**/docs/**",
+    "doc/**",
 

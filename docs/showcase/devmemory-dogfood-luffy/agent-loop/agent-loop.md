@@ -1,31 +1,31 @@
-# Agent loop · `run-20260731T203815-cddd1c`
+# Agent loop · `run-20260731T204438-98d0ed`
 
 - **model:** `anthropic/claude-opus-5`
 - **hermes_rc:** 0
-- **units:** 4
-- **at:** 2026-07-31T15:08:55Z
+- **units:** 3
+- **at:** 2026-07-31T15:15:13Z
 
 ## Summary
 
-The session's only new durable content is F37 verdict-aware PR labels: a fourth trust/ops signal channel implemented by scripts/apply-verdict-labels.py, with its plan/apply CLI, env knobs, fixture-based dry-run seam, and a label-vs-commit-status divergence for UNKNOWN verdicts. F36 timeout, architecture, SOUL, and packaging content in the transcript restate already-indexed claims.
+Session documents F38 (path-glob free skip): a pre-checkout cost gate that skips paid Hermes/OpenRouter review when every changed path matches skip globs, plus its opt-in var, force escape hatches, fail-open exit-code contract, and CLI self-check commands. None of this appears in the existing DEV/USAGE claim index.
 
 ## Usage
 
 ```json
 {
-  "estimated_cost_usd": 0.19524925,
+  "estimated_cost_usd": 0.29677875,
   "cost_status": "estimated",
   "cost_source": "provider_models_api",
   "input_tokens": 2,
-  "output_tokens": 2763,
-  "cache_read_tokens": 20016,
-  "cache_write_tokens": 18585,
-  "reasoning_tokens": 335,
-  "total_tokens": 41366,
+  "output_tokens": 2329,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 38167,
+  "reasoning_tokens": 306,
+  "total_tokens": 40498,
   "api_calls": 1,
   "model": "anthropic/claude-opus-5",
   "provider": "openrouter",
-  "session_id": "20260731_203816_f9d67f",
+  "session_id": "20260731_204439_443e17",
   "completed": true,
   "failed": false,
   "service_tier": null
@@ -36,11 +36,11 @@ The session's only new durable content is F37 verdict-aware PR labels: a fourth 
 
 ```json
 {
-  "assemble_s": 0.14,
-  "extract_s": 35.127,
-  "normalize_s": 0.002,
-  "apply_s": 4.063,
-  "total_s": 39.337
+  "assemble_s": 0.145,
+  "extract_s": 32.107,
+  "normalize_s": 0.001,
+  "apply_s": 2.879,
+  "total_s": 35.136
 }
 ```
 
