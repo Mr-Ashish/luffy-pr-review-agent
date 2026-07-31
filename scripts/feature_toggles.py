@@ -226,6 +226,15 @@ REGISTRY: list[ToggleSpec] = [
         "F58 mode: fill-empty | markers | force",
         "F58",
     ),
+    ToggleSpec(
+        "incremental",
+        "LUFFY_INCREMENTAL",
+        "bool",
+        False,
+        "product",
+        "Scope review diff to commits since last Luffy head= marker",
+        "F59",
+    ),
     # --- quality / agent ---
     ToggleSpec(
         "soul_scan",

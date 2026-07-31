@@ -68,6 +68,8 @@ When using terminal/file tools on multi-file code PRs:
 
 {{LINKED_ISSUES}}
 
+{{INCREMENTAL_NOTE}}
+
 When linked issues are present:
 - Treat them as **acceptance criteria / claim-to-fix** signals (what the author intended to solve).
 - Prefer findings that show the diff **misses** or only **partially** covers a stated issue requirement.

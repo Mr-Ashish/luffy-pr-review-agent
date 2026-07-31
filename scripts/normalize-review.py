@@ -373,6 +373,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--pr", required=True)
     p.add_argument("--run-id", default="local")
     p.add_argument(
+        "--head-sha",
+        default="",
+        help="F59: PR head SHA recorded in HTML marker for incremental reviews",
+    )
+    p.add_argument(
         "--diff-truncated",
         action="store_true",
         help="F27: inject visible banner that assembled PR diff was size-capped",
@@ -391,9 +396,14 @@ def main(argv: list[str] | None = None) -> int:
     final = redact_secrets(final)
     # F27 after contract so repair path also gets the banner
     final = inject_diff_truncated_banner(final, args.diff_truncated)
+    head = (args.head_sha or "").strip()
+    marker_new = f"<!-- luffy-review pr={args.pr} run={args.run_id}"
+    if head:
+        marker_new += f" head={head[:40]}"
+    marker_new += " -->"
     final = final.replace(
         f"<!-- luffy-review pr={args.pr} -->",
-        f"<!-- luffy-review pr={args.pr} run={args.run_id} -->",
+        marker_new,
         1,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
