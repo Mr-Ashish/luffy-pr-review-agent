@@ -22,8 +22,10 @@ Only ship what fits Luffy’s control-plane (scripts/agent/workflows/modal/ui) �
 | **H12** | **Fail closed when tool_turns=0 on multi-file non-docs PR (COMMENT, not re-prompt)** | **S** | **#2 mini APPROVE missed known test gap; GHA/tools did not** | **Shipped F45** |
 | **H13** | **SOUL.md hermes prompt_injection false-positive workaround** | **S** | **F44 log: SOUL blocked — review discipline may not load** | **Shipped F46** |
 | **H14** | **Make hermes -z reliable; avoid chat -q fallback** | **S** | **-z rc=2 was bogus `--max-turns` CLI flag → chat path** | **Shipped F47** |
-| H15 | Soft re-prompt once when tool_turns=0 + multi-file (after F45 annotate) | M | Recover quality without always failing closed | backlog |
-| H16 | Live re-score #2 mini after F47 (-z tools + F46 SOUL) | S | Measure D1/D8 lift vs F44/F45 rows | **P0 next** |
+| H15 | Soft re-prompt once when tool_turns=0 + multi-file (after F45 annotate) | M | Recover quality without always failing closed | **P0 next** |
+| H16 | Live re-score #2 mini after F47 (-z tools + F46 SOUL) | S | Measure D1/D8 lift vs F44/F45 rows | **Done H16** (total 30; -z ok; tools still 0) |
+| **H17** | **Scope SOUL/max-turns detect + agent.log capture to this-invocation log offset** | **S** | **H16: stale agent.log → false soul_blocked=1** | **Shipped F48** |
+| H18 | Hard tool nudge / require ≥1 workspace read on multi-file code PRs | S–M | gpt-4.1-mini single-shots even when -z works | backlog |
 
 ## Selection rule
 
@@ -44,3 +46,7 @@ Each fire: pick **one** unfinished highest-ROI **minimal** item. Prefer S over M
 **H13 → F46** (2026-07-31): rephrase `agent/SOUL.md` trust model (no classic injection quotes); `soul_context_scan.py` preflight + log detect; pack chip `soul-blocked`.
 
 **H14 → F47** (2026-07-31): stop passing `--max-turns` on `hermes` CLI (argparse has no flag → `invalid choice: 'N'` → chat fallback). Cap via `HERMES_MAX_ITERATIONS` + `agent.max_turns` config only; skip chat fallback on CLI argv rejection (`hermes-cli-argv.env`).
+
+**H16** (2026-07-31): live mini re-run #2 post-F47 — `-z` ok, F45 gate, score 30/50, tools still 0.
+
+**H17 → F48** (2026-07-31): `HERMES_LOG_OFFSET` into capture; this-invocation agent.log slice; stop SOUL detect on shared errors.log history.

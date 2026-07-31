@@ -99,6 +99,14 @@ class WireTests(unittest.TestCase):
         self.assertIn("soul_context_scan.py", text)
         self.assertIn("F46", text)
 
+    def test_f48_exports_log_offset_for_capture(self):
+        """H16: stale HERMES_HOME agent.log must not fake SOUL blocks."""
+        text = (ROOT / "scripts" / "run-hermes-review.sh").read_text(encoding="utf-8")
+        self.assertIn("HERMES_LOG_OFFSET", text)
+        self.assertIn("F48", text)
+        # Detect paths must not include shared errors.log history (pre-F48 FP).
+        self.assertNotIn('LOOP_DIR/errors.log', text)
+
     def test_install_lists_script(self):
         text = (ROOT / "scripts" / "install-luffy.sh").read_text(encoding="utf-8")
         self.assertIn("soul_context_scan.py", text)

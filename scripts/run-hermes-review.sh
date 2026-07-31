@@ -535,18 +535,24 @@ export HERMES_HOME OUT_DIR LUFFY_MODEL="$MODEL" OPENROUTER_MODEL="$MODEL"
 export HERMES_USAGE_FILE="$USAGE_FILE"
 export AGENT_LOOP_DIR="$LOOP_DIR"
 export LUFFY_PROVIDER=openrouter
+# F48: pass log offset so capture only packages this-invocation agent.log slice
+export HERMES_LOG_OFFSET="$LOG_OFFSET"
 chmod +x "$LUFFY_ROOT/scripts/capture-hermes-loop.py" 2>/dev/null || true
 python3 "$LUFFY_ROOT/scripts/capture-hermes-loop.py" || notice "capture-hermes-loop soft-failed"
 
 # F46 / H13: detect Hermes actually blocking SOUL.md at load time
+# F48 / H16: only scan *this invocation* artifacts (offset-sliced hermes-run.log +
+# stderr). Do NOT scan the full Hermes agent.log / errors.log history — capture
+# used to copy the last 200k of shared HERMES_HOME logs, which re-fired stale
+# "SOUL.md blocked" lines from earlier runs (false soul_blocked=1 on H16).
 SOUL_BLOCKED=0
 SOUL_BLOCK_REASON=""
 if [[ -f "$SOUL_SCAN_HELPER" ]]; then
   _soul_detect_paths=()
   [[ -f "$STDERR_FILE" ]] && _soul_detect_paths+=("$STDERR_FILE")
   [[ -f "$OUT_DIR/hermes-run.log" ]] && _soul_detect_paths+=("$OUT_DIR/hermes-run.log")
+  # After F48 capture writes an offset-sliced agent.log — safe if present.
   [[ -f "$LOOP_DIR/agent.log" ]] && _soul_detect_paths+=("$LOOP_DIR/agent.log")
-  [[ -f "$LOOP_DIR/errors.log" ]] && _soul_detect_paths+=("$LOOP_DIR/errors.log")
   if [[ ${#_soul_detect_paths[@]} -gt 0 ]]; then
     if _soul_det="$(python3 "$SOUL_SCAN_HELPER" detect "${_soul_detect_paths[@]}" 2>/dev/null)"; then
       SOUL_BLOCKED=0

@@ -239,14 +239,24 @@ def main() -> int:
     steps = steps_from_messages(messages if isinstance(messages, list) else [])
     tool_turns = sum(1 for s in steps if s.get("kind") == "assistant_tool_calls")
 
-    # Copy / truncate agent.log
+    # Copy / truncate agent.log (F48: prefer this-invocation slice via offset)
     log_src = hermes_home / "logs" / "agent.log" if hermes_home else None
     log_dest = loop_dir / "agent.log"
     log_excerpt = ""
     if log_src and log_src.is_file():
-        raw = log_src.read_text(errors="replace")
-        # keep last 200k chars
-        raw = raw[-200_000:]
+        raw_bytes = log_src.read_bytes()
+        off_raw = (os.environ.get("HERMES_LOG_OFFSET") or "").strip()
+        try:
+            log_off = int(off_raw) if off_raw else 0
+        except ValueError:
+            log_off = 0
+        if log_off > 0 and log_off <= len(raw_bytes):
+            # This-invocation bytes only (matches hermes-run.log slice).
+            chunk = raw_bytes[log_off:]
+        else:
+            # Fallback: last 200k chars when offset missing/stale.
+            chunk = raw_bytes[-200_000:]
+        raw = chunk.decode("utf-8", errors="replace")
         log_excerpt = redact_text(raw)
         log_dest.write_text(log_excerpt)
 
@@ -255,10 +265,12 @@ def main() -> int:
             json.dumps(redact_obj(usage), indent=2) + "\n"
         )
 
-    # Also grab errors.log tail if present
+    # Also grab errors.log: F48 slice by byte offset when possible (shared file).
     err_src = hermes_home / "logs" / "errors.log" if hermes_home else None
     if err_src and err_src.is_file():
-        err = redact_text(err_src.read_text(errors="replace")[-50_000:])
+        err_bytes = err_src.read_bytes()
+        # No separate errors offset tracked — keep a modest tail only.
+        err = redact_text(err_bytes[-50_000:].decode("utf-8", errors="replace"))
         (loop_dir / "errors.log").write_text(err)
 
     # List sessions dir files (names only + small jsonl copies)

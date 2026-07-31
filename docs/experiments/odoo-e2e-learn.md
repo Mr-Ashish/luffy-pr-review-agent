@@ -23,8 +23,9 @@ Corpus size: **3** open eval PRs (retitled F44 fire).
 | 2026-07-30/31 | #3 | local + showcase | openai/gpt-4.1-mini + opus showcase | local | APPROVE 90; agentic-loop showcase |
 | **2026-07-31 F44** | **#2** | **local / pr2-runlocal-a1** | **openai/gpt-4.1-mini** | local | hermes -z failed → chat -q; tool_turns=0; SOUL.md blocked as prompt_injection; raw polluted with Query+template; **F44 normalizer** extracts real body → APPROVE 90 (weaker than GHA: missed missing alias tests) |
 | **2026-07-31 F45** | **#2** | **offline gate on F44 body** | n/a (post-process) | local | **H12/F45** re-apply: tool_turns=0 + 4 files → **APPROVE→COMMENT**, score 55, F45 banner; no new Hermes spend |
+| **2026-07-31 H16** | **#2** | **local / pr2-runlocal-a1** (`.luffy-out-e2e-pr2-h16`) | **openai/gpt-4.1-mini** | local | **F47 verify:** hermes `-z` rc=0 (no argv reject, no chat fallback); tool_turns=**0** (model text stop); F45→COMMENT/55; SOUL preflight clean; false `soul_blocked` from stale log → **F48** |
 
-Artifacts: `.luffy-out-e2e-pr2-f44/` (review, raw, run-bundle, traces/pr2-runlocal-a1); F45 offline: `/tmp/f45-pr2-review-gated.md`.
+Artifacts: `.luffy-out-e2e-pr2-f44/` (review, raw, run-bundle, traces/pr2-runlocal-a1); F45 offline: `/tmp/f45-pr2-review-gated.md`; H16: `.luffy-out-e2e-pr2-h16/`.
 
 ## Introspect (F46)
 
@@ -51,10 +52,17 @@ Artifacts: `.luffy-out-e2e-pr2-f44/` (review, raw, run-bundle, traces/pr2-runloc
 1. **Root cause of hermes -z rc=2:** Luffy passed `--max-turns N` on the hermes CLI. Hermes has **no** such argparse flag; bare `N` is parsed as subcommand → `invalid choice: '25'` → exit 2 before any model call.
 2. **Why chat fallback looked "successful" but tool_turns=0:** `hermes chat -q` accepts the bad argv more leniently (or ignores it) and runs a non-agentic single-shot with no workspace tools.
 3. **Fix:** F47 removes CLI `--max-turns`; cap remains via `HERMES_MAX_ITERATIONS` + `agent.max_turns` config rewrite (Hermes-native). On CLI argv rejection, skip chat fallback (`hermes-cli-argv.env`) so we do not double-spend a zero-tool path.
-4. **Next:** H16 live mini re-run on #2 to confirm tool_turns>0 + SOUL loads (F46) and re-score D1/D8.
+4. **Next was H16** — done (see below).
+
+## Introspect (H16 live mini + F48)
+
+1. **F47 works:** H16 hermes stage 12s, stderr `hermes -z`, no `hermes-cli-argv.env`, session `20260731_215948_a52f62`, 1 API call, ~$0.003.
+2. **tool_turns=0 is now a model problem:** with working `-z` + terminal toolset, gpt-4.1-mini still ended on first text response without reading workspace files — same false “tests complete” APPROVE body as F44, rescued only by F45.
+3. **SOUL preflight true-clean; runtime soul_blocked was FP:** this-invocation `hermes-run.log` has no block line; full `HERMES_HOME/logs/agent.log` still contains older `SOUL.md blocked` from session `213006`. F48 scopes capture+detect to `HERMES_LOG_OFFSET`.
+4. **Next P0:** H15 soft re-prompt or H18 hard tool nudge so multi-file cheap runs actually explore (restore D1 toward GHA).
 
 ## Next learn targets
 
-- H16: Live re-score #2 mini after F47 (-z tools + F46 SOUL).
-- H15: optional one-shot re-prompt after F45 annotate (recover findings without always COMMENT-only).
+- H15 / H18: recover tool use on cheap multi-file path after F45 annotate.
 - Corpus maintain ≥3; optional 4th complex upstream PR when idle.
+- Re-score D1/D8 after next mini that achieves tool_turns>0.
