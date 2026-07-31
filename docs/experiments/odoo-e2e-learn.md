@@ -27,8 +27,9 @@ Corpus size: **4** open eval PRs (grew fire: ported odoo#279776).
 | **2026-07-31 H16** | **#2** | **local / pr2-runlocal-a1** (`.luffy-out-e2e-pr2-h16`) | **openai/gpt-4.1-mini** | local | **F47 verify:** hermes `-z` rc=0 (no argv reject, no chat fallback); tool_turns=**0** (model text stop); F45→COMMENT/55; SOUL preflight clean; false `soul_blocked` from stale log → **F48** |
 | **2026-07-31 corpus+4** | **#4** | **local / pr4-runlocal-a1** (`.luffy-out-e2e-pr4-h16`) | **openai/gpt-4.1-mini** | local | Port odoo#279776; hermes `-z` ok; tool_turns=**0**; F45 APPROVE→COMMENT/55; **F48 soul_blocked=0** (clean); score **31/50** |
 | **2026-07-31 F49 live** | **#2** | **local / pr2-runlocal-a1** (`.luffy-out-e2e-pr2-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→23**; F45 skipped; APPROVE 95; ~$0.063 · 24 API · 95s; soul_blocked=0; chip `tool-reprompt-ok`; score **36/50** (was 30 H16) |
+| **2026-07-31 H19 F49 #4** | **#4** | **local / pr4-runlocal-a1** (`.luffy-out-e2e-pr4-f49`) | **openai/gpt-4.1-mini** | local | **F49 recovered:** tool_turns **0→9**; F45 skipped; APPROVE 95; ~$0.014 · 10 API · 58s; soul_blocked=0; chip `tool-reprompt-ok`; score **38/50** (was 31 post-F48) |
 
-Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`; F49: `.luffy-out-e2e-pr2-f49/`.
+Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luffy-out-e2e-pr4-h16/`; F49 #2: `.luffy-out-e2e-pr2-f49/`; F49 #4: `.luffy-out-e2e-pr4-f49/`.
 
 ## Introspect (F46)
 
@@ -93,3 +94,11 @@ Artifacts: `.luffy-out-e2e-pr2-f44/`; H16: `.luffy-out-e2e-pr2-h16/`; #4: `.luff
 - H18 optional (first-pass tools / cost), not blocking.
 - Maintain corpus ≥4; source 5th complex upstream after #4 re-score.
 - Severity ranking (D9): teach when missing tests are blocking vs soft.
+
+## Introspect (H19 / F49 live #4)
+
+1. **F49 generalizes beyond #2:** On 7-file multi-module PERF, first pass still tool_turns=0; soft re-prompt recovered **0→9** (chip `tool-reprompt-ok`); F45 skipped.
+2. **Score lift 31→38:** Tools enable real file/test reads; verdict APPROVE 95 with cache-comment suggestion is more grounded than zero-tool F45 COMMENT/55.
+3. **Cheaper recovery than #2:** #4 attempt-2 ~$0.014 / 10 API / 58s vs #2 ~$0.063 / 24 API / 95s — recovery cost scales with tool thrash, not just file count.
+4. **H18 still optional:** First-pass zero tools is model choice; F49 is enough for corpus; hard nudge is cost-optional only.
+5. **Next:** Grow corpus (5th complex upstream) and/or H20 severity calibration on #2 GHA gap.

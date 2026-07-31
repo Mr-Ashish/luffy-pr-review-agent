@@ -27,6 +27,7 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 | #2 web fields (F49 mini re-prompt) | 3 | 4 | 4 | 4 | 3 | 3 | 5 | 3 | 3 | 4 | **36** | tools 0→23 recovered; still soft vs GHA gap |
 | #3 xml scrub (local mini+showcase) | 4 | 4 | 4 | 4 | 3 | 4 | 5 | 3 | 4 | 4 | **39** | D5 inline |
 | #4 stock/mrp PERF (mini post-F48) | 2 | 3 | 2 | 4 | 2 | 5 | 5 | 2 | 3 | 3 | **31** | tool_turns=0; multi-module needs tools; F49 not re-run |
+| #4 stock/mrp PERF (F49 mini re-prompt) | 3 | 4 | 4 | 4 | 3 | 4 | 5 | 3 | 4 | 4 | **38** | tools 0→9; soft comment nits only; no deep PERF hazards |
 
 ### Evidence (one line)
 
@@ -38,6 +39,7 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 - **#2 F49 mini:** Soft re-prompt recovered `tool_turns` **0→23** (session `20260731_221752_851ba1`); F45 gate skipped (`tools_used`); APPROVE 95 · ~$0.063 · 24 API · 95s; soft float `format:false` test ask (not GHA-level REQUEST CHANGES on missing alias tests); chip `tool-reprompt-ok`; soul_blocked=0.
 - **#3:** Approve justified; tests cover str/bytes/lxml; showcase loop usable.
 - **#4 mini:** Port of odoo#279776 (7 files stock/mrp/purchase_mrp); `-z` ok; F48 `soul_blocked=0`; tool_turns=0 → F45 COMMENT/55; soft rename nit only; ~$0.002 · 16s.
+- **#4 F49 mini:** Soft re-prompt recovered `tool_turns` **0→9** (sessions `20260731_222340_fb13a3` → `20260731_222355_b47e5a`); F45 skipped; APPROVE 95 · attempt-2 ~$0.014 · 10 API · total ~58s (attempt-1 ~$0.003); read mrp orderpoint/rule + tests; cache-comment suggestion only; chip `tool-reprompt-ok`; soul_blocked=0; score **38/50** (was 31).
 
 ### #2 F44 sub-dims (D1=2, D3=2, D8=1)
 
@@ -78,6 +80,17 @@ Rubric dims (1–5 each; one-line evidence). Recursive: dim ≤2 gets sub-dims.
 | D6a attempt cost | 3 | ~$0.063 + 24 calls vs attempt-1 ~$0.002 (2× hermes -z) |
 | D7a reprompt path | 5 | recovered=1; F45 skipped; soul_blocked=0; 95s |
 | D8b tool/workspace use | 4 | 23 tool turns; terminal `rg` + file reads across PR paths |
+
+### #4 F49 sub-dims (D1=3, D6=4, D8=3)
+
+| Sub | Score | Note |
+|-----|------:|------|
+| D1a true positives | 3 | No invented defects on PERF+tests; soft multi-company cache note only |
+| D1b false positives / noise | 4 | Empty findings table OK for low-risk PERF; no rename-nit spam |
+| D2a multi-module coverage | 4 | mrp orderpoint/rule + purchase_mrp tests checked after tools |
+| D6a attempt cost | 4 | attempt-2 ~$0.014 · 10 API (cheaper recovery than #2 F49) |
+| D7a reprompt path | 5 | recovered 0→9; F45 skipped; soul_blocked=0; ~58s wall |
+| D8b tool/workspace use | 4 | 9 tool turns on 7-file stock/mrp/purchase_mrp |
 | D9 severity vs GHA | 3 | APPROVE 95 vs GHA REQUEST CHANGES on missing alias tests |
 
 ### #4 mini sub-dims (D1=2, D8=2)
