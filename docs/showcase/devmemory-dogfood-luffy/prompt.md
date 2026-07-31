@@ -44,29 +44,23 @@ Respond with **only** the JSON object (fence optional).
 
 ### Transcript
 
-# Dogfood session — F47 hermes -z reliability (H14)
+# Dogfood session — F48 SOUL detect scope (H17) + H16 re-score
 
 ## What shipped
-- **F47 / H14:** Stopped passing `--max-turns N` on the `hermes` CLI in `scripts/run-hermes-review.sh`.
-- Hermes argparse has no `--max-turns` flag; bare `N` was parsed as a subcommand → `invalid choice: '25'` → `hermes -z` rc=2 → forced `hermes chat -q` fallback with **tool_turns=0**.
-- Iteration cap still applied via Hermes-native channels only:
-  - `HERMES_MAX_ITERATIONS=<n>`
-  - `agent.max_turns: <n>` in `$HERMES_HOME/config.yaml`
-- On CLI argv rejection (invalid choice / unrecognized arguments), skip chat fallback and write `hermes-cli-argv.env` so we do not burn a zero-tool spend path.
-- Tests: `tests/test_max_turns.py` asserts hermes -z block never contains `--max-turns` / `MAX_TURNS_ARGS`.
+- F48/H17: pass HERMES_LOG_OFFSET into capture-hermes-loop; package only this-invocation agent.log slice; avoid false soul_blocked from shared HERMES_HOME log history.
+- H16 live mini re-run on Mr-Ashish/odoo#2 with openai/gpt-4.1-mini after F47.
 
-## Evidence
-- F44 local PR #2: hermes-2.stderr showed `invalid choice: '25'` then chat fallback; max_turns=25 in hermes-max-turns.env.
-- Repro: `hermes -z "hello" --max-turns 25` → same argparse error; without the flag, no argparse error.
+## H16 results
+- hermes -z worked (no invalid choice, no chat fallback).
+- tool_turns=0 still (model single-shot text stop) → F45 gate COMMENT/55.
+- Score 30/50 same as F45; D8a improved slightly (SOUL preflight clean); residual gap is tool use not CLI.
+- False soul_blocked=1 from stale agent.log → fixed F48.
 
-## Operator notes
-- If a run falls to chat fallback again after F47, look for real hermes/install/API failures — not max-turns argv.
-- Next eval: live cheap mini re-run on Mr-Ashish/odoo#2 (H16) to re-score D1/D8 with tools + F46 SOUL load.
-
-## Corpus
-- https://github.com/Mr-Ashish/odoo/pull/1
-- https://github.com/Mr-Ashish/odoo/pull/2
-- https://github.com/Mr-Ashish/odoo/pull/3
+## Guardrails
+- Never scan full shared HERMES_HOME/logs/agent.log as this-run SOUL evidence.
+- Capture must honor HERMES_LOG_OFFSET when set.
+- F45 remains required when tool_turns=0 on multi-file code PRs.
+- Next: H15 soft re-prompt or H18 hard tool nudge for cheap multi-file path.
 
 
 ## Existing directories (allowed `path` values)
@@ -113,15 +107,16 @@ agent
 ### git status
 ```
 ?? .luffy-out-e2e-pr2-f44/
+?? .luffy-out-e2e-pr2-h16/
 ```
 
 ### recent log
 ```
+cd03a57 F48: scope SOUL detect + agent.log capture to this invocation (H17)
+eaee0da knowledge: dogfood F47 hermes -z argv / max-turns contract
 9b99910 F47: fix hermes -z reliability (H14) — drop invalid --max-turns CLI flag
 b305fac docs(dogfood): F46 SOUL context scan knowledge + showcase
 b92deb3 fix(F46): keep SOUL.md loadable under Hermes threat scanner (H13)
-0bb9cdb docs(dogfood): F45 tool-turns gate knowledge + showcase refresh
-59ed6aa feat(F45): fail-closed tool_turns=0 gate on multi-file code PRs (H12)
 ```
 
 ### tree (sample)
@@ -241,6 +236,7 @@ docs/experiments/2026-07-31-f43-preflight-cost.md
 docs/experiments/2026-07-31-f44-normalize-chat-chrome.md
 docs/experiments/2026-07-31-f45-tool-turns-gate.md
 docs/experiments/2026-07-31-f46-soul-context-scan.md
+docs/experiments/2026-07-31-f48-soul-detect-scope.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-f9c-suggestions.md
@@ -325,7 +321,6 @@ scripts/run-with-timeout.py
 scripts/save-trace.sh
 scripts/soul_context_scan.py
 scripts/sparse-pr-paths.sh
-scripts/tool_turns_gate.py
 ```
 
 ### git diff

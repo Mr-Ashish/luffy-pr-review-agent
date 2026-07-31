@@ -1,22 +1,23 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T16:26:22Z
+- **assembled_at:** 2026-07-31T16:35:02Z
 
 ## git status
 
 ```
 ?? .luffy-out-e2e-pr2-f44/
+?? .luffy-out-e2e-pr2-h16/
 ```
 
 ## recent log
 
 ```
+cd03a57 F48: scope SOUL detect + agent.log capture to this invocation (H17)
+eaee0da knowledge: dogfood F47 hermes -z argv / max-turns contract
 9b99910 F47: fix hermes -z reliability (H14) — drop invalid --max-turns CLI flag
 b305fac docs(dogfood): F46 SOUL context scan knowledge + showcase
 b92deb3 fix(F46): keep SOUL.md loadable under Hermes threat scanner (H13)
-0bb9cdb docs(dogfood): F45 tool-turns gate knowledge + showcase refresh
-59ed6aa feat(F45): fail-closed tool_turns=0 gate on multi-file code PRs (H12)
 ```
 
 ## tree (sample)
@@ -137,6 +138,7 @@ docs/experiments/2026-07-31-f43-preflight-cost.md
 docs/experiments/2026-07-31-f44-normalize-chat-chrome.md
 docs/experiments/2026-07-31-f45-tool-turns-gate.md
 docs/experiments/2026-07-31-f46-soul-context-scan.md
+docs/experiments/2026-07-31-f48-soul-detect-scope.md
 docs/experiments/2026-07-31-f9-inline-comments.md
 docs/experiments/2026-07-31-f9b-precise-anchors.md
 docs/experiments/2026-07-31-f9c-suggestions.md
@@ -221,7 +223,6 @@ scripts/run-with-timeout.py
 scripts/save-trace.sh
 scripts/soul_context_scan.py
 scripts/sparse-pr-paths.sh
-scripts/tool_turns_gate.py
 ```
 
 ## git diff

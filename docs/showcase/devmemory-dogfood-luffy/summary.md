@@ -1,9 +1,9 @@
-# Run run-20260731T215621-31b416
+# Run run-20260731T220501-4e40c6
 
 - session: `dogfood-luffy-session`
 - model: `anthropic/claude-opus-5`
 - hermes_rc: 0
-- units: 3
-- summary: Session F47/H14 captures a new, durable Hermes invocation constraint: the `hermes` CLI has no `--max-turns` flag, so passing it turned the bare count into a subcommand (`invalid choice: '25'`), forced rc=2 and a zero-tool `hermes chat -q` fallback. Iteration caps must now flow only through Hermes-native channels, and argv rejection is treated as a hard stop (no chat fallback) with a `hermes-cli-argv.env` breadcrumb.
-- at: 2026-07-31T16:26:53Z
-- timings: {"assemble_s": 1.268, "extract_s": 30.245, "normalize_s": 0.002}
+- units: 4
+- summary: The session yields new durable knowledge from F48/H17: SOUL-block detection and agent.log capture must be scoped to the current invocation via HERMES_LOG_OFFSET (shared HERMES_HOME log history caused a false soul_blocked=1), plus the H16 re-score finding that after F47 the `hermes -z` CLI path is healthy while tool_turns=0 persists as a model-behaviour gap that keeps the F45 gate load-bearing.
+- at: 2026-07-31T16:35:34Z
+- timings: {"assemble_s": 0.621, "extract_s": 32.593, "normalize_s": 0.002}

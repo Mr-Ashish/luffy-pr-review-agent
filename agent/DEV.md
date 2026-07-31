@@ -37,3 +37,6 @@
 - **F43:** preflight cost may skip Hermes or force cheap model when `LUFFY_MAX_COST_USD` is tight — SOUL/prompt unchanged; stub review is COMMENT.
 
 - `agent/SOUL.md` is scanned by Hermes context-file threat patterns before load; **F46/H13** rephrased the trust model so classic injection quotes do not false-positive. Guard with `python3 scripts/soul_context_scan.py check`. Runtime block still surfaces as `soul-context.env` + pack chip `soul-blocked`.
+
+- Consequence: the **F45 tool-turns gate stays required** on multi-file code PRs whenever `tool_turns=0` (gate → `COMMENT` / confidence 55). Live re-score on `Mr-Ashish/odoo#2` with `openai/gpt-4.1-mini` held at 30/50 — the residual gap is tool use, not the CLI invocation.
+- Open follow-ups for the cheap multi-file path: a soft re-prompt (H15) or a hard tool nudge (H18); do not remove the F45 gate before one of those lands.

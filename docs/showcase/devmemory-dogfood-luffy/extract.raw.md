@@ -1,18 +1,17 @@
 ```json
 {
-  "summary": "Session F47/H14 captures a new, durable Hermes invocation constraint: the `hermes` CLI has no `--max-turns` flag, so passing it turned the bare count into a subcommand (`invalid choice: '25'`), forced rc=2 and a zero-tool `hermes chat -q` fallback. Iteration caps must now flow only through Hermes-native channels, and argv rejection is treated as a hard stop (no chat fallback) with a `hermes-cli-argv.env` breadcrumb.",
+  "summary": "The session yields new durable knowledge from F48/H17: SOUL-block detection and agent.log capture must be scoped to the current invocation via HERMES_LOG_OFFSET (shared HERMES_HOME log history caused a false soul_blocked=1), plus the H16 re-score finding that after F47 the `hermes -z` CLI path is healthy while tool_turns=0 persists as a model-behaviour gap that keeps the F45 gate load-bearing.",
   "session_ids": ["dogfood-luffy-session"],
   "units": [
     {
       "kind": "dev",
-      "path": "agent",
+      "path": ".",
       "action": "merge",
       "section": "Design decisions",
-      "content": "- **F47/H14 iteration cap contract:** the `hermes` CLI exposes no `--max-turns` flag, so the cap is applied through Hermes-native channels only — `HERMES_MAX_ITERATIONS=<n>` in the environment and/or `agent.max_turns: <n>` in `$HERMES_HOME/config.yaml`. Never re-add a `--max-turns` argv path to `scripts/run-hermes-review.sh`.\n- Because Hermes argparse treats an unknown leading token as a subcommand, a bare `N` after `-z` is read as a command name, not a value — any future tuning knob must be an env var or config key, not a positional/flag pair on the `hermes -z` line.",
+      "content": "- **F48 (H17) log scoping:** `HERMES_LOG_OFFSET` is passed into `scripts/capture-hermes-loop.py` so the packaged `agent.log` is only the byte slice produced by *this* invocation. Capture must honour the offset when set — the run bundle should never carry another run's loop/SOUL evidence.\n- SOUL-block detection is therefore an invocation-scoped signal, not a property of `HERMES_HOME`: never treat the full shared `HERMES_HOME/logs/agent.log` as evidence for the current run.",
       "evidence": [
-        "Hermes argparse has no `--max-turns` flag; bare `N` was parsed as a subcommand → `invalid choice: '25'`",
-        "HERMES_MAX_ITERATIONS=<n>",
-        "agent.max_turns: <n> in $HERMES_HOME/config.yaml"
+        "pass HERMES_LOG_OFFSET into capture-hermes-loop; package only this-invocation agent.log slice",
+        "Capture must honor HERMES_LOG_OFFSET when set."
       ],
       "confidence": "high"
     },
@@ -21,11 +20,23 @@
       "path": ".",
       "action": "merge",
       "section": "Pitfalls",
-      "content": "- A malformed `hermes -z` argv is silently expensive: argparse exits rc=2, the runner falls back to `hermes chat -q`, and the review completes with **tool_turns=0** (no repo exploration) while still spending. F44 local PR #2 showed exactly this — `hermes-2.stderr` carried `invalid choice: '25'` while `hermes-max-turns.env` reported `max_turns=25`, so the cap looked applied.\n- F47 makes CLI argv rejection a distinct, non-fallback failure class: on `invalid choice` / `unrecognized arguments`, skip the chat fallback and write `hermes-cli-argv.env` instead of burning a zero-tool path.\n- Guardrail: `tests/test_max_turns.py` asserts the `hermes -z` invocation block never contains `--max-turns` or `MAX_TURNS_ARGS` — a reintroduced flag fails there, not at review time.",
+      "content": "- `HERMES_HOME` is shared across runs, so scanning the whole `agent.log` yields **false `soul_blocked=1`** from stale history — this was observed on a live H16 run whose SOUL preflight was actually clean, and is what F48 fixes. If `soul_blocked` fires, first confirm the evidence came from the current invocation's log slice before treating it as a real SOUL/threat-scanner block.",
       "evidence": [
-        "hermes-2.stderr showed `invalid choice: '25'` then chat fallback; max_turns=25 in hermes-max-turns.env",
-        "On CLI argv rejection (invalid choice / unrecognized arguments), skip chat fallback and write `hermes-cli-argv.env`",
-        "tests/test_max_turns.py asserts hermes -z block never contains `--max-turns` / `MAX_TURNS_ARGS`"
+        "False soul_blocked=1 from stale agent.log → fixed F48.",
+        "avoid false soul_blocked from shared HERMES_HOME log history"
+      ],
+      "confidence": "high"
+    },
+    {
+      "kind": "dev",
+      "path": "agent",
+      "action": "merge",
+      "section": "Pitfalls",
+      "content": "- Cheap-model reviews can end with `tool_turns=0`: the model answers single-shot text and stops without ever using the toolset, even when the CLI path is healthy (post-F47 `hermes -z` ran with no invalid-choice error and no chat fallback). SOUL/prompt preflight being clean does **not** imply the agentic loop ran.\n- Consequence: the **F45 tool-turns gate stays required** on multi-file code PRs whenever `tool_turns=0` (gate → `COMMENT` / confidence 55). Live re-score on `Mr-Ashish/odoo#2` with `openai/gpt-4.1-mini` held at 30/50 — the residual gap is tool use, not the CLI invocation.\n- Open follow-ups for the cheap multi-file path: a soft re-prompt (H15) or a hard tool nudge (H18); do not remove the F45 gate before one of those lands.",
+      "evidence": [
+        "tool_turns=0 still (model single-shot text stop) → F45 gate COMMENT/55",
+        "Score 30/50 same as F45; D8a improved slightly (SOUL preflight clean); residual gap is tool use not CLI.",
+        "F45 remains required when tool_turns=0 on multi-file code PRs."
       ],
       "confidence": "high"
     },
@@ -33,13 +44,13 @@
       "kind": "usage",
       "path": ".",
       "action": "merge",
-      "section": "Troubleshooting",
-      "content": "- Reproduce an argv-shape regression in isolation before blaming Hermes: `hermes -z \"hello\" --max-turns 25` reproduces the argparse error, and the same command without the flag runs clean.\n- Post-F47, a run that still lands in `hermes chat -q` fallback is **not** a max-turns argv problem — check for real hermes/install/API failures (missing binary, install step, OpenRouter/API errors) and look for `hermes-cli-argv.env` to tell an argv rejection apart from a runtime failure.\n- Triage order for a suspiciously fast/shallow review: confirm `tool_turns` in the run artifacts, then read `hermes-*.stderr` for `invalid choice` / `unrecognized arguments` before trusting `hermes-max-turns.env`, which records the *intended* cap rather than the accepted one.",
+      "section": "Debugging",
+      "content": "- When triaging a `soul_blocked` signal, export `HERMES_LOG_OFFSET` (byte offset of `HERMES_HOME/logs/agent.log` taken *before* launching Hermes) so `scripts/capture-hermes-loop.py` packages only this run's slice; a block reported without an offset is likely stale history.\n- To separate CLI failures from model behaviour on a cheap-model run, read the captured loop metrics: `hermes -z` health shows up as absence of invalid-choice/chat-fallback in the log slice, while `tool_turns=0` in the bundle's `loop` section means the model never entered the agentic loop and the F45 `tool-turns-gate.env` verdict downgrade is expected rather than a bug.",
       "evidence": [
-        "Repro: `hermes -z \"hello\" --max-turns 25` → same argparse error; without the flag, no argparse error.",
-        "If a run falls to chat fallback again after F47, look for real hermes/install/API failures — not max-turns argv."
+        "hermes -z worked (no invalid choice, no chat fallback).",
+        "Never scan full shared HERMES_HOME/logs/agent.log as this-run SOUL evidence."
       ],
-      "confidence": "high"
+      "confidence": "medium"
     }
   ]
 }

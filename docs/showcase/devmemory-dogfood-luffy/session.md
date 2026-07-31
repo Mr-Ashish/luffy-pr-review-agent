@@ -7,27 +7,21 @@
 
 ## Transcript / notes
 
-# Dogfood session — F47 hermes -z reliability (H14)
+# Dogfood session — F48 SOUL detect scope (H17) + H16 re-score
 
 ## What shipped
-- **F47 / H14:** Stopped passing `--max-turns N` on the `hermes` CLI in `scripts/run-hermes-review.sh`.
-- Hermes argparse has no `--max-turns` flag; bare `N` was parsed as a subcommand → `invalid choice: '25'` → `hermes -z` rc=2 → forced `hermes chat -q` fallback with **tool_turns=0**.
-- Iteration cap still applied via Hermes-native channels only:
-  - `HERMES_MAX_ITERATIONS=<n>`
-  - `agent.max_turns: <n>` in `$HERMES_HOME/config.yaml`
-- On CLI argv rejection (invalid choice / unrecognized arguments), skip chat fallback and write `hermes-cli-argv.env` so we do not burn a zero-tool spend path.
-- Tests: `tests/test_max_turns.py` asserts hermes -z block never contains `--max-turns` / `MAX_TURNS_ARGS`.
+- F48/H17: pass HERMES_LOG_OFFSET into capture-hermes-loop; package only this-invocation agent.log slice; avoid false soul_blocked from shared HERMES_HOME log history.
+- H16 live mini re-run on Mr-Ashish/odoo#2 with openai/gpt-4.1-mini after F47.
 
-## Evidence
-- F44 local PR #2: hermes-2.stderr showed `invalid choice: '25'` then chat fallback; max_turns=25 in hermes-max-turns.env.
-- Repro: `hermes -z "hello" --max-turns 25` → same argparse error; without the flag, no argparse error.
+## H16 results
+- hermes -z worked (no invalid choice, no chat fallback).
+- tool_turns=0 still (model single-shot text stop) → F45 gate COMMENT/55.
+- Score 30/50 same as F45; D8a improved slightly (SOUL preflight clean); residual gap is tool use not CLI.
+- False soul_blocked=1 from stale agent.log → fixed F48.
 
-## Operator notes
-- If a run falls to chat fallback again after F47, look for real hermes/install/API failures — not max-turns argv.
-- Next eval: live cheap mini re-run on Mr-Ashish/odoo#2 (H16) to re-score D1/D8 with tools + F46 SOUL load.
-
-## Corpus
-- https://github.com/Mr-Ashish/odoo/pull/1
-- https://github.com/Mr-Ashish/odoo/pull/2
-- https://github.com/Mr-Ashish/odoo/pull/3
+## Guardrails
+- Never scan full shared HERMES_HOME/logs/agent.log as this-run SOUL evidence.
+- Capture must honor HERMES_LOG_OFFSET when set.
+- F45 remains required when tool_turns=0 on multi-file code PRs.
+- Next: H15 soft re-prompt or H18 hard tool nudge for cheap multi-file path.
 

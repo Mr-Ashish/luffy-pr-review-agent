@@ -123,7 +123,6 @@
 - `hermes -z` is not reliable: an observed `-z` rc=2 on odoo PR #2 forced the `hermes chat -q` path, which is exactly the polluted-output case F44 scrubs. Anything that assumes one-shot mode always wins will regress (tracked as H14).
 - `tool_turns=0` on a multi-file PR is a quality smell for an *agentic* review product, not a cheap win: the no-tool mini run on PR #2 returned APPROVE while an earlier GHA tool-using review caught the real gap (missing `format:false` tests). **F45/H12** fail-closes: `scripts/tool_turns_gate.py` downgrades APPROVE→COMMENT, caps score at 55, injects an F45 banner, writes `tool-turns-gate.env` (chip `tool-turns-gate`). Docs-only / single-file exempt; `LUFFY_TOOL_TURNS_GATE=off` disables.
 - **F46/H13 SOUL load:** Hermes blocks context files matching threat patterns. Never quote classic injection phrases in `agent/SOUL.md`. Preflight: `scripts/soul_context_scan.py check`; runtime: `soul-context.env` + chip `soul-blocked`.
-- **F48/H17 SOUL detect scope:** runtime `soul_blocked` must only read **this-invocation** logs (`hermes-run.log` offset slice + stderr + capture’s offset-sliced `agent.log`). Never treat the shared full `HERMES_HOME/logs/agent.log` history as evidence — prior sessions leave stale `Context file SOUL.md blocked` lines (H16 false positive). Capture gets `HERMES_LOG_OFFSET`.
 - **H16 lesson:** fixing `hermes -z` argv does **not** guarantee tool use — gpt-4.1-mini can still single-shot with `tool_turns=0`; F45 remains the honesty gate; quality lift needs H15/H18.
 
 - The normalizer is a **trust boundary**, not a formatter: never accept a body as a valid review contract just because expected snippets/headings appear in it — prompt echo contains all of them. Contract checks must assert the placeholder-free form.
@@ -131,6 +130,8 @@
 
 - A malformed `hermes -z` argv is silently expensive: argparse exits rc=2, the runner falls back to `hermes chat -q`, and the review completes with **tool_turns=0** (no repo exploration) while still spending. F44 local PR #2 showed exactly this — `hermes-2.stderr` carried `invalid choice: '25'` while `hermes-max-turns.env` reported `max_turns=25`, so the cap looked applied.
 - F47 makes CLI argv rejection a distinct, non-fallback failure class: on `invalid choice` / `unrecognized arguments`, skip the chat fallback and write `hermes-cli-argv.env` instead of burning a zero-tool path.
+
+- `HERMES_HOME` is shared across runs, so scanning the whole `agent.log` yields **false `soul_blocked=1`** from stale history — this was observed on a live H16 run whose SOUL preflight was actually clean, and is what F48 fixes. If `soul_blocked` fires, first confirm the evidence came from the current invocation's log slice before treating it as a real SOUL/threat-scanner block.
 
 ## Patterns
 

@@ -299,6 +299,9 @@ REPO=owner/name HERMES_HOME=/tmp/hh LUFFY_MEMORY_MODE=local bash scripts/preload
 
 - If a posted review looks like the review prompt itself, the run took the `hermes chat -q` fallback (`hermes -z` failed) and normalization was bypassed/stale. Re-run `python3 scripts/normalize-review.py` over `review.raw.md`: a placeholder verdict line (`**Verdict:** < APPROVE | … >`) means prompt echo and must be rejected, not published.
 
+- When triaging a `soul_blocked` signal, export `HERMES_LOG_OFFSET` (byte offset of `HERMES_HOME/logs/agent.log` taken *before* launching Hermes) so `scripts/capture-hermes-loop.py` packages only this run's slice; a block reported without an offset is likely stale history.
+- To separate CLI failures from model behaviour on a cheap-model run, read the captured loop metrics: `hermes -z` health shows up as absence of invalid-choice/chat-fallback in the log slice, while `tool_turns=0` in the bundle's `loop` section means the model never entered the agentic loop and the F45 `tool-turns-gate.env` verdict downgrade is expected rather than a bug.
+
 ## Troubleshooting
 
 - Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` (`mode=pack|caller`, `source_sha`) and compare with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`. For `mode=caller`, runtime tracks hub `main`, not the stamp alone.

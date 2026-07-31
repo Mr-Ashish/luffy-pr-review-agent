@@ -1,31 +1,31 @@
-# Agent loop · `run-20260731T215621-31b416`
+# Agent loop · `run-20260731T220501-4e40c6`
 
 - **model:** `anthropic/claude-opus-5`
 - **hermes_rc:** 0
-- **units:** 3
-- **at:** 2026-07-31T16:26:56Z
+- **units:** 4
+- **at:** 2026-07-31T16:35:40Z
 
 ## Summary
 
-Session F47/H14 captures a new, durable Hermes invocation constraint: the `hermes` CLI has no `--max-turns` flag, so passing it turned the bare count into a subcommand (`invalid choice: '25'`), forced rc=2 and a zero-tool `hermes chat -q` fallback. Iteration caps must now flow only through Hermes-native channels, and argv rejection is treated as a hard stop (no chat fallback) with a `hermes-cli-argv.env` breadcrumb.
+The session yields new durable knowledge from F48/H17: SOUL-block detection and agent.log capture must be scoped to the current invocation via HERMES_LOG_OFFSET (shared HERMES_HOME log history caused a false soul_blocked=1), plus the H16 re-score finding that after F47 the `hermes -z` CLI path is healthy while tool_turns=0 persists as a model-behaviour gap that keeps the F45 gate load-bearing.
 
 ## Usage
 
 ```json
 {
-  "estimated_cost_usd": 0.27279125,
+  "estimated_cost_usd": 0.26941,
   "cost_status": "estimated",
   "cost_source": "provider_models_api",
   "input_tokens": 2,
-  "output_tokens": 2274,
+  "output_tokens": 2194,
   "cache_read_tokens": 0,
-  "cache_write_tokens": 34549,
-  "reasoning_tokens": 221,
-  "total_tokens": 36825,
+  "cache_write_tokens": 34328,
+  "reasoning_tokens": 258,
+  "total_tokens": 36524,
   "api_calls": 1,
   "model": "anthropic/claude-opus-5",
   "provider": "openrouter",
-  "session_id": "20260731_215623_0d5fa0",
+  "session_id": "20260731_220503_8cef0d",
   "completed": true,
   "failed": false,
   "service_tier": null
@@ -36,11 +36,11 @@ Session F47/H14 captures a new, durable Hermes invocation constraint: the `herme
 
 ```json
 {
-  "assemble_s": 1.268,
-  "extract_s": 30.245,
+  "assemble_s": 0.621,
+  "extract_s": 32.593,
   "normalize_s": 0.002,
-  "apply_s": 3.341,
-  "total_s": 34.863
+  "apply_s": 5.992,
+  "total_s": 39.214
 }
 ```
 

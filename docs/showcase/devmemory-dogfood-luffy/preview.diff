@@ -1,42 +1,45 @@
 diff --git a/DEV.md b/DEV.md
 --- a/DEV.md
 +++ b/DEV.md
-@@ -127,6 +127,9 @@
- - The normalizer is a **trust boundary**, not a formatter: never accept a body as a valid review contract just because expected snippets/headings appear in it — prompt echo contains all of them. Contract checks must assert the placeholder-free form.
- - `hermes -z` can fail at runtime and fall back to `hermes chat -q` (observed on a cheap run over Mr-Ashish/odoo PR #2); pre-F44 that path would have posted the **entire prompt** as the PR review comment.
+@@ -123,7 +123,6 @@
+ - `hermes -z` is not reliable: an observed `-z` rc=2 on odoo PR #2 forced the `hermes chat -q` path, which is exactly the polluted-output case F44 scrubs. Anything that assumes one-shot mode always wins will regress (tracked as H14).
+ - `tool_turns=0` on a multi-file PR is a quality smell for an *agentic* review product, not a cheap win: the no-tool mini run on PR #2 returned APPROVE while an earlier GHA tool-using review caught the real gap (missing `format:false` tests). **F45/H12** fail-closes: `scripts/tool_turns_gate.py` downgrades APPROVE→COMMENT, caps score at 55, injects an F45 banner, writes `tool-turns-gate.env` (chip `tool-turns-gate`). Docs-only / single-file exempt; `LUFFY_TOOL_TURNS_GATE=off` disables.
+ - **F46/H13 SOUL load:** Hermes blocks context files matching threat patterns. Never quote classic injection phrases in `agent/SOUL.md`. Preflight: `scripts/soul_context_scan.py check`; runtime: `soul-context.env` + chip `soul-blocked`.
+-- **F48/H17 SOUL detect scope:** runtime `soul_blocked` must only read **this-invocation** logs (`hermes-run.log` offset slice + stderr + capture’s offset-sliced `agent.log`). Never treat the shared full `HERMES_HOME/logs/agent.log` history as evidence — prior sessions leave stale `Context file SOUL.md blocked` lines (H16 false positive). Capture gets `HERMES_LOG_OFFSET`.
+ - **H16 lesson:** fixing `hermes -z` argv does **not** guarantee tool use — gpt-4.1-mini can still single-shot with `tool_turns=0`; F45 remains the honesty gate; quality lift needs H15/H18.
  
-+- A malformed `hermes -z` argv is silently expensive: argparse exits rc=2, the runner falls back to `hermes chat -q`, and the review completes with **tool_turns=0** (no repo exploration) while still spending. F44 local PR #2 showed exactly this — `hermes-2.stderr` carried `invalid choice: '25'` while `hermes-max-turns.env` reported `max_turns=25`, so the cap looked applied.
-+- F47 makes CLI argv rejection a distinct, non-fallback failure class: on `invalid choice` / `unrecognized arguments`, skip the chat fallback and write `hermes-cli-argv.env` instead of burning a zero-tool path.
+ - The normalizer is a **trust boundary**, not a formatter: never accept a body as a valid review contract just because expected snippets/headings appear in it — prompt echo contains all of them. Contract checks must assert the placeholder-free form.
+@@ -131,6 +130,8 @@
+ 
+ - A malformed `hermes -z` argv is silently expensive: argparse exits rc=2, the runner falls back to `hermes chat -q`, and the review completes with **tool_turns=0** (no repo exploration) while still spending. F44 local PR #2 showed exactly this — `hermes-2.stderr` carried `invalid choice: '25'` while `hermes-max-turns.env` reported `max_turns=25`, so the cap looked applied.
+ - F47 makes CLI argv rejection a distinct, non-fallback failure class: on `invalid choice` / `unrecognized arguments`, skip the chat fallback and write `hermes-cli-argv.env` instead of burning a zero-tool path.
 +
++- `HERMES_HOME` is shared across runs, so scanning the whole `agent.log` yields **false `soul_blocked=1`** from stale history — this was observed on a live H16 run whose SOUL preflight was actually clean, and is what F48 fixes. If `soul_blocked` fires, first confirm the evidence came from the current invocation's log slice before treating it as a real SOUL/threat-scanner block.
+ 
  ## Patterns
  
- - **F27 truncation banner** is mechanical (not model-dependent): `assemble-context` sets `DIFF_TRUNCATED` in `meta.env` → `run-hermes-review.sh` passes `--diff-truncated` → `inject_diff_truncated_banner()` inserts a blockquote before `**Verdict:**`. Idempotent if the model already wrote a similar note. Raising `MAX_DIFF_BYTES` is the operator control; the banner is honesty, not a skip.
 
 diff --git a/USAGE.md b/USAGE.md
 --- a/USAGE.md
 +++ b/USAGE.md
-@@ -317,6 +317,10 @@
- - Matching is `fnmatch`-based, so glob depth is literal: the `docs` preset ships both `docs/**` and `**/docs/**` because a top-level-only pattern will not match nested `pkg/docs/…`. Add both shapes when writing custom globs for a monorepo.
- - Extension globs in the preset are unanchored (`*.md`, `*.mdx`, `*.rst`, `*.txt`, `*.adoc`) — a `.txt` fixture inside `src/` counts as skippable, so audit `matched_n`/`sample` output before trusting the preset on a mixed repo.
+@@ -299,6 +299,9 @@
  
-+- Reproduce an argv-shape regression in isolation before blaming Hermes: `hermes -z "hello" --max-turns 25` reproduces the argparse error, and the same command without the flag runs clean.
-+- Post-F47, a run that still lands in `hermes chat -q` fallback is **not** a max-turns argv problem — check for real hermes/install/API failures (missing binary, install step, OpenRouter/API errors) and look for `hermes-cli-argv.env` to tell an argv rejection apart from a runtime failure.
-+- Triage order for a suspiciously fast/shallow review: confirm `tool_turns` in the run artifacts, then read `hermes-*.stderr` for `invalid choice` / `unrecognized arguments` before trusting `hermes-max-turns.env`, which records the *intended* cap rather than the accepted one.
+ - If a posted review looks like the review prompt itself, the run took the `hermes chat -q` fallback (`hermes -z` failed) and normalization was bypassed/stale. Re-run `python3 scripts/normalize-review.py` over `review.raw.md`: a placeholder verdict line (`**Verdict:** < APPROVE | … >`) means prompt echo and must be rejected, not published.
+ 
++- When triaging a `soul_blocked` signal, export `HERMES_LOG_OFFSET` (byte offset of `HERMES_HOME/logs/agent.log` taken *before* launching Hermes) so `scripts/capture-hermes-loop.py` packages only this run's slice; a block reported without an offset is likely stale history.
++- To separate CLI failures from model behaviour on a cheap-model run, read the captured loop metrics: `hermes -z` health shows up as absence of invalid-choice/chat-fallback in the log slice, while `tool_turns=0` in the bundle's `loop` section means the model never entered the agentic loop and the F45 `tool-turns-gate.env` verdict downgrade is expected rather than a bug.
 +
- ## F22/F23 verdict signals
+ ## Troubleshooting
  
- After each run Luffy derives a **verdict signal** from the posted review body:
+ - Confirm which Luffy version a target repo runs: read `.luffy-install-stamp` (`mode=pack|caller`, `source_sha`) and compare with `git -C <luffy-source> rev-parse --short HEAD`. A stale `source_sha` after a re-install means files were skipped — re-run with `--force`. For `mode=caller`, runtime tracks hub `main`, not the stamp alone.
 
 diff --git a/agent/DEV.md b/agent/DEV.md
 --- a/agent/DEV.md
 +++ b/agent/DEV.md
-@@ -21,6 +21,9 @@
+@@ -37,3 +37,6 @@
+ - **F43:** preflight cost may skip Hermes or force cheap model when `LUFFY_MAX_COST_USD` is tight — SOUL/prompt unchanged; stub review is COMMENT.
  
- - The cap is applied to the *disposable* `HERMES_HOME` config that `run-hermes-review.sh` rewrites per run, so `agent/config.yaml` is the template, not the live file the agent reads.
- 
-+- **F47/H14 iteration cap contract:** the `hermes` CLI exposes no `--max-turns` flag, so the cap is applied through Hermes-native channels only — `HERMES_MAX_ITERATIONS=<n>` in the environment and/or `agent.max_turns: <n>` in `$HERMES_HOME/config.yaml`. Never re-add a `--max-turns` argv path to `scripts/run-hermes-review.sh`.
-+- Because Hermes argparse treats an unknown leading token as a subcommand, a bare `N` after `-z` is read as a command name, not a value — any future tuning knob must be an env var or config key, not a positional/flag pair on the `hermes -z` line.
+ - `agent/SOUL.md` is scanned by Hermes context-file threat patterns before load; **F46/H13** rephrased the trust model so classic injection quotes do not false-positive. Guard with `python3 scripts/soul_context_scan.py check`. Runtime block still surfaces as `soul-context.env` + pack chip `soul-blocked`.
 +
- ## Pitfalls
- 
- - Same anchoring applies to `**Score:** <int>[/100]` and `**Confidence:** low|medium|high` — score/confidence are parsed only for reporting, and a missed match yields empty strings rather than an error.
++- Consequence: the **F45 tool-turns gate stays required** on multi-file code PRs whenever `tool_turns=0` (gate → `COMMENT` / confidence 55). Live re-score on `Mr-Ashish/odoo#2` with `openai/gpt-4.1-mini` held at 30/50 — the residual gap is tool use, not the CLI invocation.
++- Open follow-ups for the cheap multi-file path: a soft re-prompt (H15) or a hard tool nudge (H18); do not remove the F45 gate before one of those lands.
