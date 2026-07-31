@@ -92,6 +92,36 @@ merge_into_hermes() {
 TMP="$(mktemp)"
 HTTP=""
 
+# F64: durable structured FP rules (optional companion to MEMORY.md)
+preload_fp_rules() {
+  local rules_api="${MEM_PATH}/fp-rules.json"
+  rules_api="${rules_api#./}"
+  local rules_tmp
+  rules_tmp="$(mktemp)"
+  local rules_http=""
+  set +e
+  local API="https://api.github.com/repos/${REPO}/contents/${rules_api}"
+  local HDR=(-H "Accept: application/vnd.github.raw+json")
+  if [[ -n "$TOKEN" ]]; then
+    HDR+=(-H "Authorization: Bearer ${TOKEN}")
+  fi
+  rules_http=$(curl -sS -L -o "$rules_tmp" -w "%{http_code}" "${HDR[@]}" "$API" 2>/dev/null || echo "000")
+  set -e
+  if [[ "$rules_http" == "200" && -s "$rules_tmp" ]]; then
+    mkdir -p "$HERMES_HOME/memories"
+    cp -f "$rules_tmp" "$HERMES_HOME/memories/fp-rules.json"
+    if [[ -n "${OUT_DIR:-}" ]]; then
+      mkdir -p "$OUT_DIR"
+      cp -f "$rules_tmp" "$OUT_DIR/fp-rules.json"
+    fi
+    notice "Preloaded F64 fp-rules: ${REPO}/${rules_api} ($(wc -c <"$rules_tmp" | tr -d ' ') bytes)"
+    record_mh "FP_RULES=local"
+  else
+    record_mh "FP_RULES=missing"
+  fi
+  rm -f "$rules_tmp"
+}
+
 # 1) Repo-local .luffy/MEMORY.md (default branch contents API — do not rely on sparse PR workspace)
 LOCAL_MEM="${MEM_PATH}/MEMORY.md"
 # strip leading ./
@@ -101,11 +131,14 @@ if [[ "$HTTP" == "200" && -s "$TMP" ]]; then
   merge_into_hermes
   notice "Preloaded local memory: ${REPO}/${LOCAL_MEM} ($(wc -c <"$LOCAL_DEST" | tr -d ' ') bytes)"
   record_mh "MEMORY_SOURCE=local"
+  preload_fp_rules || true
   echo "HUB_MEMORY=local"
   rm -f "$TMP"
   exit 0
 fi
 log "No local memory yet at ${REPO}/${LOCAL_MEM} (HTTP ${HTTP:-?})"
+# Still try F64 rules even when MEMORY.md is missing
+preload_fp_rules || true
 
 # 2) Hub fallback when opted in
 if [[ "$HUB_OK" == "1" ]]; then

@@ -109,6 +109,29 @@ def main() -> int:
         except json.JSONDecodeError:
             timings = {}
 
+    # F64: durable FP rules for local/hub self-learn store
+    fp_rules: dict | list | None = None
+    for cand in (
+        out_dir / "fp-rules.json",
+        out_dir / "fp-resolve.json",
+    ):
+        if cand.is_file():
+            try:
+                raw = json.loads(cand.read_text(encoding="utf-8", errors="replace"))
+            except json.JSONDecodeError:
+                continue
+            if isinstance(raw, dict) and isinstance(raw.get("rules"), list):
+                fp_rules = raw
+                break
+            if isinstance(raw, list):
+                fp_rules = {
+                    "schema_version": 1,
+                    "feature": "F64",
+                    "count": len(raw),
+                    "rules": raw,
+                }
+                break
+
     payload = {
         "schema_version": 1,
         "event": "luffy-run",
@@ -125,6 +148,7 @@ def main() -> int:
         "review_md": review,
         "memory_block": memory_block,
         "timings": timings,
+        "fp_rules": fp_rules,
         "meta": {
             "github_sha": os.environ.get("GITHUB_SHA"),
             "github_ref": os.environ.get("GITHUB_REF"),

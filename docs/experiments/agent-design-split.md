@@ -18,6 +18,7 @@
 | F61 testplan generation | `testplan_generation.py` files+diff→P0/P1/P2 cases | refine / drop-with-reason | `### Suggested test plan` | `testplan`, `testplan_max_cases` |
 | F62 FP resolve + memory | `fp_resolve_memory.py` classify/mine/merge | re-raise only with new evidence | MEMORY `## FP patterns` + review-prompt | `fp_resolve`, `fp_resolve_max` |
 | F63 domain packs + auto | `lens_recipes.py` path_globs score + milvus/go/cpp JSON | fill ok/concern per pack hints | `agent/packs/*.json` | `lens_pack=auto` default |
+| F64 durable FP rules | `fp-rules.json` load/save + hub-ingest merge | same as F62 | `.luffy/fp-rules.json` | `LUFFY_FP_RULES_FILE` |
 
 ## Hermes boundary (research note)
 
