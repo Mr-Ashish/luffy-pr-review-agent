@@ -1,7 +1,7 @@
 # F58 — PR description filler
 
 **Date:** 2026-07-31  
-**Status:** shipped (control-plane)  
+**Status:** shipped (MERGED PR #8)  
 **Tag:** PRODUCT_FEATURE | DETERMINISTIC
 
 ## Problem
