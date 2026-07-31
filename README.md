@@ -284,6 +284,224 @@ Full step dump (every tool arg + message): [`agent-loop/agent-loop.md`](docs/sho
 gh run download 30574256524 -R Mr-Ashish/odoo -n luffy-trace-pr3-run30574256524
 ```
 
+## ASCII diagram index
+
+All **text** diagrams in this README (mermaid charts are separate, above):
+
+| # | Diagram | Section |
+|---|---------|---------|
+| A1 | Full control plane (Actions → orchestrator → ship) | [Agentic loop (example)](#agentic-loop-example) |
+| A2 | Hermes-only high-level (prompt → loop → review) | [Hermes agentic loop only](#hermes-agentic-loop-only) |
+| A3 | Hermes loop step-by-step (LLM ↔ tools ↔ done) | [Hermes agentic loop only](#hermes-agentic-loop-only) |
+| A4 | Message / data flow inside one Hermes run | [Hermes agentic loop only](#hermes-agentic-loop-only) |
+| A5 | Optional F49 zero-tool re-prompt second loop | [Hermes agentic loop only](#hermes-agentic-loop-only) |
+| A6 | After Hermes exits (normalize · capture · usage) | [Hermes agentic loop only](#hermes-agentic-loop-only) |
+| A7 | Modal batch traces map (top-10 milvus corpus) | [Modal DeepSeek V4 Pro traces](#modal-deepseek-v4-pro-traces--milvus-top-10) |
+
+---
+
+## Hermes agentic loop only
+
+What runs **inside** `hermes -z` once the prompt is already assembled (not the outer Actions/Modal kitchen). Live Modal batch evidence: milvus fork PRs with `deepseek/deepseek-v4-pro` (e.g. #6 → **63 messages · 24 tool turns**).
+
+### A2 — High-level
+
+```text
+                    prompt.md
+            (review contract + diff + skills)
+                         |
+                         v
+              ┌─────────────────────┐
+              │   hermes -z         │
+              │   OpenRouter model  │  e.g. deepseek/deepseek-v4-pro
+              │   toolsets=terminal │
+              │   max_turns ≤ 40    │
+              └──────────┬──────────┘
+                         |
+         ┌───────────────┴───────────────┐
+         │     AGENTIC LOOP              │
+         │  (repeat until final text)    │
+         └───────────────┬───────────────┘
+                         |
+         ┌───────────────┼───────────────┐
+         v               v               v
+   LLM think/       tool call(s)    final review
+   plan next        terminal on      Markdown
+   action           workspace        → stdout
+         |               |               |
+         |               v               v
+         |        tool result      review-N.raw.md
+         |        back into        (+ hermes-usage.json)
+         |        messages
+         └─────── loop ──────────────┘
+```
+
+### A3 — Step-by-step
+
+```text
+                         ┌──────────────┐
+                         │  START       │
+                         │  load prompt │
+                         │  + SOUL/cfg  │
+                         └──────┬───────┘
+                                v
+                    ┌───────────────────────┐
+              ┌────►│  LLM turn             │◄────────────────┐
+              │     │  model completes with │                 │
+              │     │  either:              │                 │
+              │     │   A) tool_calls[]     │                 │
+              │     │   B) final text       │                 │
+              │     └───────────┬───────────┘                 │
+              │                 │                             │
+              │       ┌─────────┴─────────┐                   │
+              │       v                   v                   │
+              │  [A] tools             [B] done               │
+              │       │                   │                   │
+              │       v                   v                   │
+              │  run each tool         write RAW review       │
+              │  (terminal):           to review-N.raw.md     │
+              │   · rg / sed / cat                            │
+              │   · read pr.diff                              │
+              │   · inspect tests                             │
+              │       │                                       │
+              │       v                                       │
+              │  append tool results                          │
+              │  as messages                                  │
+              │  tool_turns++                                 │
+              │  messages++                                   │
+              │       │                                       │
+              │       │  if turns < max_turns                 │
+              └───────┘  else force stop                      │
+                                                              │
+                                ┌─────────────────────────────┘
+                                v
+                         ┌──────────────┐
+                         │  END loop    │
+                         │  session_id  │
+                         │  usage json  │
+                         └──────────────┘
+```
+
+### A4 — Message / data flow
+
+```text
+  messages[]  (grows each turn)
+  ─────────────────────────────────────────
+  [user]     full prompt (contract, lenses,
+             F69 skills, PR meta, workspace paths)
+      │
+      v
+  [assistant]  plan + optional tool_calls
+      │
+      v
+  [tool]       stdout/stderr of terminal cmds
+      │
+      v
+  [assistant]  more tools OR final Markdown
+      │
+     ...
+      v
+  last [assistant]  = review body → RAW_OUT
+
+  counters (example from Modal milvus#6 · DeepSeek V4 Pro):
+    messages=63
+    tool_turns=24   ← only turns that invoked tools
+    max_turns=40    ← hard cap (HERMES_MAX_ITERATIONS)
+```
+
+### A5 — Optional F49 second loop (zero-tool recovery)
+
+```text
+  attempt-1 hermes -z
+       │
+       │  tool_turns == 0  AND  multi-file code PR?
+       │
+       ├─ no ──► keep attempt-1 body
+       │
+       └─ yes ─► build prompt-reprompt.md (H26: read hunks, not head)
+                      │
+                      v
+                 attempt-2 hermes -z  (same model/tools)
+                      │
+                      ├─ success + tools > 0  → use attempt-2  (e.g. 0→24)
+                      └─ fail/timeout         → restore attempt-1
+```
+
+### A6 — After Hermes exits (loop packaging)
+
+```text
+  RAW review
+      │
+      ├─► normalize-review.py     clean markdown / redaction
+      ├─► capture-hermes-loop.py  agent-loop.json + .md
+      │         (messages, steps, tool_call_turns, usage)
+      ├─► hermes-usage.json       tokens / cost / session
+      └─► hermes-N.stderr         tool noise (streamed live on Modal)
+```
+
+**One-line:** Hermes agentic loop = LLM ↔ terminal tools on the PR workspace, capped by `max_turns`, until it emits Markdown; optional one soft re-prompt if the first pass used zero tools.
+
+---
+
+## Modal DeepSeek V4 Pro traces — milvus top 10
+
+Full Modal bit-3 batch on the **top-10 cognitive-complexity** milvus-io PRs, ported to [Mr-Ashish/milvus](https://github.com/Mr-Ashish/milvus) **#4–#13**.
+
+| | |
+|--|--|
+| **Model** | `deepseek/deepseek-v4-pro` via OpenRouter · Hermes |
+| **Host** | Modal `0.8.0-f67` · F67 live log streaming |
+| **Result** | **10/10** `BIT3_OK` · comments posted |
+| **Mean score** | **83.7/100** (69–92) |
+| **Mean tools** | **24.0** (10–39) |
+| **Mean elapsed** | **~291s** (168–383s) |
+| **Verdicts** | 8 APPROVE · 1 REQUEST CHANGES · 1 COMMENT |
+| **Artifacts** | [`docs/showcase/modal-milvus-top10-deepseek-v4-pro/`](docs/showcase/modal-milvus-top10-deepseek-v4-pro/) · [REPORT.md](docs/showcase/modal-milvus-top10-deepseek-v4-pro/REPORT.md) |
+
+### A7 — Batch map (fork ↔ upstream ↔ Hermes loop stats)
+
+```text
+  milvus-io open PR (complex)     Mr-Ashish/milvus fork      Hermes loop (DeepSeek V4 Pro)
+  ────────────────────────────    ─────────────────────     ─────────────────────────────
+  #51785 schema.Version      ──►  #4   COMMENT  78   31 tools  ~383s
+  #51393 nested array idx    ──►  #5   APPROVE  85   39 tools  ~346s
+  #51886 delegator schema    ──►  #6   APPROVE  78   24 tools  ~327s
+  #51246 async storage v2    ──►  #7   APPROVE  82   20 tools  ~328s
+  #51431 RG balance epochs   ──►  #8   APPROVE  82   35 tools  ~291s
+  #51874 manifest CAS        ──►  #9   APPROVE  92   10 tools  ~168s
+  #51845 partial-update CAS  ──►  #10  REQUEST  69   29 tools  ~347s
+  #51694 published resources ──►  #11  APPROVE  92   11 tools  ~262s
+  #51641 copy-segment races  ──►  #12  APPROVE  87   20 tools  ~181s
+  #51441 stats skip index    ──►  #13  APPROVE  92   21 tools  ~274s
+```
+
+### Per-trace notes (Hermes agentic loop)
+
+| Trace | Fork / upstream | Lens | What the loop did | Outcome |
+|-------|-----------------|------|-------------------|---------|
+| 1 | [#4](https://github.com/Mr-Ashish/milvus/pull/4) / [#51785](https://github.com/milvus-io/milvus/pull/51785) | go | Deep pass over schema-clock collapse, reopen races; 31 tools | **COMMENT** 78 — medium BM25 stats edge on non-BM25 loads |
+| 2 | [#5](https://github.com/Mr-Ashish/milvus/pull/5) / [#51393](https://github.com/milvus-io/milvus/pull/51393) | cpp | Deepest tools (39) on lock-free array offsets + element exprs | **APPROVE** 85 — low memory-order nit only |
+| 3 | [#6](https://github.com/Mr-Ashish/milvus/pull/6) / [#51886](https://github.com/milvus-io/milvus/pull/51886) | go | 24 tools / 63 msgs: load gate, WAL schema view, retry | **APPROVE** 78 — nil-schema edge on index meta |
+| 4 | [#7](https://github.com/Mr-Ashish/milvus/pull/7) / [#51246](https://github.com/milvus-io/milvus/pull/51246) | cpp | Async v2 pipeline, budget admission, FileWriter permit | **APPROVE** 82 — sync-block under write permit |
+| 5 | [#8](https://github.com/Mr-Ashish/milvus/pull/8) / [#51431](https://github.com/milvus-io/milvus/pull/51431) | go | 35 tools: balance epoch observe→plan→admit→reconcile | **APPROVE** 82 — CheckerType as task source string |
+| 6 | [#9](https://github.com/Mr-Ashish/milvus/pull/9) / [#51874](https://github.com/milvus-io/milvus/pull/51874) | go | Short high-confidence CAS adoption review (10 tools) | **APPROVE** 92 — no key findings |
+| 7 | [#10](https://github.com/Mr-Ashish/milvus/pull/10) / [#51845](https://github.com/milvus-io/milvus/pull/51845) | go | Partial-update interceptor + PK version index (29 tools) | **REQUEST CHANGES** 69 — storageCost `+=` across CAS retries |
+| 8 | [#11](https://github.com/Mr-Ashish/milvus/pull/11) / [#51694](https://github.com/milvus-io/milvus/pull/51694) | cpp | Segment-owned geometry/TEXT lifetime + mutex UB fix | **APPROVE** 92 — clean |
+| 9 | [#12](https://github.com/Mr-Ashish/milvus/pull/12) / [#51641](https://github.com/milvus-io/milvus/pull/51641) | go | Publishing fence + terminal guards on copy-segment | **APPROVE** 87 — map iterate order edge |
+| 10 | [#13](https://github.com/Mr-Ashish/milvus/pull/13) / [#51441](https://github.com/milvus-io/milvus/pull/51441) | go | Skip-index false-negatives, cell IO, cost validity bit | **APPROVE** 92 — vector offset materialize-before-skip |
+
+### Re-run command
+
+```bash
+for pr in 4 5 6 7 8 9 10 11 12 13; do
+  ./scripts/trigger-review.sh modal Mr-Ashish/milvus "$pr" \
+    --model deepseek/deepseek-v4-pro --post
+done
+```
+
+Summary TSV + report: [`docs/showcase/modal-milvus-top10-deepseek-v4-pro/`](docs/showcase/modal-milvus-top10-deepseek-v4-pro/).  
+Local fat Modal logs (not committed): `.luffy-out-e2e-modal-milvus-top10-deepseek-v4-pro/pr{N}/modal-run.log`
+
 ## Setup (target repo)
 
 1. Copy `agent/`, `scripts/`, and `.github/workflows/luffy-pr-review.yml` onto the **default branch**
