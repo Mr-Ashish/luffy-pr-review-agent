@@ -12,6 +12,7 @@
 #   LUFFY_MEMORY_MODE   local|hub|both  (default local)
 #   LUFFY_MEMORY_PATH   default .luffy
 #   LUFFY_HUB_REPO      default Mr-Ashish/luffy-pr-review-agent
+#   LUFFY_MEMORY_TENANT F65 optional multi-tenant hub namespace
 #   LUFFY_HUB_PUBLISH / LUFFY_HUB_TOKEN / GITHUB_TOKEN
 set -euo pipefail
 
@@ -25,6 +26,9 @@ TOKEN="${LUFFY_HUB_TOKEN:-${GH_TOKEN:-${GITHUB_TOKEN:-}}}"
 MEM_PATH="${LUFFY_MEMORY_PATH:-.luffy}"
 MODE="${LUFFY_MEMORY_MODE:-local}"
 MODE="$(printf '%s' "$MODE" | tr '[:upper:]' '[:lower:]')"
+# F65: sanitize tenant (alnum/._- only)
+TENANT="${LUFFY_MEMORY_TENANT:-}"
+TENANT="$(printf '%s' "$TENANT" | tr -c 'A-Za-z0-9._-' '-' | sed 's/^-*//;s/-*$//' | cut -c1-64)"
 
 if [[ -z "$REPO" || -z "$HERMES_HOME" ]]; then
   log "REPO/HERMES_HOME missing; skip memory preload"
@@ -46,6 +50,9 @@ mkdir -p "$HERMES_HOME/memories"
 LOCAL_DEST="$HERMES_HOME/memories/MEMORY.md"
 record_mh "MEMORY_MODE=${MODE}"
 record_mh "MEMORY_PATH=${MEM_PATH}"
+if [[ -n "$TENANT" ]]; then
+  record_mh "MEMORY_TENANT=${TENANT}"
+fi
 
 # Hub fallback allowed?
 HUB_OK=0
@@ -140,20 +147,38 @@ log "No local memory yet at ${REPO}/${LOCAL_MEM} (HTTP ${HTTP:-?})"
 # Still try F64 rules even when MEMORY.md is missing
 preload_fp_rules || true
 
-# 2) Hub fallback when opted in
+# 2) Hub fallback when opted in (F65: optional tenants/{tenant}/repos/{slug})
 if [[ "$HUB_OK" == "1" ]]; then
   SLUG="$(printf '%s' "$REPO" | sed 's|/|--|g')"
-  HUB_MEM="memory/repos/${SLUG}/MEMORY.md"
+  if [[ -n "$TENANT" ]]; then
+    HUB_BASE="memory/tenants/${TENANT}/repos/${SLUG}"
+  else
+    HUB_BASE="memory/repos/${SLUG}"
+  fi
+  HUB_MEM="${HUB_BASE}/MEMORY.md"
   fetch_raw "$HUB_REPO" "$HUB_MEM"
   if [[ "$HTTP" == "200" && -s "$TMP" ]]; then
     merge_into_hermes
     notice "Preloaded hub memory: ${HUB_REPO}/${HUB_MEM} ($(wc -c <"$LOCAL_DEST" | tr -d ' ') bytes)"
     record_mh "MEMORY_SOURCE=hub"
+    # F64/F65: also pull structured fp-rules from the same hub tree
+    HUB_FP="${HUB_BASE}/fp-rules.json"
+    fetch_raw "$HUB_REPO" "$HUB_FP"
+    if [[ "$HTTP" == "200" && -s "$TMP" ]]; then
+      mkdir -p "$HERMES_HOME/memories"
+      cp -f "$TMP" "$HERMES_HOME/memories/fp-rules.json"
+      if [[ -n "${OUT_DIR:-}" ]]; then
+        mkdir -p "$OUT_DIR"
+        cp -f "$TMP" "$OUT_DIR/fp-rules.json"
+      fi
+      notice "Preloaded hub F64 fp-rules: ${HUB_REPO}/${HUB_FP}"
+      record_mh "FP_RULES=hub"
+    fi
     echo "HUB_MEMORY=preloaded"
     rm -f "$TMP"
     exit 0
   fi
-  log "No hub memory for ${SLUG} (HTTP ${HTTP:-?}); using seed/local only"
+  log "No hub memory for ${HUB_BASE} (HTTP ${HTTP:-?}); using seed/local only"
   record_mh "MEMORY_SOURCE=missing"
   echo "HUB_MEMORY=missing"
 else

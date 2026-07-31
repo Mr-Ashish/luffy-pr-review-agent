@@ -345,6 +345,15 @@ REGISTRY: list[ToggleSpec] = [
         "Write run under local .luffy/ memory layout",
         "F28",
     ),
+    ToggleSpec(
+        "memory_tenant",
+        "LUFFY_MEMORY_TENANT",
+        "str",
+        "",
+        "memory",
+        "F65 multi-tenant hub namespace (memory/tenants/{id}/repos/…); empty = classic shared layout",
+        "F65",
+    ),
     # --- numeric knobs (still registry-documented) ---
     ToggleSpec(
         "issue_context_max",

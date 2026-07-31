@@ -1,6 +1,11 @@
 # Luffy on Modal
 
-GitHub Actions is the legacy doorbell + kitchen. Modal is the new kitchen (and webhook doorbell).
+**F66:** Modal is the **default prod live e2e host** for hub-operated reviews
+(cheap bit-3 worker + optional webhook). GitHub Actions remains the doorbell
+for installed target repos (`@luffy review`); Modal is the kitchen for
+operator-driven multi-repo scoring (milvus corpus, dogfood).
+
+GitHub Actions = legacy doorbell + kitchen. Modal = prod kitchen (+ webhook doorbell).
 
 ## Setup (once)
 
