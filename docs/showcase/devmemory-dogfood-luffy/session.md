@@ -7,18 +7,20 @@
 
 ## Transcript / notes
 
-# dogfood-luffy-session
+# Luffy dogfood session — F51 tool depth (H26)
 
-## Session notes (H22)
-- Ran F49 mini e2e on Mr-Ashish/odoo#5 (POS ticket screen, port of odoo#279360).
-- tool_turns recovered 0→8 via LUFFY_TOOL_TURNS_REPROMPT=1; F45 gate skipped; soul_blocked=0.
-- Score 37/50; APPROVE 92; ~$0.028 · 56s; sessions 20260731_223146_62f430 → 20260731_223158_96a569.
-- Corpus fully scored: #1 35, #2 GHA 40 / F49 36, #3 39, #4 F49 38, #5 F49 37.
-- Next highest ROI: H20 severity calibration (missing tests blocking) or H23 sixth upstream PR.
+## Shipped
+- F51: tool-depth nudge after F49 soft re-prompt (H26)
+- Evidence: odoo eval #6 F49 recovered 0→1 tools but only `head -80` on large misc.py; never read street_split ~L1925; score 34/50 D8=2
+- Fix: build_reprompt_suffix + review-prompt Workspace + SOUL Scope require diff hunks / rg + line-range on changed symbols; forbid head-only large-file reads
+- Tests: test_tool_turns_gate tool_depth_h26; SOUL preflight clean
+- SHA: d27b477 on origin/main
 
-## Shipped F50 / H20 severity calibration
-- Gate: scripts/severity_calibration.py upgrades APPROVE→REQUEST CHANGES when review self-reports test gaps
-- Evidence: odoo e2e #2 F49 APPROVE 95 with format:false test suggestion vs GHA REQUEST CHANGES
-- Offline re-score: #2 36→42/50, #5 37→40/50 (#4 clean no-op)
-- Env LUFFY_SEVERITY_CALIBRATION default on; score cap 69; pack chip sev-cal
+## Next
+- H27 live mini re-score #6 under F51
+- H25 source 7th complex odoo/odoo PR
+
+## Ops
+- Corpus: 6 luffy-eval PRs on Mr-Ashish/odoo all scored
+- No .env committed
 

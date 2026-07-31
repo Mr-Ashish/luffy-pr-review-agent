@@ -1,27 +1,15 @@
 {
   "stats": {
-    "files": 3,
-    "lines_added": 8,
-    "lines_removed": 1,
-    "changes": 3
+    "files": 1,
+    "lines_added": 2,
+    "lines_removed": 0,
+    "changes": 1
   },
   "files": [
     {
-      "path": "DEV.md",
+      "path": "agent/DEV.md",
       "is_new": false,
-      "lines_added": 0,
-      "lines_removed": 1
-    },
-    {
-      "path": "USAGE.md",
-      "is_new": false,
-      "lines_added": 4,
-      "lines_removed": 0
-    },
-    {
-      "path": "ui/review-console/DEV.md",
-      "is_new": false,
-      "lines_added": 4,
+      "lines_added": 2,
       "lines_removed": 0
     }
   ]

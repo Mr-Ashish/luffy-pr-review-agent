@@ -1,29 +1,11 @@
 [
   {
-    "path": "DEV.md",
-    "kind": "dev",
-    "action": "scrub",
-    "section": "Design decisions",
-    "bytes": 29749,
-    "applied": true,
-    "unit_path": "."
-  },
-  {
-    "path": "USAGE.md",
-    "kind": "usage",
-    "action": "merge",
-    "section": "Common commands",
-    "bytes": 27004,
-    "applied": true,
-    "unit_path": "."
-  },
-  {
-    "path": "ui/review-console/DEV.md",
+    "path": "agent/DEV.md",
     "kind": "dev",
     "action": "merge",
     "section": "Design decisions",
-    "bytes": 1253,
+    "bytes": 7115,
     "applied": true,
-    "unit_path": "ui/review-console"
+    "unit_path": "agent"
   }
 ]
