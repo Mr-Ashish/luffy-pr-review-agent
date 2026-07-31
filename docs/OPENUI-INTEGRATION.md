@@ -206,6 +206,6 @@ pr-review-agent/
 | 0 Research & plan | **done** |
 | 1 Converter + tests + fixture | **done** (`scripts/review-to-openui.py`, showcase fixture) |
 | 2 Review console shell | **done** (`ui/review-console`, `npm run build` green) |
-| 3 Real artifacts | pending (paste/upload path) |
-| 4 Trigger + e2e odoo | pending |
-| 5 Docs complete | in progress |
+| 3 Real artifacts | **partial** (paste + load `.openui` in console; converter for any review.md) |
+| 4 Trigger + e2e odoo | pending (wire Modal/local trigger from UI) |
+| 5 Docs complete | **done** for Phases 0–3 (README/ARCHITECTURE/USAGE/OPENUI/MODAL) |
