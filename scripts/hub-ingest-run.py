@@ -120,7 +120,63 @@ def write_run_pack(repo_dir: Path, run: dict, source_repo: str, slug: str | None
         existing = existing.rstrip() + "\n\n" + memory_block.strip() + "\n"
     existing = rotate_memory(existing, MAX_MEMORY_BYTES)
     memory_file.write_text(existing)
+
+    # F64: merge durable structured FP rules (self-learn store)
+    fp_rules = run.get("fp_rules")
+    if isinstance(fp_rules, dict) or isinstance(fp_rules, list):
+        merge_fp_rules_file(repo_dir / "fp-rules.json", fp_rules)
+
     return memory_file, run_dir, meta
+
+
+def merge_fp_rules_file(path: Path, incoming: dict | list) -> None:
+    """Upsert F64 fp-rules.json under memory root (local .luffy or hub repo dir)."""
+    rules_in: list = []
+    if isinstance(incoming, dict):
+        rules_in = list(incoming.get("rules") or [])
+    elif isinstance(incoming, list):
+        rules_in = list(incoming)
+    if not rules_in:
+        return
+
+    existing_rules: list = []
+    if path.is_file():
+        try:
+            prev = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+            if isinstance(prev, dict):
+                existing_rules = list(prev.get("rules") or [])
+            elif isinstance(prev, list):
+                existing_rules = list(prev)
+        except json.JSONDecodeError:
+            existing_rules = []
+
+    def _key(r: dict) -> str:
+        path_s = str(r.get("path") or "")
+        line = r.get("line")
+        kind = str(r.get("kind") or "false_positive")
+        return f"{kind}|{path_s}:{line if line is not None else ''}"
+
+    prio = {"thread_reply": 0, "issue_comment": 1, "rules": 2, "memory": 3}
+    best: dict[str, dict] = {}
+    for r in existing_rules + rules_in:
+        if not isinstance(r, dict):
+            continue
+        k = _key(r)
+        if k not in best:
+            best[k] = r
+            continue
+        old = best[k]
+        if prio.get(str(r.get("source") or ""), 9) < prio.get(str(old.get("source") or ""), 9):
+            best[k] = r
+    merged = list(best.values())
+    doc = {
+        "schema_version": 1,
+        "feature": "F64",
+        "count": len(merged),
+        "rules": merged,
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
 
 
 def update_hub_index(root: Path, meta: dict) -> None:

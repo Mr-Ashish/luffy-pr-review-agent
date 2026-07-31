@@ -8,6 +8,7 @@ Deterministic control plane (no LLM):
   4. Merge with existing MEMORY.md ``## FP patterns`` section
   5. Inject a trusted prompt section: do not re-raise without new evidence
   6. Persist structured FP bullets into MEMORY.md after a successful review
+  7. F64: durable `.luffy/fp-rules.json` (structured self-learn store)
 
 Usage:
   python3 scripts/fp_resolve_memory.py classify --body "not a bug, by design"
@@ -24,6 +25,7 @@ Env:
   LUFFY_FP_RESOLVE_MAX      max patterns kept (default 24)
   LUFFY_FP_RESOLVE_FIXTURE  path to JSON list of review comments (no network)
   LUFFY_FP_RESOLVE_ISSUE_FIXTURE  optional PR conversation comments JSON
+  LUFFY_FP_RULES_FILE            path to durable fp-rules.json (F64)
   GH_TOKEN for live fetch
 """
 
@@ -133,6 +135,112 @@ def max_patterns() -> int:
         return max(1, min(80, int(os.environ.get("LUFFY_FP_RESOLVE_MAX") or _DEFAULT_MAX)))
     except ValueError:
         return _DEFAULT_MAX
+
+
+
+RULES_SCHEMA_VERSION = 1
+RULES_FILENAME = "fp-rules.json"
+
+
+def rules_path_candidates(memory_path: Path | None = None, out_dir: Path | None = None) -> list[Path]:
+    """Ordered candidates for durable F64 fp-rules.json."""
+    out: list[Path] = []
+    env = (os.environ.get("LUFFY_FP_RULES_FILE") or "").strip()
+    if env:
+        out.append(Path(env))
+    if out_dir is not None:
+        out.append(Path(out_dir) / RULES_FILENAME)
+        out.append(Path(out_dir) / "fp-resolve-rules.json")
+    hermes = os.environ.get("HERMES_HOME", "")
+    if hermes:
+        out.append(Path(hermes) / "memories" / RULES_FILENAME)
+    if memory_path is not None:
+        mp = Path(memory_path)
+        out.append(mp.parent / RULES_FILENAME if mp.name.lower().endswith(".md") else mp / RULES_FILENAME)
+    mem_root = (os.environ.get("LUFFY_MEMORY_PATH") or ".luffy").strip()
+    out.append(Path(mem_root) / RULES_FILENAME)
+    # de-dupe preserve order
+    seen: set[str] = set()
+    uniq: list[Path] = []
+    for c in out:
+        k = str(c)
+        if k not in seen:
+            seen.add(k)
+            uniq.append(c)
+    return uniq
+
+
+def patterns_from_rules_file(path: Path | None) -> list["FpPattern"]:
+    if not path or not Path(path).is_file():
+        return []
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8", errors="replace"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    rules = data.get("rules") if isinstance(data, dict) else data
+    if not isinstance(rules, list):
+        return []
+    out: list[FpPattern] = []
+    for x in rules:
+        if not isinstance(x, dict):
+            continue
+        line = x.get("line")
+        try:
+            line_i = int(line) if line is not None and str(line).strip() != "" else None
+        except (TypeError, ValueError):
+            line_i = None
+        out.append(
+            FpPattern(
+                kind=str(x.get("kind") or "false_positive"),
+                path=str(x.get("path") or ""),
+                line=line_i,
+                reason=str(x.get("reason") or ""),
+                pr=str(x.get("pr") or ""),
+                parent_id=x.get("parent_id"),
+                reply_id=x.get("reply_id"),
+                source=str(x.get("source") or "rules"),
+                author=str(x.get("author") or ""),
+            )
+        )
+    return out
+
+
+def load_rules_file(
+    *,
+    memory_path: Path | None = None,
+    out_dir: Path | None = None,
+    explicit: Path | None = None,
+) -> tuple[list["FpPattern"], str]:
+    """Load first existing durable rules file. Returns (patterns, source_path)."""
+    cands: list[Path] = []
+    if explicit is not None:
+        cands.append(Path(explicit))
+    cands.extend(rules_path_candidates(memory_path=memory_path, out_dir=out_dir))
+    for c in cands:
+        if c.is_file():
+            pats = patterns_from_rules_file(c)
+            if pats or c.stat().st_size > 2:
+                return pats, str(c)
+    return [], ""
+
+
+def rules_document(patterns: list["FpPattern"]) -> dict[str, Any]:
+    return {
+        "schema_version": RULES_SCHEMA_VERSION,
+        "feature": "F64",
+        "count": len(patterns),
+        "rules": [p.as_dict() for p in patterns],
+    }
+
+
+def save_rules_file(path: Path, patterns: list["FpPattern"]) -> Path:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # merge with existing on disk
+    existing = patterns_from_rules_file(path)
+    merged = merge_patterns(patterns, existing)
+    path.write_text(json.dumps(rules_document(merged), indent=2) + "\n", encoding="utf-8")
+    return path
 
 
 def is_luffy_inline_body(body: str) -> bool:
@@ -423,7 +531,7 @@ def patterns_from_issue_comments(
 
 def merge_patterns(*groups: list[FpPattern], limit: int | None = None) -> list[FpPattern]:
     """Dedupe by key; prefer thread_reply over issue_comment over memory."""
-    prio = {"thread_reply": 0, "issue_comment": 1, "memory": 2, "": 3}
+    prio = {"thread_reply": 0, "issue_comment": 1, "rules": 2, "memory": 3, "": 4}
     best: dict[str, FpPattern] = {}
     for group in groups:
         for p in group:
@@ -638,13 +746,15 @@ def build_plan(
     review_comments: list[dict[str, Any]] | None = None,
     issue_comments: list[dict[str, Any]] | None = None,
     memory_md: str = "",
+    rules: list[FpPattern] | None = None,
     pr: str = "",
     limit: int | None = None,
 ) -> list[FpPattern]:
     thr = patterns_from_review_comments(review_comments or [], pr=pr)
     iss = patterns_from_issue_comments(issue_comments or [], pr=pr)
     mem = parse_memory_fp_section(memory_md)
-    return merge_patterns(thr, iss, mem, limit=limit)
+    rul = list(rules or [])
+    return merge_patterns(thr, iss, rul, mem, limit=limit)
 
 
 def assemble(
@@ -705,10 +815,18 @@ def assemble(
     except Exception:
         issue_comments = []
 
+    rules_pats, rules_src = load_rules_file(
+        memory_path=Path(memory_path) if memory_path else None,
+        out_dir=out_dir,
+    )
+    if rules_src:
+        mem_src = (mem_src + f"+rules:{rules_src}") if mem_src else f"rules:{rules_src}"
+
     patterns = build_plan(
         review_comments=review_comments,
         issue_comments=issue_comments,
         memory_md=memory_md,
+        rules=rules_pats,
         pr=str(pr),
     )
     sec = render_section(patterns)
@@ -813,10 +931,27 @@ def update_memory(
         render_memory_section(merge_patterns(to_write, parse_memory_fp_section(new_text))),
         encoding="utf-8",
     )
+    # F64: durable structured rules next to MEMORY + OUT_DIR
+    rules_targets = [
+        out_dir / RULES_FILENAME,
+        mem_path.parent / RULES_FILENAME,
+    ]
+    env_rules = (os.environ.get("LUFFY_FP_RULES_FILE") or "").strip()
+    if env_rules:
+        rules_targets.insert(0, Path(env_rules))
+    written_rules = ""
+    for rt in rules_targets:
+        try:
+            save_rules_file(rt, to_write)
+            if not written_rules:
+                written_rules = str(rt)
+        except OSError:
+            continue
     return {
         "updated": "1",
         "count": str(len(to_write)),
         "memory": str(mem_path),
+        "rules": written_rules,
     }
 
 
@@ -836,6 +971,7 @@ def main(argv: list[str] | None = None) -> int:
     pl.add_argument("--comments", type=Path, help="review comments JSON list")
     pl.add_argument("--issue-comments", type=Path, default=None)
     pl.add_argument("--memory", type=Path, default=None)
+    pl.add_argument("--rules", type=Path, default=None, help="F64 fp-rules.json")
     pl.add_argument("--pr", default="")
     pl.add_argument("--json", action="store_true")
 
@@ -868,10 +1004,12 @@ def main(argv: list[str] | None = None) -> int:
         mem = ""
         if args.memory and args.memory.is_file():
             mem = args.memory.read_text(encoding="utf-8", errors="replace")
+        rules = patterns_from_rules_file(args.rules) if getattr(args, "rules", None) else []
         patterns = build_plan(
             review_comments=load_json_list(args.comments),
             issue_comments=load_json_list(args.issue_comments),
             memory_md=mem,
+            rules=rules,
             pr=args.pr,
         )
         if args.json:

@@ -327,5 +327,89 @@ class FindingMatch(unittest.TestCase):
         self.assertIsNone(miss)
 
 
+class RulesFile(unittest.TestCase):
+    def test_save_load_merge(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            rules = td_path / "fp-rules.json"
+            pats = [
+                _mod.FpPattern(
+                    kind="false_positive",
+                    path="a.go",
+                    line=1,
+                    reason="by design",
+                    source="thread_reply",
+                    author="alice",
+                    pr="3",
+                )
+            ]
+            _mod.save_rules_file(rules, pats)
+            loaded, src = _mod.load_rules_file(explicit=rules)
+            self.assertEqual(src, str(rules))
+            self.assertEqual(len(loaded), 1)
+            self.assertEqual(loaded[0].path, "a.go")
+            # second write merges
+            more = [
+                _mod.FpPattern(
+                    kind="resolved",
+                    path="b.go",
+                    line=2,
+                    reason="fixed",
+                    source="thread_reply",
+                )
+            ]
+            _mod.save_rules_file(rules, more)
+            loaded2 = _mod.patterns_from_rules_file(rules)
+            self.assertEqual(len(loaded2), 2)
+
+    def test_update_writes_rules(self):
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            out = td_path / "out"
+            out.mkdir()
+            patterns = [
+                {
+                    "kind": "false_positive",
+                    "path": "z.go",
+                    "line": 9,
+                    "reason": "by design",
+                    "pr": "1",
+                    "source": "thread_reply",
+                    "author": "alice",
+                }
+            ]
+            (out / "fp-resolve.json").write_text(
+                json.dumps(patterns), encoding="utf-8"
+            )
+            mem = td_path / "MEMORY.md"
+            mem.write_text("# Luffy review memory\n\n", encoding="utf-8")
+            os.environ["LUFFY_FP_RESOLVE"] = "1"
+            try:
+                r = _mod.update_memory(out_dir=out, memory_path=mem)
+            finally:
+                os.environ.pop("LUFFY_FP_RESOLVE", None)
+            self.assertEqual(r["updated"], "1")
+            self.assertTrue((out / "fp-rules.json").is_file())
+            self.assertTrue((mem.parent / "fp-rules.json").is_file())
+            doc = json.loads((out / "fp-rules.json").read_text(encoding="utf-8"))
+            self.assertEqual(doc["schema_version"], 1)
+            self.assertEqual(doc["count"], 1)
+            self.assertEqual(doc["rules"][0]["path"], "z.go")
+
+    def test_build_plan_includes_rules(self):
+        rules = [
+            _mod.FpPattern(
+                kind="false_positive",
+                path="c.go",
+                line=3,
+                reason="x",
+                source="rules",
+            )
+        ]
+        plan = _mod.build_plan(rules=rules, memory_md="")
+        self.assertEqual(len(plan), 1)
+        self.assertEqual(plan[0].source, "rules")
+
+
 if __name__ == "__main__":
     unittest.main()
