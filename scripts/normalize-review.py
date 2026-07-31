@@ -24,6 +24,7 @@ REQUIRED_SNIPPETS = (
 SOFT_SECTIONS = (
     "### Walkthrough",
     "### Key findings",
+    "### Multi-lens checklist",
     "### Suggestions",
     "### Code suggestions",
     "### Nits",
@@ -138,6 +139,7 @@ _SECTION_ALIASES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"^#{0,3}\s*Blocking\s*$", re.I | re.M), "### Blocking"),
     (re.compile(r"^#{0,3}\s*Key findings\s*$", re.I | re.M), "### Key findings"),
     (re.compile(r"^#{0,3}\s*Security audit\s*$", re.I | re.M), "### Security audit"),
+    (re.compile(r"^#{0,3}\s*Multi-lens checklist\s*$", re.I | re.M), "### Multi-lens checklist"),
     (re.compile(r"^#{0,3}\s*Suggestions\s*$", re.I | re.M), "### Suggestions"),
     (re.compile(r"^#{0,3}\s*Code suggestions\s*$", re.I | re.M), "### Code suggestions"),
     (re.compile(r"^#{0,3}\s*Nits\s*$", re.I | re.M), "### Nits"),

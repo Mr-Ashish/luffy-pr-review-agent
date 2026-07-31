@@ -844,6 +844,17 @@ None — runner failure.
 ### Security audit
 No
 
+### Multi-lens checklist
+| Lens | Status | Note |
+|------|--------|------|
+| correctness | n/a | runner failure |
+| security | n/a | runner failure |
+| tests | n/a | runner failure |
+| performance | n/a | runner failure |
+| api_contracts | n/a | runner failure |
+| concurrency | n/a | runner failure |
+| maintainability | n/a | runner failure |
+
 ### Suggestions
 - None
 

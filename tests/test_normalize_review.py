@@ -235,5 +235,39 @@ class NormalizeReviewTests(unittest.TestCase):
         self.assertNotIn("contract repair", out.lower())
 
 
+    def test_multi_lens_section_alias(self):
+        """F52/H28: promote Multi-lens checklist heading to ### form."""
+        raw = (
+            "## Luffy Review — PR #6\n\n"
+            "**Verdict:** APPROVE\n"
+            "**Confidence:** high\n"
+            "**Score:** 90/100\n"
+            "**Review effort:** 2/5\n\n"
+            "### Summary\nOk.\n\n"
+            "### Blocking\nNone\n\n"
+            "### Security audit\nNo\n\n"
+            "Multi-lens checklist\n"
+            "| Lens | Status | Note |\n"
+            "|------|--------|------|\n"
+            "| correctness | ok | regex + tests |\n"
+            "| security | n/a | no user input path |\n"
+            "| tests | ok | unit fixtures |\n"
+            "| performance | n/a | |\n"
+            "| api_contracts | n/a | |\n"
+            "| concurrency | n/a | |\n"
+            "| maintainability | ok | complex regex |\n\n"
+            "### Tests & risk\n"
+            "- Relevant tests added/updated: yes\n"
+            "- Coverage: unit\n"
+            "- Risk: low — n/a\n"
+            "- Rollback: easy\n\n"
+            "### What I checked\n- street_split\n"
+        )
+        out = self.run_norm(raw, pr="6")
+        self.assertIn("### Multi-lens checklist", out)
+        self.assertIn("correctness", out)
+
+
+
 if __name__ == "__main__":
     unittest.main()
