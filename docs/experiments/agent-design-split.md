@@ -1,6 +1,6 @@
 # Agent design split — tool vs code vs prompt vs MD
 
-**Updated:** 2026-07-31 (F56)  
+**Updated:** 2026-07-31 (F57)  
 **Principle:** deterministic work → scripts; judgment → lean prompts; persona/lenses → MD; config → toggles.
 
 | Feature | Code / scripts | Prompt / intelligence | MD / agent files | Toggles / config |

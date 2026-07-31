@@ -127,6 +127,7 @@ RUNTIME_SCRIPTS=(
   run-luffy-review.sh
   run-with-timeout.py
   max_turns.py
+  mermaid_architecture.py
   model_tier.py
   preflight_cost.py
   tool_turns_gate.py

@@ -181,6 +181,24 @@ REGISTRY: list[ToggleSpec] = [
         "Active lens recipe pack id (default|security|docs|odoo|performance)",
         "F56",
     ),
+    ToggleSpec(
+        "mermaid",
+        "LUFFY_MERMAID",
+        "bool",
+        True,
+        "product",
+        "Inject auto Mermaid architecture diagram from changed files",
+        "F57",
+    ),
+    ToggleSpec(
+        "mermaid_max_nodes",
+        "LUFFY_MERMAID_MAX_NODES",
+        "int",
+        24,
+        "product",
+        "Max nodes in auto Mermaid architecture diagram",
+        "F57",
+    ),
     # --- quality / agent ---
     ToggleSpec(
         "soul_scan",
