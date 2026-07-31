@@ -134,6 +134,7 @@ RUNTIME_SCRIPTS=(
   preflight_cost.py
   pr_description_filler.py
   testplan_generation.py
+  fp_resolve_memory.py
   tool_turns_gate.py
   severity_calibration.py
   soul_context_scan.py

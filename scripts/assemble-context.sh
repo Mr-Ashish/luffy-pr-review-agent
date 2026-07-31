@@ -371,6 +371,25 @@ try:
 except Exception:
     testplan_on = "0"
 
+# F62: false-positive resolve + memory patterns (soft; pure code)
+fp_resolve_on = "0"
+fp_resolve_count = "0"
+try:
+    import sys as _sys5
+    _sys5.path.insert(0, str(luffy_root / "scripts"))
+    from fp_resolve_memory import assemble as fp_assemble  # type: ignore
+
+    _fp = fp_assemble(
+        repo=str(repo),
+        pr=str(pr_number),
+        out_dir=out_dir,
+        prompt_path=Path(os.environ["PROMPT_PATH"]),
+    )
+    fp_resolve_on = str(_fp.get("enabled") or "0")
+    fp_resolve_count = str(_fp.get("count") or "0")
+except Exception:
+    fp_resolve_on = "0"
+
 # Shell-safe meta for later steps
 meta = {
     "REPO": repo,
@@ -397,6 +416,8 @@ meta = {
     "PR_DESCRIPTION_ACTION": pr_desc_action,
     "TESTPLAN": testplan_on,
     "TESTPLAN_CASES": testplan_cases,
+    "FP_RESOLVE": fp_resolve_on,
+    "FP_RESOLVE_COUNT": fp_resolve_count,
 }
 with open(os.environ["META_PATH"], "w") as fh:
     for k, v in meta.items():

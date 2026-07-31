@@ -80,6 +80,13 @@ export REVIEW_FILE
 
 if [[ $ORCH_RC -eq 0 ]]; then
   stage distill "$SCRIPTS/distill-memory.sh" || true
+  # F62: persist author FP/resolve signals into MEMORY.md (after distill)
+  if [[ -f "$SCRIPTS/fp_resolve_memory.py" ]]; then
+    stage fp_resolve_update \
+      python3 "$SCRIPTS/fp_resolve_memory.py" update \
+        --out-dir "$OUT_DIR" \
+        --memory "${HERMES_HOME}/memories/MEMORY.md" || true
+  fi
 fi
 
 # Build timings.json

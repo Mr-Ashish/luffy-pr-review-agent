@@ -14,6 +14,7 @@
 ## Design decisions
 
 - **F61 suggested test plan:** `scripts/testplan_generation.py` builds prioritized (P0/P1/P2) concrete scenarios from `pr.json` + optional unified diff (symbol extract for Go/Py/JS/Rust). Assemble writes `testplan.md` and injects into the prompt; post-normalize soft-injects `### Suggested test plan` when the model omits/empties it. Toggle `LUFFY_TESTPLAN` / F55 keys `testplan`, `testplan_max_cases`. Pure code — judgment only refines.
+- **F62 FP resolve + memory:** `scripts/fp_resolve_memory.py` mines author replies on Luffy inline threads (and path-citing PR comments) for false-positive / resolved language, merges MEMORY.md `## FP patterns`, injects a trusted prompt table at assemble, and updates Hermes MEMORY after distill. Toggle `LUFFY_FP_RESOLVE` / `fp_resolve`, `fp_resolve_max`. Deterministic — judgment only re-raises with new evidence.
 
 - **F59 incremental review:** opt-in `LUFFY_INCREMENTAL=1`. `scripts/incremental_review.py` reads prior Luffy comment markers for `head=SHA`, then rewrites `pr.diff` to `base...head` compare patch. Markers gain `head=` via normalize `--head-sha`. Default off (full PR diff).
 

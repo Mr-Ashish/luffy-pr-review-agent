@@ -1,6 +1,6 @@
 # Agent design split — tool vs code vs prompt vs MD
 
-**Updated:** 2026-07-31 (F59)  
+**Updated:** 2026-08-01 (F62)  
 **Principle:** deterministic work → scripts; judgment → lean prompts; persona/lenses → MD; config → toggles.
 
 | Feature | Code / scripts | Prompt / intelligence | MD / agent files | Toggles / config |
@@ -12,10 +12,11 @@
 | F50 severity | `severity_calibration.py` | model-assigned severity | SOUL scale | `severity_calibration` |
 | F45/F49 tool turns | gate + reprompt scripts | whether re-ask is needed | — | `tool_turns_gate`, `tool_turns_reprompt` |
 | F55 toggles | **`feature_toggles.py` registry + resolve** | none | DEV.md split note | `.luffy/toggles.json` + env |
-| Federated memory | publish/ingest I/O scripts | light apply of FP patterns | MEMORY.seed principles | `hub_publish`, `local_publish` |
+| Federated memory | publish/ingest I/O + F62 FP section | light apply of FP patterns | MEMORY.seed + `## FP patterns` | `hub_publish`, `local_publish`, `fp_resolve` |
 | F60 reply on thread | `reply_on_thread.py` match+`in_reply_to` | — | inline markers | `reply_on_thread` |
 | Mermaid / filler / incremental / testplan | scripts first (F57–F61) | judgment only where needed | thin recipes | new registry entries |
 | F61 testplan generation | `testplan_generation.py` files+diff→P0/P1/P2 cases | refine / drop-with-reason | `### Suggested test plan` | `testplan`, `testplan_max_cases` |
+| F62 FP resolve + memory | `fp_resolve_memory.py` classify/mine/merge | re-raise only with new evidence | MEMORY `## FP patterns` + review-prompt | `fp_resolve`, `fp_resolve_max` |
 
 ## Hermes boundary (research note)
 

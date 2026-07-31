@@ -9,6 +9,7 @@ Maps Key findings (+ Blocking bullets) onto lines in pr.diff:
         (multi-line when the suggestion's `-` lines match PR `+` lines)
   F54 — per finding: copy-pasteable Fix-it agent prompt (Claude Code ready)
   F60 — re-review: reply in existing Luffy inline threads (in_reply_to)
+  F62 — skip planned findings that match known FP/resolved patterns
 
 Usage:
   python3 scripts/post-inline-comments.py plan \\
@@ -892,6 +893,69 @@ def main(argv: list[str] | None = None) -> int:
 
     comments = plan_comments(review_md, diff_text, max_n=max_n, severities=sev)
 
+    # F62: drop planned findings that match known FP/resolved patterns (soft)
+    fp_suppressed = 0
+    try:
+        from fp_resolve_memory import (  # type: ignore
+            enabled as _fp_enabled,
+            build_plan as _fp_build,
+            FpPattern,
+        )
+
+        if _fp_enabled():
+            patterns: list[Any] = []
+            # Prefer assemble artifact
+            for cand in (
+                Path(os.environ.get("OUT_DIR") or "") / "fp-resolve.json",
+                Path("fp-resolve.json"),
+            ):
+                if cand.is_file():
+                    try:
+                        raw = json.loads(cand.read_text(encoding="utf-8"))
+                        patterns = [
+                            FpPattern(
+                                kind=str(x.get("kind") or "false_positive"),
+                                path=str(x.get("path") or ""),
+                                line=x.get("line"),
+                                reason=str(x.get("reason") or ""),
+                                pr=str(x.get("pr") or ""),
+                                source=str(x.get("source") or ""),
+                                author=str(x.get("author") or ""),
+                            )
+                            for x in raw
+                            if isinstance(x, dict)
+                        ]
+                        break
+                    except (OSError, json.JSONDecodeError, TypeError):
+                        patterns = []
+            if patterns:
+                kept: list[dict[str, Any]] = []
+                for c in comments:
+                    if c.get("kind") == "suggestion":
+                        kept.append(c)
+                        continue
+                    path = str(c.get("path") or "")
+                    line = c.get("line")
+                    blob = f"`{path}:{line}` {c.get('body') or ''}" if line else f"`{path}` {c.get('body') or ''}"
+                    hit = None
+                    for p in patterns:
+                        if not p.path:
+                            continue
+                        if normalize_path(p.path) != normalize_path(path):
+                            continue
+                        if p.line is not None and line is not None and int(p.line) != int(line):
+                            if p.kind != "false_positive":
+                                continue
+                        hit = p
+                        break
+                    if hit is not None:
+                        fp_suppressed += 1
+                        continue
+                    kept.append(c)
+                comments = kept
+    except Exception:
+        fp_suppressed = 0
+
     if args.cmd == "plan":
         print(
             json.dumps(
@@ -902,6 +966,7 @@ def main(argv: list[str] | None = None) -> int:
                     "suggestions": sum(1 for c in comments if c.get("kind") == "suggestion"),
                     "fixit": sum(1 for c in comments if c.get("fixit")),
                     "fixit_enabled": fixit_prompts_enabled_from_env(),
+                    "fp_suppressed": fp_suppressed,
                     "comments": comments,
                     "files_in_diff": len(first_added_lines(diff_text)),
                 },
@@ -915,7 +980,16 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"ok": True, "skipped": "LUFFY_INLINE_COMMENTS off", "posted": 0}))
         return 0
     if not comments:
-        print(json.dumps({"ok": True, "posted": 0, "skipped": "no mappable findings"}))
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "posted": 0,
+                    "skipped": "no mappable findings",
+                    "fp_suppressed": fp_suppressed,
+                }
+            )
+        )
         return 0
 
     # F60: split into thread replies vs new top-level inlines
