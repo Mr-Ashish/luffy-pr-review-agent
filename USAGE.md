@@ -317,6 +317,10 @@ REPO=owner/name HERMES_HOME=/tmp/hh LUFFY_MEMORY_MODE=local bash scripts/preload
 - Matching is `fnmatch`-based, so glob depth is literal: the `docs` preset ships both `docs/**` and `**/docs/**` because a top-level-only pattern will not match nested `pkg/docs/…`. Add both shapes when writing custom globs for a monorepo.
 - Extension globs in the preset are unanchored (`*.md`, `*.mdx`, `*.rst`, `*.txt`, `*.adoc`) — a `.txt` fixture inside `src/` counts as skippable, so audit `matched_n`/`sample` output before trusting the preset on a mixed repo.
 
+- Reproduce an argv-shape regression in isolation before blaming Hermes: `hermes -z "hello" --max-turns 25` reproduces the argparse error, and the same command without the flag runs clean.
+- Post-F47, a run that still lands in `hermes chat -q` fallback is **not** a max-turns argv problem — check for real hermes/install/API failures (missing binary, install step, OpenRouter/API errors) and look for `hermes-cli-argv.env` to tell an argv rejection apart from a runtime failure.
+- Triage order for a suspiciously fast/shallow review: confirm `tool_turns` in the run artifacts, then read `hermes-*.stderr` for `invalid choice` / `unrecognized arguments` before trusting `hermes-max-turns.env`, which records the *intended* cap rather than the accepted one.
+
 ## F22/F23 verdict signals
 
 After each run Luffy derives a **verdict signal** from the posted review body:

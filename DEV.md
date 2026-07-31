@@ -127,6 +127,9 @@
 - The normalizer is a **trust boundary**, not a formatter: never accept a body as a valid review contract just because expected snippets/headings appear in it — prompt echo contains all of them. Contract checks must assert the placeholder-free form.
 - `hermes -z` can fail at runtime and fall back to `hermes chat -q` (observed on a cheap run over Mr-Ashish/odoo PR #2); pre-F44 that path would have posted the **entire prompt** as the PR review comment.
 
+- A malformed `hermes -z` argv is silently expensive: argparse exits rc=2, the runner falls back to `hermes chat -q`, and the review completes with **tool_turns=0** (no repo exploration) while still spending. F44 local PR #2 showed exactly this — `hermes-2.stderr` carried `invalid choice: '25'` while `hermes-max-turns.env` reported `max_turns=25`, so the cap looked applied.
+- F47 makes CLI argv rejection a distinct, non-fallback failure class: on `invalid choice` / `unrecognized arguments`, skip the chat fallback and write `hermes-cli-argv.env` instead of burning a zero-tool path.
+
 ## Patterns
 
 - **F27 truncation banner** is mechanical (not model-dependent): `assemble-context` sets `DIFF_TRUNCATED` in `meta.env` → `run-hermes-review.sh` passes `--diff-truncated` → `inject_diff_truncated_banner()` inserts a blockquote before `**Verdict:**`. Idempotent if the model already wrote a similar note. Raising `MAX_DIFF_BYTES` is the operator control; the banner is honesty, not a skip.

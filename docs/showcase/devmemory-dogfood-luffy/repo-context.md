@@ -1,7 +1,7 @@
 # Repository context
 
 - **root:** `/Users/ashishmishra/Documents/experiments/pr-review-agent`
-- **assembled_at:** 2026-07-31T16:20:23Z
+- **assembled_at:** 2026-07-31T16:26:22Z
 
 ## git status
 
@@ -12,11 +12,11 @@
 ## recent log
 
 ```
+9b99910 F47: fix hermes -z reliability (H14) — drop invalid --max-turns CLI flag
+b305fac docs(dogfood): F46 SOUL context scan knowledge + showcase
 b92deb3 fix(F46): keep SOUL.md loadable under Hermes threat scanner (H13)
 0bb9cdb docs(dogfood): F45 tool-turns gate knowledge + showcase refresh
 59ed6aa feat(F45): fail-closed tool_turns=0 gate on multi-file code PRs (H12)
-fd252e6 feat(normalize): F44 strip hermes chat chrome + reject template echo
-a58eb3b docs(knowledge): dogfood F43 preflight cost + showcase
 ```
 
 ## tree (sample)

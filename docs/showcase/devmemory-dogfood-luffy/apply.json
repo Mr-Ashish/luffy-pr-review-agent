@@ -1,10 +1,28 @@
 [
   {
+    "path": "agent/DEV.md",
+    "kind": "dev",
+    "action": "merge",
+    "section": "Design decisions",
+    "bytes": 5371,
+    "applied": true,
+    "unit_path": "agent"
+  },
+  {
+    "path": "DEV.md",
+    "kind": "dev",
+    "action": "merge",
+    "section": "Pitfalls",
+    "bytes": 28475,
+    "applied": true,
+    "unit_path": "."
+  },
+  {
     "path": "USAGE.md",
     "kind": "usage",
     "action": "merge",
-    "section": "Debugging",
-    "bytes": 23920,
+    "section": "Troubleshooting",
+    "bytes": 24679,
     "applied": true,
     "unit_path": "."
   }

@@ -7,34 +7,27 @@
 
 ## Transcript / notes
 
-# dogfood-luffy-session (F44)
+# Dogfood session — F47 hermes -z reliability (H14)
 
-We built and operate Luffy, a comment-triggered PR review agent (Hermes + OpenRouter + hub memory).
+## What shipped
+- **F47 / H14:** Stopped passing `--max-turns N` on the `hermes` CLI in `scripts/run-hermes-review.sh`.
+- Hermes argparse has no `--max-turns` flag; bare `N` was parsed as a subcommand → `invalid choice: '25'` → `hermes -z` rc=2 → forced `hermes chat -q` fallback with **tool_turns=0**.
+- Iteration cap still applied via Hermes-native channels only:
+  - `HERMES_MAX_ITERATIONS=<n>`
+  - `agent.max_turns: <n>` in `$HERMES_HOME/config.yaml`
+- On CLI argv rejection (invalid choice / unrecognized arguments), skip chat fallback and write `hermes-cli-argv.env` so we do not burn a zero-tool spend path.
+- Tests: `tests/test_max_turns.py` asserts hermes -z block never contains `--max-turns` / `MAX_TURNS_ARGS`.
 
-## F44 change
-- `scripts/normalize-review.py` now extracts the real review from `hermes chat -q` chrome.
-- Rejects prompt-template echo with placeholder `**Verdict:** < APPROVE | … >`.
-- Promotes unbolded `Verdict:` / `Summary` headings so parse-verdict and contract checks work.
-- Does not treat bare `───` separators as TUI chrome (models use them between findings).
+## Evidence
+- F44 local PR #2: hermes-2.stderr showed `invalid choice: '25'` then chat fallback; max_turns=25 in hermes-max-turns.env.
+- Repro: `hermes -z "hello" --max-turns 25` → same argparse error; without the flag, no argparse error.
 
-## E2e evidence
-- Multi-PR corpus on Mr-Ashish/odoo PRs #1 #2 #3 (luffy-eval titles).
-- Cheap run on PR #2: hermes -z failed → chat fallback; without F44 would post full prompt.
-- GHA prior review on PR #2 had higher signal (missing format:false tests) than no-tool mini run.
+## Operator notes
+- If a run falls to chat fallback again after F47, look for real hermes/install/API failures — not max-turns argv.
+- Next eval: live cheap mini re-run on Mr-Ashish/odoo#2 (H16) to re-score D1/D8 with tools + F46 SOUL load.
 
-## Durable lessons
-- Normalizer is a trust boundary: never treat prompt-echo as valid contract just because snippets match.
-- tool_turns=0 on multi-file PRs is a quality smell for agentic review product.
-- SOUL.md can be blocked by Hermes prompt_injection scanner — needs a P1 workaround.
-
-## F45 tool-turns gate (H12)
-When Hermes records tool_turns=0 on a multi-file non-docs PR, Luffy fail-closes:
-scripts/tool_turns_gate.py downgrades APPROVE to COMMENT, caps score at 55,
-injects F45 banner, writes tool-turns-gate.env. Docs-only and single-file exempt.
-LUFFY_TOOL_TURNS_GATE=off disables. Evidence from odoo e2e PR #2 mini vs GHA.
-
-## F46 SOUL context scan (H13)
-Hermes blocks SOUL.md when it matches threat patterns (prompt_injection).
-Luffy rephrased agent/SOUL.md trust model to avoid quoting classic injection phrases.
-scripts/soul_context_scan.py check/detect; soul-context.env; pack chip soul-blocked.
+## Corpus
+- https://github.com/Mr-Ashish/odoo/pull/1
+- https://github.com/Mr-Ashish/odoo/pull/2
+- https://github.com/Mr-Ashish/odoo/pull/3
 
