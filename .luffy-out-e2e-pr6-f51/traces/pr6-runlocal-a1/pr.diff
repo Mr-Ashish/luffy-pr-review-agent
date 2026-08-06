@@ -1,0 +1,895 @@
+diff --git a/addons/base_address_extended/tests/test_street_fields.py b/addons/base_address_extended/tests/test_street_fields.py
+index a540d8dd7c3a2e..5780d2bc411509 100644
+--- a/addons/base_address_extended/tests/test_street_fields.py
++++ b/addons/base_address_extended/tests/test_street_fields.py
+@@ -13,29 +13,35 @@ def test_partner_create(self):
+         partner = self.env['res.partner'].create({'name': 'Test Address', 'country_id': mx_id})
+ 
+         values = [
+-            ['', '', '', ''],
+-            ['Place Royale', 'Place Royale', '', ''],
+-            ['Chaussee de Namur 40a - 2b', 'Chaussee de Namur', '40a', '2b'],
+-            ['Chaussee de Namur 1', 'Chaussee de Namur', '1', ''],
+-            ['40 Chaussee de Namur', '40 Chaussee de Namur', '', ''],
+-            ['Chaussee de Namur, 40 - Apt 2b', 'Chaussee de Namur,', '40', 'Apt 2b'],
+-            ['header Chaussee de Namur, 40 trailer ', 'header Chaussee de Namur, 40 trailer', '', ''],
+-            ['\nCl 53\n # 43 - 81', 'Cl 53\n #', '43', '81'],
+-            ['Street Line 1\nNumber Line 2 44 76', 'Street Line 1\nNumber Line 2 44', '76', ''],
++            ['', '', '', '', ''],
++            ['Place Royale', 'Place Royale', '', '', 'Place Royale'],
++            ['Chaussee de Namur 40a - 2b', 'Chaussee de Namur', '40a', '2b', 'Chaussee de Namur 40a - 2b'],
++            ['Chaussee de Namur 1', 'Chaussee de Namur', '1', '', 'Chaussee de Namur 1'],
++            ['40 Chaussee de Namur', 'Chaussee de Namur', '40', '', 'Chaussee de Namur 40'],
++            ['Chaussee de Namur, 40 - Apt 2b', 'Chaussee de Namur', '40', 'Apt 2b', 'Chaussee de Namur 40 - Apt 2b'],
++            ['header Chaussee de Namur, 40 trailer ', 'header Chaussee de Namur', '40', '', 'header Chaussee de Namur 40'],
++            ['\nCl 53\n # 43 - 81', 'Cl 53\n #', '43', '81', 'Cl 53\n # 43 - 81'],
++            ['Street Line 1\nNumber Line 2 44 76', 'Street Line 1\nNumber Line 2 44', '76', '', 'Street Line 1\nNumber Line 2 44 76'],
++            ['1600 Pennsylvania Ave NW, Apt 4B', 'Pennsylvania Ave NW', '1600', 'Apt 4B', 'Pennsylvania Ave NW 1600 - Apt 4B'],
++            ['10, Rue de la Paix', 'Rue de la Paix', '10', '', 'Rue de la Paix 10'],
++            ['Calle Gran Vía, 42, 3º Dcha', 'Calle Gran Vía', '42', '3º Dcha', 'Calle Gran Vía 42 - 3º Dcha'],
++            ['Jean-Baptiste-Lebas 12 - A-3', 'Jean-Baptiste-Lebas', '12', 'A-3', 'Jean-Baptiste-Lebas 12 - A-3'],
++            ['Jean-Baptiste-Lebas, 12 / A-3', 'Jean-Baptiste-Lebas', '12', 'A-3', 'Jean-Baptiste-Lebas 12 - A-3'],
++            ['1-7-1 Nagatacho, Chiyoda-ku, Apt 3', 'Nagatacho, Chiyoda-ku', '1-7-1', 'Apt 3', 'Nagatacho, Chiyoda-ku 1-7-1 - Apt 3'],
+         ]
+ 
+-        for street, name, number, number2 in values:
++        for street, name, number, number2, _computed_street in values:
+             # test street -> street values (compute)
+             partner.street = street
+             self.assertEqual(partner.street_name, name, 'Wrongly formatted street name: expected %s, received %s' % (name, partner.street_name))
+             self.assertEqual(partner.street_number, number, 'Wrongly formatted street number: expected %s, received %s' % (number, partner.street_number))
+             self.assertEqual(partner.street_number2, number2, 'Wrongly formatted street number2: expected %s, received %s' % (number2, partner.street_number2))
+ 
+-        for street, name, number, number2 in values:
++        for _street, name, number, number2, computed_street in values:
+             partner.street_number2 = number2
+             partner.street_number = number
+             partner.street_name = name
+-            self.assertEqual(partner.street, street.strip(), 'Wrongly formatted street: expected %s, received %s' % (street, partner.street))
++            self.assertEqual(partner.street, computed_street, 'Wrongly formatted street: expected %s, received %s' % (street, partner.street))
+ 
+     def test_child_sync(self):
+         """ Test that city_id is propagated to (contact-type) children contacts. """
+diff --git a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_child_partner.xml b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_child_partner.xml
+index 0d2a63d01964a0..ec952928703f28 100644
+--- a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_child_partner.xml
++++ b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_child_partner.xml
+@@ -33,7 +33,7 @@
+             </cac:PartyName>
+             <cac:PostalAddress>
+                 <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-                <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++                <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+                 <cbc:BuildingNumber>10</cbc:BuildingNumber>
+                 <cbc:CityName>Aalborg</cbc:CityName>
+                 <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -47,7 +47,7 @@
+                 <cbc:CompanyID schemeID="DK:SE">DK12345674</cbc:CompanyID>
+                 <cac:RegistrationAddress>
+                     <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-                    <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++                    <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+                     <cbc:BuildingNumber>10</cbc:BuildingNumber>
+                     <cbc:CityName>Aalborg</cbc:CityName>
+                     <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -66,7 +66,7 @@
+                 <cbc:CompanyID schemeID="DK:CVR">DK12345674</cbc:CompanyID>
+                 <cac:RegistrationAddress>
+                     <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-                    <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++                    <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+                     <cbc:BuildingNumber>10</cbc:BuildingNumber>
+                     <cbc:CityName>Aalborg</cbc:CityName>
+                     <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -94,7 +94,7 @@
+             </cac:PartyName>
+             <cac:PostalAddress>
+                 <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-                <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++                <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+                 <cbc:BuildingNumber>10</cbc:BuildingNumber>
+                 <cbc:CityName>Eghezee</cbc:CityName>
+                 <cbc:PostalZone>6870</cbc:PostalZone>
+@@ -108,7 +108,7 @@
+                 <cbc:CompanyID schemeID="ZZZ">BE0897223670</cbc:CompanyID>
+                 <cac:RegistrationAddress>
+                     <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-                    <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++                    <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+                     <cbc:BuildingNumber>10</cbc:BuildingNumber>
+                     <cbc:CityName>Eghezee</cbc:CityName>
+                     <cbc:PostalZone>6870</cbc:PostalZone>
+@@ -127,7 +127,7 @@
+                 <cbc:CompanyID schemeID="ZZZ">BE0897223670</cbc:CompanyID>
+                 <cac:RegistrationAddress>
+                     <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-                    <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++                    <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+                     <cbc:BuildingNumber>10</cbc:BuildingNumber>
+                     <cbc:CityName>Eghezee</cbc:CityName>
+                     <cbc:PostalZone>6870</cbc:PostalZone>
+@@ -147,7 +147,7 @@
+         <cac:DeliveryLocation>
+             <cac:Address>
+                 <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-                <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++                <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+                 <cbc:BuildingNumber>10</cbc:BuildingNumber>
+                 <cbc:CityName>Eghezee</cbc:CityName>
+                 <cbc:PostalZone>6870</cbc:PostalZone>
+diff --git a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_discount.xml b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_discount.xml
+index ab9eaf2228df4c..5d509797931e48 100644
+--- a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_discount.xml
++++ b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_discount.xml
+@@ -30,7 +30,7 @@
+       </cac:PartyName>
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -44,7 +44,7 @@
+         <cbc:CompanyID schemeID="DK:SE">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -63,7 +63,7 @@
+         <cbc:CompanyID schemeID="DK:CVR">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -91,7 +91,7 @@
+       </cac:PartyName>
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>11</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -105,7 +105,7 @@
+         <cbc:CompanyID schemeID="DK:SE">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>11</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -124,7 +124,7 @@
+         <cbc:CompanyID schemeID="DK:CVR">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>11</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -146,7 +146,7 @@
+     <cac:DeliveryLocation>
+       <cac:Address>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>11</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+diff --git a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_be.xml b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_be.xml
+index 80f4959986a0f3..40c6568135b35f 100644
+--- a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_be.xml
++++ b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_be.xml
+@@ -33,7 +33,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -48,7 +48,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+             StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -68,7 +68,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+             StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -97,7 +97,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++        <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Eghezee</cbc:CityName>
+         <cbc:PostalZone>6870</cbc:PostalZone>
+@@ -112,7 +112,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+             StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++          <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Eghezee</cbc:CityName>
+           <cbc:PostalZone>6870</cbc:PostalZone>
+@@ -132,7 +132,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+             StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++          <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Eghezee</cbc:CityName>
+           <cbc:PostalZone>6870</cbc:PostalZone>
+@@ -155,7 +155,7 @@
+       <cac:Address>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++        <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Eghezee</cbc:CityName>
+         <cbc:PostalZone>6870</cbc:PostalZone>
+diff --git a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_fr.xml b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_fr.xml
+index 60ffb3205239de..d4060d00b510e3 100644
+--- a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_fr.xml
++++ b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_fr.xml
+@@ -30,7 +30,7 @@
+       </cac:PartyName>
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -44,7 +44,7 @@
+         <cbc:CompanyID schemeID="DK:SE">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -63,7 +63,7 @@
+         <cbc:CompanyID schemeID="DK:CVR">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -91,7 +91,7 @@
+       </cac:PartyName>
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++        <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+         <cbc:BuildingNumber>16</cbc:BuildingNumber>
+         <cbc:CityName>Lille</cbc:CityName>
+         <cbc:PostalZone>59000</cbc:PostalZone>
+@@ -105,7 +105,7 @@
+         <cbc:CompanyID schemeID="ZZZ">FR23334175221</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++          <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+           <cbc:BuildingNumber>16</cbc:BuildingNumber>
+           <cbc:CityName>Lille</cbc:CityName>
+           <cbc:PostalZone>59000</cbc:PostalZone>
+@@ -124,7 +124,7 @@
+         <cbc:CompanyID schemeID="ZZZ">FR12356894100056</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++          <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+           <cbc:BuildingNumber>16</cbc:BuildingNumber>
+           <cbc:CityName>Lille</cbc:CityName>
+           <cbc:PostalZone>59000</cbc:PostalZone>
+@@ -145,7 +145,7 @@
+     <cac:DeliveryLocation>
+       <cac:Address>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++        <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+         <cbc:BuildingNumber>16</cbc:BuildingNumber>
+         <cbc:CityName>Lille</cbc:CityName>
+         <cbc:PostalZone>59000</cbc:PostalZone>
+diff --git a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_partner_dk.xml b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_partner_dk.xml
+index deaef6a23da5e4..735e3a31657f59 100644
+--- a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_partner_dk.xml
++++ b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_partner_dk.xml
+@@ -30,7 +30,7 @@
+       </cac:PartyName>
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -44,7 +44,7 @@
+         <cbc:CompanyID schemeID="DK:SE">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -63,7 +63,7 @@
+         <cbc:CompanyID schemeID="DK:CVR">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -91,7 +91,7 @@
+       </cac:PartyName>
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>11</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -105,7 +105,7 @@
+         <cbc:CompanyID schemeID="DK:SE">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>11</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -124,7 +124,7 @@
+         <cbc:CompanyID schemeID="DK:CVR">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>11</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -146,7 +146,7 @@
+     <cac:DeliveryLocation>
+       <cac:Address>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>11</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+diff --git a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_refund_foreign_partner_fr.xml b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_refund_foreign_partner_fr.xml
+index b3cc33f828d221..f2764bf4c8ef3c 100644
+--- a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_refund_foreign_partner_fr.xml
++++ b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_refund_foreign_partner_fr.xml
+@@ -29,7 +29,7 @@
+       </cac:PartyName>
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -43,7 +43,7 @@
+         <cbc:CompanyID schemeID="DK:SE">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -62,7 +62,7 @@
+         <cbc:CompanyID schemeID="DK:CVR">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -90,7 +90,7 @@
+       </cac:PartyName>
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++        <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+         <cbc:BuildingNumber>16</cbc:BuildingNumber>
+         <cbc:CityName>Lille</cbc:CityName>
+         <cbc:PostalZone>59000</cbc:PostalZone>
+@@ -104,7 +104,7 @@
+         <cbc:CompanyID schemeID="ZZZ">FR23334175221</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++          <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+           <cbc:BuildingNumber>16</cbc:BuildingNumber>
+           <cbc:CityName>Lille</cbc:CityName>
+           <cbc:PostalZone>59000</cbc:PostalZone>
+@@ -123,7 +123,7 @@
+         <cbc:CompanyID schemeID="ZZZ">FR12356894100056</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++          <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+           <cbc:BuildingNumber>16</cbc:BuildingNumber>
+           <cbc:CityName>Lille</cbc:CityName>
+           <cbc:PostalZone>59000</cbc:PostalZone>
+@@ -144,7 +144,7 @@
+     <cac:DeliveryLocation>
+       <cac:Address>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++        <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+         <cbc:BuildingNumber>16</cbc:BuildingNumber>
+         <cbc:CityName>Lille</cbc:CityName>
+         <cbc:PostalZone>59000</cbc:PostalZone>
+diff --git a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_refund_partner_dk.xml b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_refund_partner_dk.xml
+index f9cdc6becda3f1..d91ab4171e093e 100644
+--- a/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_refund_partner_dk.xml
++++ b/addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_refund_partner_dk.xml
+@@ -29,7 +29,7 @@
+       </cac:PartyName>
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -43,7 +43,7 @@
+         <cbc:CompanyID schemeID="DK:SE">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -62,7 +62,7 @@
+         <cbc:CompanyID schemeID="DK:CVR">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -90,7 +90,7 @@
+       </cac:PartyName>
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>11</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -104,7 +104,7 @@
+         <cbc:CompanyID schemeID="DK:SE">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>11</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -123,7 +123,7 @@
+         <cbc:CompanyID schemeID="DK:CVR">DK12345674</cbc:CompanyID>
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>11</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -145,7 +145,7 @@
+     <cac:DeliveryLocation>
+       <cac:Address>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>11</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+diff --git a/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_be.xml b/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_be.xml
+index dfd0e34a26f4b9..81208dd5395a31 100644
+--- a/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_be.xml
++++ b/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_be.xml
+@@ -29,7 +29,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -44,7 +44,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -64,7 +64,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -90,7 +90,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++        <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Eghezee</cbc:CityName>
+         <cbc:PostalZone>6870</cbc:PostalZone>
+@@ -105,7 +105,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++          <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Eghezee</cbc:CityName>
+           <cbc:PostalZone>6870</cbc:PostalZone>
+@@ -125,7 +125,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++          <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Eghezee</cbc:CityName>
+           <cbc:PostalZone>6870</cbc:PostalZone>
+@@ -148,7 +148,7 @@
+       <cac:Address>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Rue du Paradis,</cbc:StreetName>
++        <cbc:StreetName>Rue du Paradis</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Eghezee</cbc:CityName>
+         <cbc:PostalZone>6870</cbc:PostalZone>
+diff --git a/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_fr.xml b/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_fr.xml
+index c792453743cb88..ef6449467e6160 100644
+--- a/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_fr.xml
++++ b/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_fr.xml
+@@ -29,7 +29,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -44,7 +44,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -64,7 +64,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -90,7 +90,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++        <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+         <cbc:BuildingNumber>16</cbc:BuildingNumber>
+         <cbc:CityName>Lille</cbc:CityName>
+         <cbc:PostalZone>59000</cbc:PostalZone>
+@@ -105,7 +105,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++          <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+           <cbc:BuildingNumber>16</cbc:BuildingNumber>
+           <cbc:CityName>Lille</cbc:CityName>
+           <cbc:PostalZone>59000</cbc:PostalZone>
+@@ -125,7 +125,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++          <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+           <cbc:BuildingNumber>16</cbc:BuildingNumber>
+           <cbc:CityName>Lille</cbc:CityName>
+           <cbc:PostalZone>59000</cbc:PostalZone>
+@@ -147,7 +147,7 @@
+       <cac:Address>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++        <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+         <cbc:BuildingNumber>16</cbc:BuildingNumber>
+         <cbc:CityName>Lille</cbc:CityName>
+         <cbc:PostalZone>59000</cbc:PostalZone>
+diff --git a/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_partner_dk.xml b/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_partner_dk.xml
+index 8ad2799a69387b..c5fbf685f5188d 100644
+--- a/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_partner_dk.xml
++++ b/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_partner_dk.xml
+@@ -29,7 +29,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -44,7 +44,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -64,7 +64,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -90,7 +90,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>11</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -105,7 +105,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>11</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -125,7 +125,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>11</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -148,7 +148,7 @@
+       <cac:Address>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>11</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+diff --git a/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_refund_foreign_partner_fr.xml b/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_refund_foreign_partner_fr.xml
+index f27f2ecd36c617..ca83e319e5356e 100644
+--- a/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_refund_foreign_partner_fr.xml
++++ b/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_refund_foreign_partner_fr.xml
+@@ -28,7 +28,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -43,7 +43,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -63,7 +63,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -89,7 +89,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++        <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+         <cbc:BuildingNumber>16</cbc:BuildingNumber>
+         <cbc:CityName>Lille</cbc:CityName>
+         <cbc:PostalZone>59000</cbc:PostalZone>
+@@ -104,7 +104,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++          <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+           <cbc:BuildingNumber>16</cbc:BuildingNumber>
+           <cbc:CityName>Lille</cbc:CityName>
+           <cbc:PostalZone>59000</cbc:PostalZone>
+@@ -124,7 +124,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Rue Fabricy,</cbc:StreetName>
++          <cbc:StreetName>Rue Fabricy</cbc:StreetName>
+           <cbc:BuildingNumber>16</cbc:BuildingNumber>
+           <cbc:CityName>Lille</cbc:CityName>
+           <cbc:PostalZone>59000</cbc:PostalZone>
+diff --git a/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_refund_partner_dk.xml b/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_refund_partner_dk.xml
+index a84d89a74befe9..c184c65f749670 100644
+--- a/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_refund_partner_dk.xml
++++ b/addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_refund_partner_dk.xml
+@@ -28,7 +28,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>10</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -43,7 +43,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -63,7 +63,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>10</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -89,7 +89,7 @@
+       <cac:PostalAddress>
+         <cbc:AddressFormatCode listAgencyID="320" listID="urn:oioubl:codelist:addressformatcode-1.1">
+           StructuredDK</cbc:AddressFormatCode>
+-        <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++        <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+         <cbc:BuildingNumber>11</cbc:BuildingNumber>
+         <cbc:CityName>Aalborg</cbc:CityName>
+         <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -104,7 +104,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>11</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+@@ -124,7 +124,7 @@
+         <cac:RegistrationAddress>
+           <cbc:AddressFormatCode listAgencyID="320"
+             listID="urn:oioubl:codelist:addressformatcode-1.1">StructuredDK</cbc:AddressFormatCode>
+-          <cbc:StreetName>Paradisæblevej,</cbc:StreetName>
++          <cbc:StreetName>Paradisæblevej</cbc:StreetName>
+           <cbc:BuildingNumber>11</cbc:BuildingNumber>
+           <cbc:CityName>Aalborg</cbc:CityName>
+           <cbc:PostalZone>9430</cbc:PostalZone>
+diff --git a/odoo/tools/misc.py b/odoo/tools/misc.py
+index 0ab09852eecb65..05b3a22ae32108 100644
+--- a/odoo/tools/misc.py
++++ b/odoo/tools/misc.py
+@@ -1922,14 +1922,46 @@ def verify_limited_field_access_token(record, field_name, access_token, *, scope
+     ) and datetime.datetime.now() < datetime.datetime.fromtimestamp(int(timestamp, 16))
+ 
+ 
+-ADDRESS_REGEX = re.compile(r'^(.*?)(\s[0-9][0-9\S]*)?(?: - (.+))?$', flags=re.DOTALL)
++ADDRESS_REGEXES = [
++    # Same as regex bellow, but match if the building number is at the start of the string
++    re.compile(r'''^
++        (?P<building_number>[0-9][a-zA-Z0-9/-]*)[,\s]+
++        (?P<street>.*?)
++        # We want to capture the door number after the last comma of the string, as we could
++        # have commas in the street name
++        (?:\s*[-,/]\s*(?P<door_number>(?=.*\d)(?:(?!\s*,\s*|\s+-\s+).)+))?
++    $''', flags=re.DOTALL | re.VERBOSE),
++    # Match addresses where building number is between street name and door number
++    re.compile(r'''^
++        # Non greedy match on street name, so it will stops as soon as it faces a digit
++        (?P<street>.*?)\s*
++        # We will use this comma for a condition later
++        (?P<comma>,)?\s*
++        # Match the building number, it must starts with a digit, and it stops when facing
++        # a blank space, a comma or end of string
++        (?P<building_number>[0-9][a-zA-Z0-9/-]*)?
++        # If we didn't capture a comma in the comma group, we do a positive lookahead to check
++        # if we have a door number after
++        (?(comma)|(?=\s+[,-/]|\s*$))
++        # Door number group has to starts with '-', ',' or '/'
++        (?:\s*[-,/]\s*(?P<door_number>(?=.*\d)(?:(?!\s*,\s*|\s+-\s+).)+))?
++    ''', flags=re.DOTALL | re.VERBOSE),
++]
+ def street_split(street):
+-    match = ADDRESS_REGEX.match(street or '')
+-    results = match.groups('') if match else ('', '', '')
++    for regex in ADDRESS_REGEXES:
++        match = regex.match(street or '')
++        results = match.groupdict() if match else {}
++        if results:
++            return {
++                'street_name': (results.get('street') or '').strip(),
++                'street_number': (results.get('building_number') or '').strip(),
++                'street_number2': (results.get('door_number') or '').strip(),
++            }
++
+     return {
+-        'street_name': results[0].strip(),
+-        'street_number': results[1].strip(),
+-        'street_number2': results[2],
++        'street_name': '',
++        'street_number': '',
++        'street_number2': '',
+     }
+ 
+ 

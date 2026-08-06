@@ -1,0 +1,203 @@
+{
+  "run": {
+    "schema_version": 1,
+    "event": "luffy-run",
+    "source_repo": "Mr-Ashish/odoo",
+    "pr_number": "4",
+    "run_id": "local",
+    "run_attempt": "1",
+    "trace_id": "pr4-runlocal-a1",
+    "model": "openai/gpt-4.1-mini",
+    "status": "success",
+    "verdict": "APPROVE",
+    "trigger_comment": "",
+    "review_truncated": false,
+    "review_md": "<!-- luffy-review pr=4 run=local -->\n## \ud83c\udff4\u200d\u2620\ufe0f Luffy Review \u2014 PR #4\n\n**Verdict:** APPROVE  \n**Confidence:** high  \n**Score:** 95/100  \n**Review effort:** 3/5  \n\n### Summary\nThis PR applies the upstream performance optimization from the original Odoo PR #279776 to speed up replenishment horizon updates. It focuses on batching lead-day computations for stock orderpoints, caching BoM lookups, and optimizing manufacturing and purchase replenishment paths. The code changes touch multiple modules related to stock, manufacturing, and purchase replenishment with added tests verifying the enhancements.\n\n### Walkthrough\n- `addons/mrp/models/stock_orderpoint.py` / `StockWarehouseOrderpoint`: Batches BoM lookups for lead-day calculation and leverages context caching to avoid repeated computations.\n- `addons/mrp/models/stock_rule.py` / `StockRule`: Adds caching of preproduction rules for improved performance in replenishment processing.\n- `addons/purchase_mrp/models/stock_rule.py`: Minor changes to integrate with replenishment improvements.\n- Test files under `addons/mrp/tests/` and `addons/purchase_mrp/tests/` add coverage for replenishment horizon logic and batch lead-day respect.\n- The overall change reduces redundant database queries and optimizes data lookups on replenishment paths.\n\n### Blocking\n- None\n\n### Key findings\n| Severity | File | Issue | Trigger scenario |\n|----------|------|-------|------------------|\n| None     |      |       |                  |\n\nNone \u2014 no high-confidence defects in new code.\n\n### Security audit\nNo\n\n### Suggestions\n- Ensure added caches respect multi-company and multi-warehouse scenarios fully (though looks mostly covered).\n- Consider adding explicit comments on the key cached context keys to help maintainers understand the optimization tradeoffs.\n- Minor styling: In some parts, adding a short explanation on why certain methods are overridden could improve future readability.\n\n### Code suggestions\n#### Add brief comment for caching context keys (`addons/mrp/models/stock_orderpoint.py`)\n```diff\n- def _compute_lead_days(self):\n-     boms = self._get_lead_days_boms()\n-     return super(StockWarehouseOrderpoint, self.with_context(\n-         orderpoint_lead_days_boms=boms,\n-         orderpoint_preproduction_rules_cache={},\n-     ))._compute_lead_days()\n+ def _compute_lead_days(self):\n+     boms = self._get_lead_days_boms()\n+     # Cache BOMs and preproduction rules in the context to avoid redundant DB queries during lead day computations\n+     return super(StockWarehouseOrderpoint, self.with_context(\n+         orderpoint_lead_days_boms=boms,\n+         orderpoint_preproduction_rules_cache={},\n+     ))._compute_lead_days()\n```\nWhy: Improves future maintainability by documenting the caching intention.\n\n### Nits\n- None\n\n### Tests & risk\n- Relevant tests added/updated: yes\n- Coverage: The replenishment horizon tests cover lead day batch computations, manufacturing delays, and replenishment info correctness across stock, mrp, and purchase_mrp modules.\n- Risk: low \u2014 purely performance oriented with no behavioral regressions expected, and solid test coverage reduces risk.\n- Rollback: easy \u2014 changes are localized in key caching and batching logic without API impacts.\n\n### What I checked\n- Read core changed files `addons/mrp/models/stock_orderpoint.py`, `addons/mrp/models/stock_rule.py`\n- Selected tests in `addons/mrp/tests/test_replenish.py` and `addons/purchase_mrp/tests/test_replenishment.py` to confirm test coverage on replenishment and lead day logic.\n- Verified no truncated diff or missing files on the PR.\n\n---\n*Luffy \u00b7 Hermes Agent \u00b7 OpenRouter \u00b7 memory-backed review*\n*Cost / usage: model=`openai/gpt-4.1-mini` \u00b7 ~$0.01 (estimated) \u00b7 99k tokens \u00b7 10 API calls*\n",
+    "memory_block": "## Review run pr4-runlocal-a1\n- Source: `Mr-Ashish/odoo` PR #4\n- Status: success\n- Model: openai/gpt-4.1-mini\n- Verdict: APPROVE\n- Blocking: - None\n- Summary: This PR applies the upstream performance optimization from the original Odoo PR #279776 to speed up replenishment horizon updates. It focuses on batching lead-day computations for stock orderpoints, caching BoM lookups, and optimizing manufacturing and purchase replenishment paths. The code changes touch multiple modules related to stock, manufacturing, and purchase replenishment with added tests verifying the enhancements.\n- Trigger: \n",
+    "timings": {
+      "started_at": "2026-07-31T16:53:36Z",
+      "ended_at": "2026-07-31T16:54:34Z",
+      "total_seconds": 58,
+      "stages": [
+        {
+          "name": "preload_memory",
+          "seconds": 1,
+          "exit_code": 0
+        },
+        {
+          "name": "assemble",
+          "seconds": 1,
+          "exit_code": 0
+        },
+        {
+          "name": "hermes",
+          "seconds": 56,
+          "exit_code": 0
+        },
+        {
+          "name": "distill",
+          "seconds": 0,
+          "exit_code": 0
+        }
+      ]
+    },
+    "meta": {
+      "github_sha": null,
+      "github_ref": null,
+      "github_event_name": null,
+      "started_at": "2026-07-31T16:53:36Z",
+      "trace_meta": {
+        "trace_id": "pr4-runlocal-a1",
+        "schema_version": 1,
+        "repo": "Mr-Ashish/odoo",
+        "pr_number": "4",
+        "run_id": "local",
+        "run_attempt": "1",
+        "model": "openai/gpt-4.1-mini",
+        "status": "success",
+        "started_at": "2026-07-31T16:53:36Z",
+        "ended_at": "2026-07-31T16:54:34Z",
+        "workspace_root": "/Users/ashishmishra/Documents/experiments/odoo",
+        "github_sha": null,
+        "github_ref": null,
+        "github_event_name": null,
+        "hermes_rc": "0",
+        "trigger_comment": "",
+        "files": {
+          "agent-loop/agent-loop.json": {
+            "bytes": 62645,
+            "sha256": "29e3fc3a1b72c7ac76f8088e3f11783e8b3e026504363b700f6aaa3e2c4d2a96"
+          },
+          "agent-loop/agent-loop.md": {
+            "bytes": 18514,
+            "sha256": "7ea9fd2aba48a447c230cd23b9a8b6e61e7e05c43cb27b4c4487d52f94ebfe5a"
+          },
+          "agent-loop/agent.log": {
+            "bytes": 2401,
+            "sha256": "eef6981c9f16d6803f0e991e1750831be330c3d4ba257a6af0a658aa445fc0ee"
+          },
+          "agent-loop/errors.log": {
+            "bytes": 2901,
+            "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+          },
+          "agent-loop/usage.json": {
+            "bytes": 462,
+            "sha256": "c2cdef4adba4ed855f1dfc4b9fc1331d9f6d145c01d777ca0f8dced652304faf"
+          },
+          "agent-loop-attempt1/agent-loop.json": {
+            "bytes": 14604,
+            "sha256": "1a11f42920d4d5d5b5c8f3c0d7d9c5dddfa417e3f71893e6c73aa138aa57975e"
+          },
+          "agent-loop-attempt1/agent-loop.md": {
+            "bytes": 4596,
+            "sha256": "125aafd7d1ac144e8f8e37d803d31c7b0a426957e80a1e2836480779aeb90879"
+          },
+          "agent-loop-attempt1/agent.log": {
+            "bytes": 2401,
+            "sha256": "72f29d0d9af9e4f550b7e27a96d4a28e8b7ebde6885b173b0defb4a641568711"
+          },
+          "agent-loop-attempt1/errors.log": {
+            "bytes": 2901,
+            "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+          },
+          "agent-loop-attempt1/usage.json": {
+            "bytes": 447,
+            "sha256": "794826278a94e05c519ad6761cce1f3b497030eb790a9d1b850ddf600e621326"
+          },
+          "context.md": {
+            "bytes": 1685,
+            "sha256": "bfc2520a97e53e6560ee224c75fac0731684e629f4e434167bda94efd23aabec"
+          },
+          "files.txt": {
+            "bytes": 394,
+            "sha256": "1a06369e056d8a16b8ca706a39c7849806a11a7a9fdd4a5d60a4c0a960c82548"
+          },
+          "hermes-max-turns.env": {
+            "bytes": 49,
+            "sha256": "6b66a2a2643dbe65337b35ba3df7745af620ba392034d1c7c30c6d487e581097"
+          },
+          "hermes-pin.txt": {
+            "bytes": 41,
+            "sha256": "0ea7b07d1ee10f05f03acb0228b48c579f1f1f89ba622198bbbeda984e9b631a"
+          },
+          "hermes-run.log": {
+            "bytes": 2401,
+            "sha256": "eef6981c9f16d6803f0e991e1750831be330c3d4ba257a6af0a658aa445fc0ee"
+          },
+          "hermes-usage.json": {
+            "bytes": 462,
+            "sha256": "c2cdef4adba4ed855f1dfc4b9fc1331d9f6d145c01d777ca0f8dced652304faf"
+          },
+          "hermes.stderr": {
+            "bytes": 11233,
+            "sha256": "ed0631ef618246e3a39bbc93f5dcc39d06073a37f6f5f5f16bfa7b2aa59b1913"
+          },
+          "memory-after.md": {
+            "bytes": 1779,
+            "sha256": "4984f5ebd9ec3522f1647badf9232062fe1e461402b573b2a40c2b5fa3824bda"
+          },
+          "memory-before.md": {
+            "bytes": 1569,
+            "sha256": "23471767536b8c44b66adeca1e2075ed7f4bcc0d8593c2af8a9a2874706f1369"
+          },
+          "meta.env": {
+            "bytes": 717,
+            "sha256": "568283cee6f5f25755e6702df4ef56f7f7f3c795510ec5794675c7a4ece83f6b"
+          },
+          "model-tier.env": {
+            "bytes": 101,
+            "sha256": "0f86727ff56852244a50c17d502c7aa26b4ee8a59c24c258a9e3afa4e5029062"
+          },
+          "pr.diff": {
+            "bytes": 18221,
+            "sha256": "a615799017090349f4fe7deb91f9666ff80866155dd313ebd16c1e52ee8de327"
+          },
+          "pr.json": {
+            "bytes": 2033,
+            "sha256": "227760088d64527ca597538f29dc7cabaa8349711e1829595613991efb2f5f73"
+          },
+          "preflight-cost.env": {
+            "bytes": 367,
+            "sha256": "53e4ffb27bc48895166325c55ab57ae3800cf3a9df05f14590279aa5b15f8f30"
+          },
+          "prompt-reprompt.md": {
+            "bytes": 6099,
+            "sha256": "a9ff272fde667349592b2e508ed6b0ee18fde8290be112d1d7c305084fa2cecb"
+          },
+          "prompt.md": {
+            "bytes": 5025,
+            "sha256": "17c7ad78f858b655b5cd1cebbbfa5feec374b4a4bb21dd071d7249abd3480816"
+          },
+          "review.md": {
+            "bytes": 3764,
+            "sha256": "b15e3a82bcffa4c8c991f7dde00451c0f698f9054fbb7454a7bab8e7a8e1b76e"
+          },
+          "review.raw.md": {
+            "bytes": 3633,
+            "sha256": "cf0df7e57249facfd57ea814606d1e06e8df1d5029dcd262585e4173c5c2416f"
+          },
+          "soul-context-preflight.env": {
+            "bytes": 108,
+            "sha256": "4c0441fe38df5259bae5c8033849b9bff2f757257509cc9d7f79fa64e2789df0"
+          },
+          "soul-context.env": {
+            "bytes": 23,
+            "sha256": "c4cbeffb88797871d982e5fe6c7b24e44e89172a4b605ff56d42a204c49c81c0"
+          },
+          "timings.json": {
+            "bytes": 446,
+            "sha256": "13d41807521c41ea8d28429e8469aad09dccfcf52adc2a956ee143bb504c933f"
+          },
+          "tool-turns-gate.env": {
+            "bytes": 156,
+            "sha256": "76a364026a582c744fc22889a1570a2908938badcdf46d3e723960dec5836e6c"
+          },
+          "tool-turns-reprompt.env": {
+            "bytes": 128,
+            "sha256": "11f7ce321b2ccb6d8e24578209290ee5b7b8cf98f81f2811008079d4ebfb3b5b"
+          }
+        }
+      }
+    }
+  }
+}

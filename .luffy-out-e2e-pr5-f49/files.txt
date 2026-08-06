@@ -1,0 +1,8 @@
+Total: +109 / -122 across 6 files
+
+- `addons/point_of_sale/static/src/app/screens/ticket_screen/search_bar/search_bar.scss` (+24/-26)
+- `addons/point_of_sale/static/src/app/screens/ticket_screen/search_bar/search_bar.xml` (+2/-2)
+- `addons/point_of_sale/static/src/app/screens/ticket_screen/ticket_screen.js` (+16/-6)
+- `addons/point_of_sale/static/src/app/screens/ticket_screen/ticket_screen.scss` (+51/-58)
+- `addons/point_of_sale/static/src/app/screens/ticket_screen/ticket_screen.xml` (+14/-28)
+- `addons/pos_restaurant/static/src/app/screens/ticket_screen/ticket_screen.xml` (+2/-2)

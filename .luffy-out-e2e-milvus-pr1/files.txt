@@ -1,0 +1,8 @@
+Total: +104 / -37 across 6 files
+
+- `internal/flushcommon/writebuffer/write_buffer_test.go` (+13/-1)
+- `internal/querynodev2/delegator/delegator_test.go` (+14/-2)
+- `internal/streamingnode/server/wal/interceptors/shard/function_materializer.go` (+2/-9)
+- `internal/streamingnode/server/wal/interceptors/shard/shard_interceptor_test.go` (+3/-1)
+- `internal/util/function/manager.go` (+26/-7)
+- `internal/util/function/manager_test.go` (+46/-17)

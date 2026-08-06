@@ -1,0 +1,9 @@
+Total: +234 / -22 across 7 files
+
+- `addons/mrp/models/stock_orderpoint.py` (+54/-14)
+- `addons/mrp/models/stock_rule.py` (+48/-2)
+- `addons/mrp/tests/test_replenish.py` (+65/-0)
+- `addons/purchase_mrp/models/stock_rule.py` (+7/-0)
+- `addons/purchase_mrp/tests/test_replenishment.py` (+52/-0)
+- `addons/stock/models/stock_orderpoint.py` (+4/-6)
+- `addons/stock/tests/test_proc_rule.py` (+4/-0)

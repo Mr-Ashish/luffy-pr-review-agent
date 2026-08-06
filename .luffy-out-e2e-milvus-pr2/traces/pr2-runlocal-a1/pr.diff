@@ -1,0 +1,436 @@
+diff --git a/client/milvusclient/bloom_filter.go b/client/milvusclient/bloom_filter.go
+index 7630247fd3b6b..0432693013274 100644
+--- a/client/milvusclient/bloom_filter.go
++++ b/client/milvusclient/bloom_filter.go
+@@ -51,10 +51,14 @@ type BloomFilterBlob []byte
+ // resulting blob is reproducible in other languages from the same spec
+ // (docs/design-docs/design_docs/20260707-bloom-filter-expression.md).
+ //
+-// The blob must fit the proxy's gRPC receive limit
+-// (proxy.grpc.serverMaxRecvSize, 64 MiB by default) alongside the rest of the
+-// request; use sbbf.EstimateMarshalSize(n, fpr) to check the exact blob size
+-// for a planned member count before building the filter.
++// The blob passes two proxy limits: its body must fit
++// proxy.maxBloomFilterSize (64 MiB by default) and the whole request must fit
++// proxy.grpc.serverMaxRecvSize (128 MiB by default). Use
++// sbbf.EstimateMarshalSize(n, fpr) to check the exact blob size for a planned
++// member count before building the filter. Bodies are powers of two, so a
++// count just past a tier boundary doubles the blob and a slightly higher fpr
++// usually brings it back under; a rejection from the proxy reports the
++// smallest fpr that would have fit.
+ func NewBloomFilterBlob(members any, fpr float64) (BloomFilterBlob, error) {
+ 	// One switch per member type: it both sizes the builder and inserts, so a
+ 	// future member type cannot be added to one dispatch and forgotten in the
+diff --git a/client/sbbf/sbbf.go b/client/sbbf/sbbf.go
+index a1eeee9088995..c72760d945da7 100644
+--- a/client/sbbf/sbbf.go
++++ b/client/sbbf/sbbf.go
+@@ -95,8 +95,12 @@ const (
+ 	MaxFPR = 0.05
+ 
+ 	// DefaultFPR is the recommended false-positive rate when a caller has no
+-	// specific target: ~1.38 bytes/member, so a 32 MiB blob (the largest that
+-	// fits the default 64 MiB gRPC recv limit) holds ~24 M members.
++	// specific target. Sizing follows OptimalNumOfBytes, so a body holds roughly
++	// 0.72 members per byte at this rate: a 64 MiB body (the default
++	// proxy.maxBloomFilterSize) holds ~48.6M members, a 32 MiB body ~24.3M.
++	// Because bodies are powers of two, a member count just past a tier boundary
++	// doubles the blob; raising fpr is usually the cheaper fix. 50M members, for
++	// example, need fpr >= ~0.0058 to stay inside 64 MiB.
+ 	DefaultFPR = 0.005
+ )
+ 
+diff --git a/configs/milvus.yaml b/configs/milvus.yaml
+index 5b8f1edb15812..35eaecb8640a5 100644
+--- a/configs/milvus.yaml
++++ b/configs/milvus.yaml
+@@ -363,7 +363,7 @@ proxy:
+   maxFieldNum: 256 # The maximum number of field can be created when creating in a collection. It is strongly DISCOURAGED to set maxFieldNum >= 256.
+   maxVectorFieldNum: 10 # The maximum number of vector fields that can be specified in a collection
+   maxShardNum: 16 # The maximum number of shards can be created when creating in a collection.
+-  maxBloomFilterSize: 33554432 # The maximum byte size of the SBBF body in a client pre-built bloom_match filter blob accepted by the proxy (the fixed 32-byte MBF1 header is allowed on top). The blob is embedded into the query plan and fanned out to every QueryNode, so this bounds per-request memory/network amplification. Must not exceed the MBF1 format cap (128 MiB); the default admits ~24M int64 members at the default FPR while staying under the default gRPC receive limit.
++  maxBloomFilterSize: 67108864 # The maximum byte size of the SBBF body in a client pre-built bloom_match filter blob accepted by the proxy (the fixed 32-byte MBF1 header is allowed on top). The blob is embedded into the query plan and fanned out to every QueryNode, so this bounds per-request memory/network amplification. Must not exceed the MBF1 format cap (128 MiB). SBBF bodies are powers of two, so the default admits bodies up to 64 MiB: ~48.6M int64 members at the default fpr=0.005, ~55.4M at fpr=0.01. Raising the member count past a tier boundary requires raising the fpr too, not only this limit. Keep proxy.grpc.serverMaxRecvSize above this plus the rest of the request.
+   maxBloomFilterPlanSize: 134217728 # The maximum aggregate serialized byte size of bloom-bearing expression plans in one Search, HybridSearch, or Query request. The proxy checks the assembled plans before proto.Marshal, so repeated references to one bloom_match template value and Bloom filters across hybrid sub-searches cannot amplify past the configured budget before the QueryNode RPC. Must be positive; invalid values fall back to 128 MiB.
+   maxDimension: 32768 # The maximum number of dimensions of a vector can have when creating in a collection.
+   # Whether to produce gin logs.\n
+@@ -443,7 +443,7 @@ proxy:
+   internalPort: 19529
+   grpc:
+     serverMaxSendSize: 268435456 # The maximum size of each RPC request that the proxy can send, unit: byte
+-    serverMaxRecvSize: 67108864 # The maximum size of each RPC request that the proxy can receive, unit: byte
++    serverMaxRecvSize: 134217728 # The maximum size of each RPC request that the proxy can receive, unit: byte
+     clientMaxSendSize: 268435456 # The maximum size of each RPC request that the clients on proxy can send, unit: byte
+     clientMaxRecvSize: 67108864 # The maximum size of each RPC request that the clients on proxy can receive, unit: byte
+ 
+diff --git a/docs/design-docs/design_docs/20260707-bloom-filter-expression.md b/docs/design-docs/design_docs/20260707-bloom-filter-expression.md
+index 065afe31259b2..64298c11acd76 100644
+--- a/docs/design-docs/design_docs/20260707-bloom-filter-expression.md
++++ b/docs/design-docs/design_docs/20260707-bloom-filter-expression.md
+@@ -67,13 +67,19 @@ value with **no base64 inflation**. Because the SBBF body is rounded **up to a p
+ usable capacity comes in size tiers, so the practical ceilings under the default FPR (0.5%,
+ ~11 bits/member) are:
+ 
+-- **32 MiB blob → ~24 M members**, the largest tier that fits comfortably under the default
+-  64 MiB recv limit. This is the effective out-of-the-box cap.
+-- **64 MiB blob → ~48 M members**, but a 64 MiB body plus envelope and request framing
+-  exceeds the default limit, so this tier requires **raising `serverMaxRecvSize`**.
+-- **128 MiB blob → ~97 M members**, the C++ prober's hard cap on a single blob.
+-
+-Coarsening the FPR shifts every tier up (e.g. a 32 MiB blob holds ~39 M members at the 5%
++- **32 MiB body → ~24.3 M members.**
++- **64 MiB body → ~48.6 M members**, the effective out-of-the-box cap: it is the default
++  `proxy.maxBloomFilterSize`, and a 64 MiB body plus envelope and framing fits the default
++  128 MiB `serverMaxRecvSize`.
++- **128 MiB body → ~97 M members**, the MBF1 format cap on a single blob. Reaching it needs
++  both limits raised.
++
++Because bodies are powers of two, a member count just past a tier boundary doubles the blob.
++50M members at the default FPR want 65.77 MiB of bits, which rounds up to a 128 MiB body and
++is rejected; fpr >= ~0.0058 keeps the same 50M inside 64 MiB. A rejection reports that bound,
++so callers do not have to rediscover it.
++
++Coarsening the FPR shifts every tier up (e.g. a 64 MiB body holds ~78 M members at the 5%
+ maximum FPR). Beyond these, callers raise the recv limit, coarsen the FPR, or post-filter
+ through an external KV / a future registered-filter handle (Future Work). The design does not
+ chase absolute maximum sizing — solid support into the tens of millions is the goal.
+@@ -451,14 +457,16 @@ framework, and the delete-safety guard are all encoding-agnostic and reused unch
+ 
+ ### Resource protection
+ 
+-- **`proxy.maxBloomFilterSize`** (default 32 MiB, refreshable): operator-tunable **per-blob**
++- **`proxy.maxBloomFilterSize`** (default 64 MiB, refreshable): operator-tunable **per-blob**
+   cap on the SBBF **body**, enforced in `validateBloomFilterBlob`, so an oversized blob is
+   rejected at the proxy rather than fanned out to QueryNodes. The fixed 32-byte MBF1 header is
+-  allowed on top of the budget: the SBBF body is always a power of two, so budgeting the whole
+-  blob at exactly 32 MiB would reject a full 32 MiB body (32 MiB + 32 B) and silently halve the
+-  usable ceiling to a 16 MiB body (~12M members instead of ~24M). Budgeting the body keeps the
+-  default a clean power of two and admits a full 32 MiB body (~24M int64 members at the default
+-  FPR). The 128 MiB MBF1 num_blocks format cap remains the hard per-blob ceiling on both sides.
++  allowed on top of the budget (`len(blob) > maxSize + kHeaderSize`), so a full 64 MiB body
++  passes exactly. Budgeting the body rather than the whole blob keeps the limit a clean power
++  of two: a whole-blob cap of exactly 64 MiB would reject a 64 MiB body (64 MiB + 32 B) and
++  silently halve the usable ceiling to a 32 MiB body. Since bodies are powers of two, every
++  value in [64 MiB, 128 MiB) admits the same filters, so the default is set to the smallest of
++  them and states the real ceiling. The 128 MiB MBF1 num_blocks format cap remains the hard
++  per-blob ceiling on both sides.
+ - **`proxy.maxBloomFilterPlanSize`** (default 128 MiB, refreshable): request-wide cap on the
+   serialized size of every bloom-bearing plan, enforced with `proto.Size(plan)` before
+   `proto.Marshal`. Reusing one `{bf}` in multiple expressions therefore consumes the budget for
+diff --git a/internal/core/src/exec/expression/BloomFilterExpr.cpp b/internal/core/src/exec/expression/BloomFilterExpr.cpp
+index ff5c40b49809f..f05e4f5c79623 100644
+--- a/internal/core/src/exec/expression/BloomFilterExpr.cpp
++++ b/internal/core/src/exec/expression/BloomFilterExpr.cpp
+@@ -46,7 +46,7 @@ SplitBlockBloomFilterView::Parse(std::string_view blob) {
+     }
+     // Defensive upper bound on the whole envelope, checked before any field
+     // is read. The proxy is the operator-tunable gate: it rejects blobs above
+-    // proxy.maxBloomFilterSize (default 32 MiB) at plan-build time and
++    // proxy.maxBloomFilterSize (default 64 MiB) at plan-build time and
+     // validates the envelope via sbbf.Parse (same 128 MB format cap mirroring
+     // Arrow's kMaximumBloomFilterBytes); in practice the blob is also bounded
+     // by the gRPC transport limit. But a hand-crafted plan can reach segcore
+diff --git a/internal/parser/planparserv2/bloom_match.go b/internal/parser/planparserv2/bloom_match.go
+index 878482d17bbbc..5b7e575482c3c 100644
+--- a/internal/parser/planparserv2/bloom_match.go
++++ b/internal/parser/planparserv2/bloom_match.go
+@@ -19,6 +19,8 @@ package planparserv2
+ import (
+ 	"encoding/binary"
+ 	"fmt"
++	"math"
++	"math/bits"
+ 
+ 	"github.com/milvus-io/milvus-proto/go-api/v3/schemapb"
+ 	parser "github.com/milvus-io/milvus/internal/parser/planparserv2/generated"
+@@ -49,6 +51,11 @@ const (
+ 	mbf1DomainInt64 = 1 << 0
+ 	mbf1DomainUTF8  = 1 << 1
+ 	mbf1DomainKnown = mbf1DomainInt64 | mbf1DomainUTF8
++
++	// Accepted false-positive rate range, mirroring sbbf.MinFPR / sbbf.MaxFPR.
++	// Used only to bound the fpr suggested in the over-size error.
++	mbf1MinFPR = 0.0001
++	mbf1MaxFPR = 0.05
+ )
+ 
+ // bloom_match(field, {blob}) — approximate membership filter. The client builds
+@@ -100,7 +107,7 @@ func checkBloomMatchField(columnInfo *planpb.ColumnInfo, argText string) error {
+ // validateBloomFilterBlob validates a client pre-built SBBF blob (raw bytes) and
+ // returns it ready to embed into the plan. The client builds the bit-identical
+ // MBF1/SBBF blob (client/sbbf, reproducible cross-language) and ships the
+-// compact ~32 MB blob as a raw bytes template value — no proxy-side build. The
++// compact blob as a raw bytes template value — no proxy-side build. The
+ // blob declares the value domains it was built from, which
+ // checkBloomFilterValueDomain matches against the target field; this validation
+ // covers the envelope itself (magic/version/algo/domains/num_blocks/body length)
+@@ -108,11 +115,11 @@ func checkBloomMatchField(columnInfo *planpb.ColumnInfo, argText string) error {
+ // is rejected here at the proxy rather than fanned out to QueryNodes.
+ func validateBloomFilterBlob(blob []byte) ([]byte, error) {
+ 	// Per-blob gate. proxy.maxBloomFilterSize budgets the SBBF *body* (default
+-	// 32 MiB); the fixed 32-byte MBF1 header is allowed on top, hence the
++	// 64 MiB); the fixed 32-byte MBF1 header is allowed on top, hence the
+ 	// `+ mbf1HeaderSize`. Budgeting the body rather than the whole blob matters
+-	// because the SBBF body is always a power of two: a full 32 MiB body is
+-	// 32 MiB + 32 B, so a whole-blob cap of exactly 32 MiB would reject it and
+-	// silently drop the usable ceiling to the next power-of-two-down (a 16 MiB
++	// because the SBBF body is always a power of two: a full 64 MiB body is
++	// 64 MiB + 32 B, so a whole-blob cap of exactly 64 MiB would reject it and
++	// silently drop the usable ceiling to the next power-of-two-down (a 32 MiB
+ 	// body, ~half the member capacity). The 128 MiB MBF1 num_blocks format cap
+ 	// (checked in validateMBF1Envelope) remains the hard ceiling above this.
+ 	//
+@@ -121,8 +128,8 @@ func validateBloomFilterBlob(blob []byte) ([]byte, error) {
+ 	// remains necessary to reject one oversized filter at its input boundary.
+ 	if maxSize := paramtable.Get().ProxyCfg.MaxBloomFilterSize.GetAsInt(); len(blob) > maxSize+mbf1HeaderSize {
+ 		return nil, merr.WrapErrParameterInvalidMsg(
+-			"bloom_match filter blob body is %d bytes, exceeding proxy.maxBloomFilterSize (%d)",
+-			len(blob)-mbf1HeaderSize, maxSize)
++			"bloom_match filter blob body is %d bytes, exceeding proxy.maxBloomFilterSize (%d)%s",
++			len(blob)-mbf1HeaderSize, maxSize, oversizedBlobHint(blob, maxSize))
+ 	}
+ 	if err := validateMBF1Envelope(blob); err != nil {
+ 		return nil, merr.Wrap(err, "bloom_match filter blob is invalid")
+@@ -130,6 +137,44 @@ func validateBloomFilterBlob(blob []byte) ([]byte, error) {
+ 	return blob, nil
+ }
+ 
++// oversizedBlobHint turns "your filter is too big" into something the caller
++// can act on. Without it the only remedy visible from the error is "send fewer
++// members", when the usual fix is a higher fpr: SBBF bodies are powers of two,
++// so a member count just past a boundary doubles the blob, and one step of fpr
++// brings it back under the cap.
++//
++// It returns "" when no advice is possible. The blob is not yet validated here,
++// so n_declared is read defensively and treated as a hint only — the caller's
++// error is already decided and cannot be made wrong by a bogus value.
++func oversizedBlobHint(blob []byte, maxSize int) string {
++	if len(blob) < mbf1HeaderSize || maxSize < mbf1BytesPerBlock {
++		return ""
++	}
++	n := binary.LittleEndian.Uint64(blob[8:16])
++	if n == 0 || n > math.MaxInt64 {
++		return ""
++	}
++	// Only powers of two are reachable body sizes, so the usable budget is the
++	// largest power of two that fits under the cap, not the cap itself.
++	usable := uint64(1) << (bits.Len64(uint64(maxSize)) - 1)
++
++	// Invert the SBBF sizing formula m = -8n/ln(1-fpp^(1/8)) at m = usable*8
++	// bits: fpp = (1 - e^(-n/usable))^8. Ceil to four decimals so the suggested
++	// value is never a rounding step below what actually fits — a larger fpr
++	// only ever yields a smaller filter.
++	fpr := math.Pow(1-math.Exp(-float64(n)/float64(usable)), 8)
++	fpr = math.Ceil(fpr*10000) / 10000
++	if fpr < mbf1MinFPR {
++		fpr = mbf1MinFPR
++	}
++	if fpr > mbf1MaxFPR {
++		return fmt.Sprintf("; the declared %d members do not fit %d bytes even at the maximum fpr %g — "+
++			"reduce the member count or raise proxy.maxBloomFilterSize", n, usable, mbf1MaxFPR)
++	}
++	return fmt.Sprintf("; rebuild the filter with fpr >= %g for the declared %d members "+
++		"(SBBF bodies are powers of two, so a smaller fpr jumps straight to the next size)", fpr, n)
++}
++
+ // validateMBF1Envelope structurally validates the MBF1 blob header
+ // (magic/version/algo/domains/reserved/num_blocks/body-length) — the same checks the
+ // client builder and the C++ prober make, replicated here so this package does
+diff --git a/internal/parser/planparserv2/bloom_match_hint_test.go b/internal/parser/planparserv2/bloom_match_hint_test.go
+new file mode 100644
+index 0000000000000..609416283f968
+--- /dev/null
++++ b/internal/parser/planparserv2/bloom_match_hint_test.go
+@@ -0,0 +1,148 @@
++// Licensed to the LF AI & Data foundation under one
++// or more contributor license agreements. See the NOTICE file
++// distributed with this work for additional information
++// regarding copyright ownership. The ASF licenses this file
++// to you under the Apache License, Version 2.0 (the
++// "License"); you may not use this file except in compliance
++// with the License. You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++package planparserv2
++
++import (
++	"encoding/binary"
++	"math"
++	"strconv"
++	"strings"
++	"testing"
++
++	"github.com/stretchr/testify/assert"
++	"github.com/stretchr/testify/require"
++)
++
++// hintBlob builds a header-shaped byte slice declaring n members. Only the
++// n_declared field matters to oversizedBlobHint; the rest is never read.
++func hintBlob(n uint64, size int) []byte {
++	if size < mbf1HeaderSize {
++		size = mbf1HeaderSize
++	}
++	b := make([]byte, size)
++	binary.LittleEndian.PutUint64(b[8:16], n)
++	return b
++}
++
++// sbbfBodyBytes reimplements sbbf.optimalNumOfBytes so the suggested fpr can be
++// checked against what the client builder would actually produce.
++func sbbfBodyBytes(n uint64, fpp float64) int {
++	const minBits, maxBits = 32 * 8, mbf1MaxFilterBytes * 8
++	m := -8.0 * float64(n) / math.Log(1.0-math.Pow(fpp, 1.0/8.0))
++	var numBits int
++	if m < 0 || m > float64(maxBits) {
++		numBits = maxBits
++	} else {
++		numBits = int(m)
++	}
++	if numBits < minBits {
++		numBits = minBits
++	}
++	if numBits&(numBits-1) != 0 {
++		p := 1
++		for p < numBits {
++			p <<= 1
++		}
++		numBits = p
++	}
++	if numBits > maxBits {
++		numBits = maxBits
++	}
++	return numBits >> 3
++}
++
++// TestOversizedBlobHintSuggestsWorkableFPR is the property that makes the hint
++// worth printing: rebuilding at the suggested fpr must actually fit the cap.
++// A hint that still overflows would send the caller round the loop twice.
++func TestOversizedBlobHintSuggestsWorkableFPR(t *testing.T) {
++	const maxSize = 64 * 1024 * 1024 // the new proxy.maxBloomFilterSize default
++	usable := 64 * 1024 * 1024       // largest power-of-two body under the cap
++
++	for _, n := range []uint64{
++		30_000_000, 48_000_000, 48_700_000, 50_000_000, 55_000_000, 55_400_000,
++	} {
++		hint := oversizedBlobHint(hintBlob(n, 128*1024*1024), maxSize)
++		require.NotEmptyf(t, hint, "n=%d should produce a hint", n)
++		require.Containsf(t, hint, "fpr >=", "n=%d: %s", n, hint)
++
++		fpr := hintFPR(t, hint)
++		require.LessOrEqualf(t, fpr, mbf1MaxFPR, "n=%d suggested fpr above the accepted range", n)
++		require.GreaterOrEqualf(t, fpr, mbf1MinFPR, "n=%d suggested fpr below the accepted range", n)
++
++		got := sbbfBodyBytes(n, fpr)
++		assert.LessOrEqualf(t, got, usable,
++			"n=%d: rebuilding at the suggested fpr=%g yields a %d-byte body, still over the %d usable budget",
++			n, fpr, got, usable)
++	}
++}
++
++// TestOversizedBlobHintAtDefaultFPRBoundary pins the case this change exists
++// for: 50M members at the default fpr=0.005 need 128 MiB and are rejected, and
++// the hint must point at an fpr that brings them under 64 MiB.
++func TestOversizedBlobHintAtDefaultFPRBoundary(t *testing.T) {
++	const n = 50_000_000
++	require.Equal(t, 128*1024*1024, sbbfBodyBytes(n, 0.005), "50M at the default fpr should need 128 MiB")
++	require.Equal(t, 64*1024*1024, sbbfBodyBytes(n, 0.01), "50M at fpr=0.01 should fit 64 MiB")
++
++	hint := oversizedBlobHint(hintBlob(n, 128*1024*1024+mbf1HeaderSize), 64*1024*1024)
++	require.Contains(t, hint, "50000000")
++	fpr := hintFPR(t, hint)
++	assert.LessOrEqual(t, sbbfBodyBytes(n, fpr), 64*1024*1024)
++
++	// Pin the exact bound, not just "some fpr that fits". The analytic threshold
++	// is (1-e^(-n/B))^8 = 0.005797 for n=50M, B=64 MiB, and the hint rounds up
++	// to four decimals, so 0.0058. Documentation that quotes a looser value
++	// (0.01 fits, but wastes ~10% of the filter's accuracy budget) has drifted
++	// from what the code actually computes; this assertion is what catches that.
++	assert.InDelta(t, 0.0058, fpr, 1e-9,
++		"the suggested fpr must be the tight bound, not a rounder nearby value")
++
++	// One step below the suggestion must genuinely not fit, or the bound is not
++	// tight.
++	assert.Greater(t, sbbfBodyBytes(n, 0.0057), 64*1024*1024,
++		"fpr just under the suggested bound must still overflow")
++}
++
++// TestOversizedBlobHintDegradesSafely covers the inputs where no advice is
++// possible. The hint runs before envelope validation, so it must never panic
++// or invent a suggestion from a malformed blob.
++func TestOversizedBlobHintDegradesSafely(t *testing.T) {
++	assert.Empty(t, oversizedBlobHint(nil, 64*1024*1024), "nil blob")
++	assert.Empty(t, oversizedBlobHint(make([]byte, 8), 64*1024*1024), "shorter than the header")
++	assert.Empty(t, oversizedBlobHint(hintBlob(1000, 64), 0), "nonsensical cap")
++	assert.Empty(t, oversizedBlobHint(hintBlob(0, 64), 64*1024*1024), "no declared members")
++	assert.Empty(t, oversizedBlobHint(hintBlob(math.MaxUint64, 64), 64*1024*1024), "absurd declared members")
++
++	// Far past what the cap can hold at any accepted fpr: say so instead of
++	// suggesting an fpr that would not help.
++	hint := oversizedBlobHint(hintBlob(5_000_000_000, 64), 64*1024*1024)
++	assert.Contains(t, hint, "even at the maximum fpr")
++}
++
++// hintFPR extracts the float following "fpr >= " in the hint.
++func hintFPR(t *testing.T, hint string) float64 {
++	t.Helper()
++	idx := strings.Index(hint, "fpr >= ")
++	require.GreaterOrEqualf(t, idx, 0, "hint carries no fpr: %q", hint)
++	rest := hint[idx+len("fpr >= "):]
++	if end := strings.IndexByte(rest, ' '); end >= 0 {
++		rest = rest[:end]
++	}
++	v, err := strconv.ParseFloat(rest, 64)
++	require.NoErrorf(t, err, "unparsable fpr %q in hint %q", rest, hint)
++	return v
++}
+diff --git a/pkg/util/paramtable/component_param.go b/pkg/util/paramtable/component_param.go
+index b785db88f1268..29670f6b842ff 100644
+--- a/pkg/util/paramtable/component_param.go
++++ b/pkg/util/paramtable/component_param.go
+@@ -2265,19 +2265,32 @@ func (p *proxyConfig) init(base *BaseTable) {
+ 
+ 	p.MaxBloomFilterSize = ParamItem{
+ 		Key: "proxy.maxBloomFilterSize",
+-		// 32 MiB. Budgets the SBBF body; the fixed 32-byte MBF1 header is allowed
+-		// on top (see validateBloomFilterBlob). The body is always a power of two,
+-		// so a full 32 MiB body fits under this cap and admits ~24M int64 members
+-		// at the default FPR — budgeting the whole blob at 32 MiB would instead
+-		// reject a 32 MiB body and halve the ceiling to a 16 MiB body.
+-		DefaultValue: "33554432",
++		// 64 MiB. Budgets the SBBF body; the fixed 32-byte MBF1 header is allowed
++		// on top, so the gate is `len(blob) > maxSize + mbf1HeaderSize` and a
++		// full 64 MiB body passes exactly (see validateBloomFilterBlob). Because
++		// SBBF bodies are powers of two, any value in [64 MiB, 128 MiB) admits
++		// the same set of filters; 64 MiB is chosen as the smallest of those, so
++		// the number states the real ceiling rather than implying headroom that
++		// does not exist.
++		//
++		// A 64 MiB body admits ~48.6M int64 members at the default fpr=0.005 and
++		// ~55.4M at fpr=0.01. Raised from 32 MiB (~24M members) so 50M-member
++		// filters become expressible — but only at a raised fpr: 50M at the
++		// default 0.005 wants 65.77 MiB of bits, and the power-of-two round-up
++		// takes that to a 128 MiB body. The smallest fpr that keeps 50M inside
++		// 64 MiB is ~0.0058; oversizedBlobHint computes that bound per request
++		// and reports it in the rejection.
++		DefaultValue: "67108864",
+ 		Version:      "3.0.0",
+ 		Doc: "The maximum byte size of the SBBF body in a client pre-built bloom_match " +
+ 			"filter blob accepted by the proxy (the fixed 32-byte MBF1 header is allowed on " +
+ 			"top). The blob is embedded into the query plan and fanned out to every QueryNode, " +
+ 			"so this bounds per-request memory/network amplification. Must not exceed the MBF1 " +
+-			"format cap (128 MiB); the default admits ~24M int64 members at the default FPR " +
+-			"while staying under the default gRPC receive limit.",
++			"format cap (128 MiB). SBBF bodies are powers of two, so the default admits bodies " +
++			"up to 64 MiB: ~48.6M int64 members at the default fpr=0.005, ~55.4M at fpr=0.01. " +
++			"Raising the member count past a tier boundary requires raising the fpr too, not " +
++			"only this limit. Keep proxy.grpc.serverMaxRecvSize above this plus the rest of " +
++			"the request.",
+ 		Export: true,
+ 	}
+ 	p.MaxBloomFilterSize.Init(base.mgr)

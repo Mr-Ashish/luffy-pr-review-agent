@@ -1,0 +1,365 @@
+::notice::Luffy orchestrator · root=/Users/ashishmishra/Documents/experiments/pr-review-agent workspace=/Users/ashishmishra/Documents/experiments/odoo
+::notice::Luffy stage: preload_memory
+MEMORY_MODE=local
+MEMORY_PATH=.luffy
+No local memory yet at Mr-Ashish/odoo/.luffy/MEMORY.md (HTTP 404)
+Hub preload skipped (mode=local, LUFFY_HUB_PUBLISH=0)
+MEMORY_SOURCE=seed
+HUB_MEMORY=skipped
+::notice::Luffy stage: assemble
+Assembling context for Mr-Ashish/odoo#2 → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/prompt.md
+Context ready: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/prompt.md (diff_truncated=false)
+::notice::Luffy stage: hermes
+::notice::F43 preflight cost · decision=allow reason=no_budget est=$0.009926 model=openai/gpt-4.1-mini
+F43 preflight cost · decision=allow reason=no_budget est=$0.009926 model=openai/gpt-4.1-mini
+::notice::hermes present but pin mismatch (want 53559aaf86b84dadae83cd9bb605ca476f9a0606 head=4a798f4bce29302c9e981c877753e083f80fe533); reinstalling...
+hermes present but pin mismatch (want 53559aaf86b84dadae83cd9bb605ca476f9a0606 head=4a798f4bce29302c9e981c877753e083f80fe533); reinstalling...
+::notice::hermes install.sh args: --skip-setup --commit 53559aaf86b84dadae83cd9bb605ca476f9a0606 --force-commit
+hermes install.sh args: --skip-setup --commit 53559aaf86b84dadae83cd9bb605ca476f9a0606 --force-commit
+
+[0;35m[1m
+┌─────────────────────────────────────────────────────────┐
+│             ⚕ Hermes Agent Installer                    │
+├─────────────────────────────────────────────────────────┤
+│  An open source AI agent by Nous Research.              │
+└─────────────────────────────────────────────────────────┘
+[0m
+[0;32m✓[0m Detected: macos (macos)
+[0;36m→[0m Installing managed uv into /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/bin ...
+[0;32m✓[0m Managed uv installed (uv 0.12.0 (b88d7c5c4 2026-07-28 aarch64-apple-darwin))
+[0;36m→[0m Checking Python 3.11...
+[0;32m✓[0m Python found: Python 3.11.14
+[0;36m→[0m Checking Git...
+[0;32m✓[0m Git 2.39.5 found
+[0;36m→[0m Checking Node.js (for browser tools)...
+[0;32m✓[0m Node.js v20.20.0 found
+[0;36m→[0m Checking internet connectivity for package install and web tools...
+[0;32m✓[0m Internet connectivity looks good
+[0;36m→[0m Checking ripgrep (fast file search)...
+[0;32m✓[0m ripgrep 15.2.0 found
+[0;36m→[0m Checking ffmpeg (TTS voice messages)...
+[0;32m✓[0m ffmpeg 8.0.1 found
+[0;36m→[0m Installing to /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/hermes-agent...
+[0;36m→[0m Trying SSH clone...
+[0;36m→[0m SSH failed, trying HTTPS...
+Cloning into '/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/hermes-agent'...
+Updating files:  78% (6312/8089)Updating files:  79% (6391/8089)Updating files:  80% (6472/8089)Updating files:  81% (6553/8089)Updating files:  82% (6633/8089)Updating files:  83% (6714/8089)Updating files:  84% (6795/8089)Updating files:  85% (6876/8089)Updating files:  86% (6957/8089)Updating files:  87% (7038/8089)Updating files:  88% (7119/8089)Updating files:  89% (7200/8089)Updating files:  90% (7281/8089)Updating files:  91% (7361/8089)Updating files:  92% (7442/8089)Updating files:  93% (7523/8089)Updating files:  94% (7604/8089)Updating files:  95% (7685/8089)Updating files:  96% (7766/8089)Updating files:  97% (7847/8089)Updating files:  98% (7928/8089)Updating files:  99% (8009/8089)Updating files: 100% (8089/8089)Updating files: 100% (8089/8089), done.
+[0;32m✓[0m Cloned via HTTPS
+From https://github.com/NousResearch/hermes-agent
+ * branch                53559aaf86b84dadae83cd9bb605ca476f9a0606 -> FETCH_HEAD
+[0;36m→[0m Pinning checkout to commit 53559aaf86b84dadae83cd9bb605ca476f9a0606...
+HEAD is now at 53559aaf8 fix(agent): protect batch-compaction markers from micro supersede/defrag
+[0;32m✓[0m Repository ready
+[0;36m→[0m Creating virtual environment with Python 3.11...
+Using CPython 3.11.14 interpreter at: /Users/ashishmishra/.pyenv/versions/3.11.14/bin/python3.11
+Creating virtual environment at: venv
+Activate with: source venv/bin/activate
+[0;32m✓[0m Virtual environment ready (Python 3.11)
+[0;36m→[0m Installing dependencies...
+[0;36m→[0m Trying tier: hash-verified (uv.lock) ...
+[0;36m→[0m (this resolves + downloads the curated [all] set — first run on a
+[0;36m→[0m  fresh venv can take 1-5 minutes; uv prints progress below)
+Resolved 250 packages in 17ms
+   Building hermes-agent @ file:///Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/hermes-agent
+      Built hermes-agent @ file:///Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/hermes-agent
+Prepared 1 package in 960ms
+Installed 96 packages in 275ms
+ + agent-client-protocol==0.9.0
+ + aiohappyeyeballs==2.6.1
+ + aiohttp==3.14.1
+ + aiosignal==1.4.0
+ + annotated-doc==0.0.4
+ + annotated-types==0.7.0
+ + anyio==4.12.1
+ + attrs==25.4.0
+ + certifi==2026.5.20
+ + cffi==2.0.0
+ + charset-normalizer==3.4.4
+ + click==8.4.2
+ + croniter==6.0.0
+ + cryptography==48.0.1
+ + defusedxml==0.7.1
+ + distro==1.9.0
+ + fastapi==0.133.1
+ + fire==0.7.1
+ + frozenlist==1.8.0
+ + google-api-core==2.30.3
+ + google-api-python-client==2.194.0
+ + google-auth==2.55.1
+ + google-auth-httplib2==0.3.1
+ + google-auth-oauthlib==1.3.1
+ + googleapis-common-protos==1.73.0
+ + h11==0.16.0
+ + hermes-agent==0.19.1 (from file:///Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/hermes-agent)
+ + httpcore==1.0.9
+ + httplib2==0.31.2
+ + httptools==0.7.1
+ + httpx==0.28.1
+ + httpx-sse==0.4.3
+ + idna==3.15
+ + jinja2==3.1.6
+ + jiter==0.13.0
+ + jsonschema==4.26.0
+ + jsonschema-specifications==2025.9.1
+ + markdown==3.10.2
+ + markdown-it-py==4.0.0
+ + markupsafe==3.0.3
+ + mcp==1.26.0
+ + mdurl==0.1.2
+ + multidict==6.7.1
+ + nemo-relay==0.6.0
+ + oauthlib==3.3.1
+ + openai==2.24.0
+ + packaging==26.0
+ + pathspec==1.1.1
+ + pillow==12.2.0
+ + prompt-toolkit==3.0.52
+ + propcache==0.4.1
+ + proto-plus==1.27.2
+ + protobuf==6.33.5
+ + psutil==7.2.2
+ + ptyprocess==0.7.0
+ + pyasn1==0.6.3
+ + pyasn1-modules==0.4.2
+ + pycparser==3.0
+ + pydantic==2.13.4
+ + pydantic-core==2.46.4
+ + pydantic-settings==2.13.1
+ + pygments==2.19.2
+ + pyjwt==2.13.0
+ + pyparsing==3.3.2
+ + python-dateutil==2.9.0.post0
+ + python-dotenv==1.2.2
+ + python-multipart==0.0.32
+ + pytz==2025.2
+ + pyyaml==6.0.3
+ + referencing==0.37.0
+ + requests==2.33.0
+ + requests-oauthlib==2.0.0
+ + rich==14.3.3
+ + rpds-py==0.30.0
+ + ruamel-yaml==0.18.17
+ + ruamel-yaml-clib==0.2.15
+ + simple-term-menu==1.6.6
+ + six==1.17.0
+ + sniffio==1.3.1
+ + socksio==1.0.0
+ + sse-starlette==3.3.2
+ + starlette==1.3.1
+ + tenacity==9.1.4
+ + termcolor==3.3.0
+ + tqdm==4.67.3
+ + typing-extensions==4.15.0
+ + typing-inspection==0.4.2
+ + uritemplate==4.2.0
+ + urllib3==2.7.0
+ + uvicorn==0.41.0
+ + uvloop==0.22.1
+ + watchfiles==1.1.1
+ + wcwidth==0.6.0
+ + websockets==15.0.1
+ + yarl==1.22.0
+ + youtube-transcript-api==1.2.4
+[0;32m✓[0m Main package installed (hash-verified via uv.lock)
+[0;32m✓[0m All dependencies installed
+[0;36m→[0m Installing Node.js dependencies (browser tools)...
+✅ Browser tools ready. Run: python run_agent.py --help
+[0;32m✓[0m Node.js dependencies installed
+[0;36m→[0m Installing browser engine (Playwright Chromium)...
+[0;33m⚠[0m Playwright does not support automatic dependency installation on macos.
+[0;36m→[0m Install Chromium/browser system dependencies for your distribution, then run:
+[0;36m→[0m   cd /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/hermes-agent && npx playwright install chromium
+[0;36m→[0m Browser tools will not work until dependencies are installed.
+[0;32m✓[0m Browser engine setup complete
+[0;36m→[0m Installing TUI dependencies...
+✅ Browser tools ready. Run: python run_agent.py --help
+[0;32m✓[0m TUI dependencies installed
+[0;36m→[0m Setting up hermes command...
+[0;32m✓[0m Installed hermes launcher → ~/.local/bin/hermes
+[0;32m✓[0m Installed hermes-acp launcher → ~/.local/bin/hermes-acp
+[0;36m→[0m ~/.local/bin already on PATH
+[0;32m✓[0m hermes command ready
+[0;36m→[0m Setting up configuration files...
+[0;32m✓[0m Created ~/.hermes/.env from template
+[0;32m✓[0m Created ~/.hermes/config.yaml from template
+[0;32m✓[0m Created ~/.hermes/SOUL.md (edit to customize personality)
+[0;32m✓[0m Configuration directory ready: ~/.hermes/
+[0;36m→[0m Syncing bundled skills to ~/.hermes/skills/ ...
+Syncing bundled skills into ~/.hermes/skills/ ...
+  + apple-reminders
+  + imessage
+  + findmy
+  + apple-notes
+  + blogwatcher
+  + polymarket
+  + llm-wiki
+  + arxiv
+  + research-paper-writing
+  + xurl
+  + test-driven-development
+  + systematic-debugging
+  + plan
+  + inspecting-hermes-desktop-dom
+  + hermes-agent-skill-authoring
+  + python-debugpy
+  + spike
+  + requesting-code-review
+  + simplify-code
+  + node-inspect-debugger
+  + dogfood
+  + huggingface-hub
+  + serving-llms-vllm
+  + llama-cpp
+  + evaluating-llms-harness
+  + weights-and-biases
+  + github-auth
+  + github-repo-management
+  + github-pr-workflow
+  + github-code-review
+  + github-issues
+  + codebase-inspection
+  + obsidian
+  + comfyui
+  + baoyu-infographic
+  + songwriting-and-ai-music
+  + ascii-video
+  + touchdesigner-mcp
+  + excalidraw
+  + claude-design
+  + ascii-art
+  + design-md
+  + popular-web-designs
+  + manim-video
+  + pretext
+  + humanizer
+  + p5js
+  + architecture-diagram
+  + sketch
+  + himalaya
+  + openhue
+  + claude-code
+  + codex
+  + hermes-agent
+  + computer-use
+  + opencode
+  + nano-pdf
+  + maps
+  + teams-meeting-pipeline
+  + xlsx
+  + pdf
+  + notion
+  + airtable
+  + powerpoint
+  + google-workspace
+  + ocr-and-documents
+  + docx
+  + youtube-content
+  + songsee
+  + gif-search
+
+Done: 70 new, 0 updated, 0 unchanged. 70 total bundled.
+[0;32m✓[0m Skills synced to ~/.hermes/skills/
+[0;36m→[0m Skipping setup wizard (--skip-setup)
+
+[0;32m[1m
+┌─────────────────────────────────────────────────────────┐
+│              ✓ Installation Complete!                   │
+└─────────────────────────────────────────────────────────┘
+[0m
+
+[0;36m[1m📁 Your files:[0m
+
+   [0;33mConfig:[0m    /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/config.yaml
+   [0;33mAPI Keys:[0m  /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/.env
+   [0;33mData:[0m      /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/cron/, sessions/, logs/
+   [0;33mCode:[0m      /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/hermes-agent
+
+[0;36m─────────────────────────────────────────────────────────[0m
+
+[0;36m[1m🚀 Commands:[0m
+
+   [0;32mhermes[0m              Start chatting
+   [0;32mhermes setup[0m        Configure API keys & settings
+   [0;32mhermes config[0m       View/edit configuration
+   [0;32mhermes config edit[0m  Open config in editor
+   [0;32mhermes gateway install[0m Install gateway service (messaging + cron)
+   [0;32mhermes update[0m       Update to latest version
+
+[0;36m─────────────────────────────────────────────────────────[0m
+
+[0;33m⚡ Reload your shell to use 'hermes' command:[0m
+
+   source ~/.zshrc
+
+::notice::hermes installed: /Users/ashishmishra/.local/bin/hermes head=4a798f4bce29302c9e981c877753e083f80fe533 pin=53559aaf86b84dadae83cd9bb605ca476f9a0606
+hermes installed: /Users/ashishmishra/.local/bin/hermes head=4a798f4bce29302c9e981c877753e083f80fe533 pin=53559aaf86b84dadae83cd9bb605ca476f9a0606
+Hermes Agent v0.19.1 (2026.7.30) · upstream 126ff707 · local 53559aaf (+19669 carried commits)
+Install directory: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/hermes-agent
+Install method: git
+Python: 3.11.14
+OpenAI SDK: 2.24.0
+::notice::Hermes review · model=openai/gpt-4.1-mini tier=explicit toolsets=terminal workspace=/Users/ashishmishra/Documents/experiments/odoo hermes_home=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home timeout=1500s max_turns=25
+Hermes review · model=openai/gpt-4.1-mini tier=explicit toolsets=terminal workspace=/Users/ashishmishra/Documents/experiments/odoo hermes_home=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home timeout=1500s max_turns=25
+::notice::hermes -z failed or empty (rc=2); trying hermes chat -q
+hermes -z failed or empty (rc=2); trying hermes chat -q
+hermes-run.log bytes=10323
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/agent-loop
+captured steps=2 messages=2 tool_turns=0 session=None
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/review-2.md
+usage-summary: no usage file; skip append
+REVIEW_FILE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/review-2.md
+AGENT_LOOP_DIR=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/agent-loop
+::notice::Review written: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/review-2.md (9772 bytes)
+Review written: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/review-2.md (9772 bytes)
+::notice::Agent loop captured: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/agent-loop
+Agent loop captured: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/agent-loop
+::notice::Luffy stage: distill
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/memories/MEMORY.md
+Memory distilled → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/memories/MEMORY.md (937 bytes)
+::notice::Luffy stage: save_trace
+Included agent-loop package → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/traces/pr2-runlocal-a1/agent-loop
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/traces/pr2-runlocal-a1
+TRACE_DIR=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/traces/pr2-runlocal-a1
+TRACE_ID=pr2-runlocal-a1
+Trace stored at /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/traces/pr2-runlocal-a1 (136K)
+::notice::Luffy stage: publish_local
+MEMORY_MODE=local
+MEMORY_PATH=.luffy
+payload_bytes=15507
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/hub-payload.json
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/client_payload.json
+::notice::Local memory publish → Mr-Ashish/odoo@19.0 path=.luffy
+Local memory publish → Mr-Ashish/odoo@19.0 path=.luffy
+Wrote local memory under /private/var/folders/2b/l8r1b38n75jd77wtd44p4ycr0000gn/T/tmp.2lfaLkznfs/target/.luffy trace=pr2-runlocal-a1
+MEMORY=/private/var/folders/2b/l8r1b38n75jd77wtd44p4ycr0000gn/T/tmp.2lfaLkznfs/target/.luffy/MEMORY.md
+RUN_DIR=/private/var/folders/2b/l8r1b38n75jd77wtd44p4ycr0000gn/T/tmp.2lfaLkznfs/target/.luffy/runs/pr2-runlocal-a1
+LAYOUT=local
+The following paths are ignored by one of your .gitignore files:
+.luffy
+hint: Use -f if you really want to add them.
+hint: Turn this message off by running
+hint: "git config advice.addIgnoredFile false"
+No local memory changes to commit
+LOCAL_PUBLISH=noop
+::notice::Luffy stage: publish_hub
+LUFFY_HUB_PUBLISH=0 (mode=local); skip hub publish
+HUB_PUBLISH=skipped
+::notice::Luffy stage: pack_ui_bundle
+host=local trace=pr2-runlocal-a1 verdict=< APPROVE | REQUEST CHANGES | COMMENT > files=17
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/run-bundle.json
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/traces/pr2-runlocal-a1/run-bundle.json
+RUN_BUNDLE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/run-bundle.json
+REVIEW_FILE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/review-2.md
+LUFFY_STATUS=success
+TRACE_DIR=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/traces/pr2-runlocal-a1
+RUN_BUNDLE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/run-bundle.json
+--- memory-health ---
+MEMORY_SOURCE=seed
+MEMORY_MODE=local
+MEMORY_PATH=.luffy
+LOCAL_PUBLISH=noop
+HUB_PUBLISH=skipped
+Done. Review: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/review-2.md
+Set POST_COMMENT=1 to post, or run:
+  ./scripts/post-review-comment.sh /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr2-f44/review-2.md 2

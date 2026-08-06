@@ -1,0 +1,215 @@
+{
+  "run": {
+    "schema_version": 1,
+    "event": "luffy-run",
+    "source_repo": "Mr-Ashish/milvus",
+    "pr_number": "1",
+    "run_id": "local",
+    "run_attempt": "1",
+    "trace_id": "pr1-runlocal-a1",
+    "model": "openai/gpt-4.1-mini",
+    "status": "success",
+    "verdict": "COMMENT",
+    "trigger_comment": "",
+    "review_truncated": false,
+    "review_md": "<!-- luffy-review pr=1 run=local -->\n## \ud83c\udff4\u200d\u2620\ufe0f Luffy Review \u2014 PR #1\n\n**Verdict:** COMMENT  \n**Confidence:** medium  \n**Score:** 75/100  \n**Review effort:** 3/5\n\n### Summary\nThis PR moves WAL insert body parsing into the `FunctionRunnerManager` and optimizes it by skipping parsing when no runner-backed functions are present in the schema. The changes affect insert message materialization paths and provide test coverage with mock insert messages in multiple test suites. The PR passes CI checks with no visible errors.\n\n### Walkthrough\n- Added a `materializeTestInsertMessage` mock type in tests for insert message materialization control.\n- Changed calls to `Materialize` in tests to use the mock type wrapping the insert message.\n- Modified `materializeFunctionFields` in `shardInterceptor` to directly pass insert message to `Materialize` without intermediate parsing.\n- Added test for skipping materialization when no functions exist.\n- Adjusted related test suites to accommodate the mocking and new materialization approach.\n\n### Architecture diagram\n<!-- luffy-mermaid -->\n\n_Auto-generated from 6 changed file(s) (F57). Edges between groups are adjacency, not proven runtime dependencies._\n\n```mermaid\nflowchart LR\n  %% PR changed modules (6 files, 1 groups)\n  subgraph g_internal[\"internal\"]\n    f_internal_flushcommon_writebuffer_write_buffer_test_go[\"write_buffer_test.go\"]\n    %% internal/flushcommon/writebuffer/write_buffer_test.go\n    f_internal_querynodev2_delegator_delegator_test_go[\"delegator_test.go\"]\n    %% internal/querynodev2/delegator/delegator_test.go\n    f_internal_streamingnode_server_wal_interceptors_shard_function_[\"function_materializer.go\"]\n    %% internal/streamingnode/server/wal/interceptors/shard/function_materializer.go\n    f_internal_streamingnode_server_wal_interceptors_shard_shard_int[\"shard_interceptor_test.go\"]\n    %% internal/streamingnode/server/wal/interceptors/shard/shard_interceptor_test.go\n    f_internal_util_function_manager_go[\"manager.go\"]\n    %% internal/util/function/manager.go\n    f_internal_util_function_manager_test_go[\"manager_test.go\"]\n    %% internal/util/function/manager_test.go\n  end\n```\n\n<details><summary>Files in diagram</summary>\n\n- `internal/flushcommon/writebuffer/write_buffer_test.go`\n- `internal/querynodev2/delegator/delegator_test.go`\n- `internal/streamingnode/server/wal/interceptors/shard/function_materializer.go`\n- `internal/streamingnode/server/wal/interceptors/shard/shard_interceptor_test.go`\n- `internal/util/function/manager.go`\n- `internal/util/function/manager_test.go`\n\n</details>\n\n\n### Blocking\n- None\n\n### Key findings\nNone \u2014 no high-confidence defects in new code.\n\n### Security audit\nNo \u2014 changes do not expose new attack surfaces or risks visibly.\n\n### Multi-lens checklist\n| Lens         | Status  | Note                                                                |\n|--------------|---------|---------------------------------------------------------------------|\n| correctness  | ok      | New materialization logic with mock tests cover edge cases.        |\n| security     | ok      | No unsafe operations or secrets exposure seen.                      |\n| tests       | ok      | Tests added/updated for core materialize logic and new code paths. |\n| performance  | ok      | Optimization to skip parsing if no functions, reducing overhead.   |\n| api_contracts| ok      | No breaking public API changes, internal refactoring only.          |\n| concurrency  | n/a     | No concurrent code or locking changes seen here.                    |\n| maintainability| ok    | Code changes are isolated and tested, mock use improves clarity.   |\n\n### Suggestions\n- In tests, consider adding some negative scenarios for `materializeFunctionFields` where malformed or unexpected insert messages are passed to strengthen robustness.\n\n### Code suggestions\nNone\n\n### Nits\n- Consider adding brief comments on the new mock type `materializeTestInsertMessage` in tests to clarify its purpose for future maintainers.\n\n### Tests & risk\n- Relevant tests added/updated: yes  \n- Coverage: Covers new materialization paths, including skips and errors  \n- Risk: low \u2014 changes are internal refactoring and optimization with test safety net  \n- Rollback: easy \u2014 revert refactor and test adjustments\n\n### What I checked\n- Full PR diff and test additions for coverage of the `Materialize` logic and `shardInterceptor.materializeFunctionFields`.\n- Verification that no new direct parsing happens outside the `FunctionRunnerManager`.\n- Checked tests for use of mock insert message wrappers and proper assertions.\n\n---\n*Luffy \u00b7 Hermes Agent \u00b7 OpenRouter \u00b7 memory-backed review*\n*Cost / usage: model=`openai/gpt-4.1-mini` \u00b7 ~$0.07 (estimated) \u00b7 573k tokens \u00b7 25 API calls*\n",
+    "memory_block": "## Review run pr1-runlocal-a1\n- Source: `Mr-Ashish/milvus` PR #1\n- Status: success\n- Model: openai/gpt-4.1-mini\n- Verdict: COMMENT\n- Blocking: - None\n- Summary: This PR moves WAL insert body parsing into the `FunctionRunnerManager` and optimizes it by skipping parsing when no runner-backed functions are present in the schema. The changes affect insert message materialization paths and provide test coverage with mock insert messages in multiple test suites. The PR passes CI checks with no visible errors.\n- Trigger: \n",
+    "timings": {
+      "started_at": "2026-07-31T18:22:34Z",
+      "ended_at": "2026-07-31T18:24:18Z",
+      "total_seconds": 104,
+      "stages": [
+        {
+          "name": "preload_memory",
+          "seconds": 1,
+          "exit_code": 0
+        },
+        {
+          "name": "assemble",
+          "seconds": 4,
+          "exit_code": 0
+        },
+        {
+          "name": "hermes",
+          "seconds": 99,
+          "exit_code": 0
+        },
+        {
+          "name": "distill",
+          "seconds": 0,
+          "exit_code": 0
+        }
+      ]
+    },
+    "meta": {
+      "github_sha": null,
+      "github_ref": null,
+      "github_event_name": null,
+      "started_at": "2026-07-31T18:22:34Z",
+      "trace_meta": {
+        "trace_id": "pr1-runlocal-a1",
+        "schema_version": 1,
+        "repo": "Mr-Ashish/milvus",
+        "pr_number": "1",
+        "run_id": "local",
+        "run_attempt": "1",
+        "model": "openai/gpt-4.1-mini",
+        "status": "success",
+        "started_at": "2026-07-31T18:22:34Z",
+        "ended_at": "2026-07-31T18:24:18Z",
+        "workspace_root": "/Users/ashishmishra/Documents/experiments/pr-review-agent",
+        "github_sha": null,
+        "github_ref": null,
+        "github_event_name": null,
+        "hermes_rc": "0",
+        "trigger_comment": "",
+        "files": {
+          "agent-loop/agent-loop.json": {
+            "bytes": 188445,
+            "sha256": "45991387cf76f0e632b7da9c119298bae8466adbab720324ee762dc2fcd843a2"
+          },
+          "agent-loop/agent-loop.md": {
+            "bytes": 35284,
+            "sha256": "91b761452f7b4a69c213aae6270e984b26ad4a2fb02e46740681648c82222c77"
+          },
+          "agent-loop/agent.log": {
+            "bytes": 2401,
+            "sha256": "290aa3fc2fe7b9663b1dfa0cf2161fd0133b29fb5a73cd0c80a1633a80c311c2"
+          },
+          "agent-loop/errors.log": {
+            "bytes": 2901,
+            "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+          },
+          "agent-loop/usage.json": {
+            "bytes": 454,
+            "sha256": "20bc5e485a43ed02c21bfe37186cb63d7195947c00803878d5cae0d35e6127cc"
+          },
+          "agent-loop-attempt1/agent-loop.json": {
+            "bytes": 25414,
+            "sha256": "420e8bc9387db8268e13e2706ff3537e256a2b2cc562ae0f5cbc2daa37228461"
+          },
+          "agent-loop-attempt1/agent-loop.md": {
+            "bytes": 4613,
+            "sha256": "13c64b58dbe7105f5389534cc82835fa1c8d31e65c70a1f48fc00f615e7d8caa"
+          },
+          "agent-loop-attempt1/agent.log": {
+            "bytes": 2401,
+            "sha256": "7436833fef6965293a2348394761df4e6f3af301e04f4c0a78a497e858bb8ef8"
+          },
+          "agent-loop-attempt1/errors.log": {
+            "bytes": 2901,
+            "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+          },
+          "agent-loop-attempt1/usage.json": {
+            "bytes": 445,
+            "sha256": "7ab8b2095a0f0fe45def236e1859d8720ff48a66294655bf3022937e73fdd075"
+          },
+          "context.md": {
+            "bytes": 6074,
+            "sha256": "09c40dc72171d6582a8fee1e20c9b9491f99195a6e06fdf5edafa673d6d7b29b"
+          },
+          "files.txt": {
+            "bytes": 444,
+            "sha256": "9b76a0877a101387091304ea60b68df2c4f4aa990af2c913e6772c9bd77226b0"
+          },
+          "hermes-max-turns.env": {
+            "bytes": 49,
+            "sha256": "6b66a2a2643dbe65337b35ba3df7745af620ba392034d1c7c30c6d487e581097"
+          },
+          "hermes-pin.txt": {
+            "bytes": 41,
+            "sha256": "0ea7b07d1ee10f05f03acb0228b48c579f1f1f89ba622198bbbeda984e9b631a"
+          },
+          "hermes-run.log": {
+            "bytes": 2401,
+            "sha256": "290aa3fc2fe7b9663b1dfa0cf2161fd0133b29fb5a73cd0c80a1633a80c311c2"
+          },
+          "hermes-usage.json": {
+            "bytes": 454,
+            "sha256": "20bc5e485a43ed02c21bfe37186cb63d7195947c00803878d5cae0d35e6127cc"
+          },
+          "hermes.stderr": {
+            "bytes": 31044,
+            "sha256": "1ee5e8b69aac9115099d5cb4646ac269a16198e703ea1e2a02707a99e029a32e"
+          },
+          "linked-issue-context.env": {
+            "bytes": 233,
+            "sha256": "fd87b30e13d49b02940b94f09ef198aa1e97488e30a5410056f616b14e752c08"
+          },
+          "linked-issues.md": {
+            "bytes": 4118,
+            "sha256": "02f9dc3ccf5b2c7350f6d39f049eb2c54c6b02e8fc6ef830e511ebc36f2d72b7"
+          },
+          "memory-after.md": {
+            "bytes": 2790,
+            "sha256": "6e61cec423c1f110b28c99eb9ec1afa517a2f05ae71faf9f75846db0110be601"
+          },
+          "memory-before.md": {
+            "bytes": 2574,
+            "sha256": "b1a09b867881caab1acb86de9b8f15bc1755da993e5045962a12c9a394af06fb"
+          },
+          "meta.env": {
+            "bytes": 939,
+            "sha256": "2710d1840a625b734c5c6e706183135256b9f9dd98babc19254e05df1f7c5f26"
+          },
+          "model-tier.env": {
+            "bytes": 101,
+            "sha256": "52366ea5eb712ca8609e8eb5af44e6e10cbd38c3c5574f006533fc699b9a42ad"
+          },
+          "pr.diff": {
+            "bytes": 18151,
+            "sha256": "ac7754e03493ce01975eff1b408ec1559b46335b1b3ee2fe769261a110d6127e"
+          },
+          "pr.json": {
+            "bytes": 2036,
+            "sha256": "10c965e2986aa6bd8e3e0946262ea1a884019ca8e98cdcdd6b3009ed78072251"
+          },
+          "preflight-cost.env": {
+            "bytes": 367,
+            "sha256": "ea3da65940ea44d4a90b4fc9db557119b6a660a32b9f46603c27b0511cfedfe6"
+          },
+          "prompt-reprompt.md": {
+            "bytes": 16313,
+            "sha256": "a38a9eac9428ef8af72dc7407692f4cf20fe6312460353cf658a08704931e997"
+          },
+          "prompt.md": {
+            "bytes": 14622,
+            "sha256": "ef002f935e280bd78313edf52f6996258ab694418a5d5465273ca89d1ae1f81e"
+          },
+          "review.md": {
+            "bytes": 4769,
+            "sha256": "fddee342b4c31b964251013d7403fd932d40d6a914ffe418fed8b783d5b6dfe3"
+          },
+          "review.raw.md": {
+            "bytes": 4080,
+            "sha256": "44843140336322e60ca903c84362979fb4c44af53ba835454ac16c551962f7cd"
+          },
+          "severity-calibration.env": {
+            "bytes": 160,
+            "sha256": "00e678f63d2ddb820e1d5e74ffa18b9aac8aabb16e9deaa46f796f613d950e04"
+          },
+          "soul-context-preflight.env": {
+            "bytes": 108,
+            "sha256": "4c0441fe38df5259bae5c8033849b9bff2f757257509cc9d7f79fa64e2789df0"
+          },
+          "soul-context.env": {
+            "bytes": 23,
+            "sha256": "c4cbeffb88797871d982e5fe6c7b24e44e89172a4b605ff56d42a204c49c81c0"
+          },
+          "timings.json": {
+            "bytes": 447,
+            "sha256": "2741547da2681d75168bf999668069a33e92256996cf40f8e04fe43025a748ec"
+          },
+          "tool-turns-gate.env": {
+            "bytes": 157,
+            "sha256": "e9629e1d0cdbd42140a457a21c391ccb5b0a18f43b5d3f45663e2b0a101c3a50"
+          },
+          "tool-turns-reprompt.env": {
+            "bytes": 129,
+            "sha256": "2689b3aae4e79e982663e3f688328a8abd7f57c78c72597860ecac301757e3c2"
+          }
+        }
+      }
+    }
+  }
+}

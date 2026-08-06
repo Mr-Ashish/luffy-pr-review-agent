@@ -1,0 +1,27 @@
+{
+  "trace_id": "pr2-runlocal-a1",
+  "schema_version": 1,
+  "meta": "meta.json",
+  "artifacts": [
+    "agent-loop/agent-loop.json",
+    "agent-loop/agent-loop.md",
+    "agent-loop/agent.log",
+    "agent-loop/errors.log",
+    "context.md",
+    "files.txt",
+    "hermes-pin.txt",
+    "hermes-run.log",
+    "hermes.stderr",
+    "memory-after.md",
+    "meta.env",
+    "pr.diff",
+    "pr.json",
+    "prompt.md",
+    "review.md",
+    "review.raw.md",
+    "timings.json"
+  ],
+  "review": "review.md",
+  "prompt": "prompt.md",
+  "raw_review": "review.raw.md"
+}

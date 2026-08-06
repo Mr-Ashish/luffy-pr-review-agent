@@ -1,0 +1,207 @@
+{
+  "run": {
+    "schema_version": 1,
+    "event": "luffy-run",
+    "source_repo": "Mr-Ashish/odoo",
+    "pr_number": "6",
+    "run_id": "local",
+    "run_attempt": "1",
+    "trace_id": "pr6-runlocal-a1",
+    "model": "openai/gpt-4.1-mini",
+    "status": "success",
+    "verdict": "APPROVE",
+    "trigger_comment": "",
+    "review_truncated": false,
+    "review_md": "<!-- luffy-review pr=6 run=local -->\n## \ud83c\udff4\u200d\u2620\ufe0f Luffy Review \u2014 PR #6\n\n**Verdict:** APPROVE  \n**Confidence:** high  \n**Score:** 95/100  \n**Review effort:** 2/5  \n\n### Summary\nThis PR updates the `street_split` regex in `odoo/tools/misc.py` to fix address parsing. It also touches related logic in the `base_address_extended` module and updates multi-locale test fixtures for address handling. The change appears well-covered by existing and added tests, including detailed unit tests for the street splitting behavior.\n\n### Walkthrough\n- `odoo/tools/misc.py:street_split` \u2014 core updated regex for splitting street address into components with improved accuracy.\n- `addons/base_address_extended/models/res_partner.py` \u2014 update and consume the `street_split` function for partner street fields computation and inverse.\n- `addons/base_address_extended/tests/test_street_fields.py` \u2014 tests verify that street field computations produce expected street_name, street_number, and street_number2 for diverse address formats.\n- Several localization modules updated with fixtures reflecting the new address splitting logic.\n\n### Blocking\n- None\n\n### Key findings\n| Severity | File | Issue | Trigger scenario |\n|----------|------|-------|------------------|\n| None \u2014 no high-confidence defects in new code. | | | |\n\n### Security audit\nNo\n\n### Suggestions\n- Consider reviewing and documenting the regex in `street_split` for maintainability given its complexity.\n- Ensure all locales relying on address splitting have tests aligned with the new regex behavior.\n\n### Code suggestions\n#### Slight doc improvement in `street_split` function (`odoo/tools/misc.py`)\n```diff\n- def street_split(street):\n+ def street_split(street):\n+     \"\"\"\n+     Splits a street address into components:\n+     - street_name: The main street name without building or door number\n+     - street_number: The building number or main address number\n+     - street_number2: Additional door or apartment number\n+     \"\"\"\n```\nWhy: Improves clarity on what the function returns, aiding future maintainers.\n\n### Nits\n- None\n\n### Tests & risk\n- Relevant tests added/updated: yes (notably `addons/base_address_extended/tests/test_street_fields.py`)\n- Coverage: Covers common and complex address formats including doors, apartments, multiple separators.\n- Risk: Low \u2014 Address splitting is improved and tested; minimal backward compatibility risk given test coverage.\n- Rollback: Easy \u2014 regex can be reverted or adjusted as needed.\n\n### What I checked\n- Core `street_split` code and its regex at `odoo/tools/misc.py`\n- `addons/base_address_extended/models/res_partner.py` integration and computed fields usage\n- Comprehensive test coverage under `addons/base_address_extended/tests/test_street_fields.py`\n- Presence of updated data fixtures in multiple localization addons for consistency\n\n---\n*Luffy \u00b7 Hermes Agent \u00b7 OpenRouter \u00b7 memory-backed review*\n*Cost / usage: model=`openai/gpt-4.1-mini` \u00b7 ~$0.03 (estimated) \u00b7 227k tokens \u00b7 18 API calls*\n",
+    "memory_block": "## Review run pr6-runlocal-a1\n- Source: `Mr-Ashish/odoo` PR #6\n- Status: success\n- Model: openai/gpt-4.1-mini\n- Verdict: APPROVE\n- Blocking: - None\n- Summary: This PR updates the `street_split` regex in `odoo/tools/misc.py` to fix address parsing. It also touches related logic in the `base_address_extended` module and updates multi-locale test fixtures for address handling. The change appears well-covered by existing and added tests, including detailed unit tests for the street splitting behavior.\n- Trigger: \n",
+    "timings": {
+      "started_at": "2026-07-31T17:32:09Z",
+      "ended_at": "2026-07-31T17:33:29Z",
+      "total_seconds": 80,
+      "stages": [
+        {
+          "name": "preload_memory",
+          "seconds": 0,
+          "exit_code": 0
+        },
+        {
+          "name": "assemble",
+          "seconds": 2,
+          "exit_code": 0
+        },
+        {
+          "name": "hermes",
+          "seconds": 78,
+          "exit_code": 0
+        },
+        {
+          "name": "distill",
+          "seconds": 0,
+          "exit_code": 0
+        }
+      ]
+    },
+    "meta": {
+      "github_sha": null,
+      "github_ref": null,
+      "github_event_name": null,
+      "started_at": "2026-07-31T17:32:09Z",
+      "trace_meta": {
+        "trace_id": "pr6-runlocal-a1",
+        "schema_version": 1,
+        "repo": "Mr-Ashish/odoo",
+        "pr_number": "6",
+        "run_id": "local",
+        "run_attempt": "1",
+        "model": "openai/gpt-4.1-mini",
+        "status": "success",
+        "started_at": "2026-07-31T17:32:09Z",
+        "ended_at": "2026-07-31T17:33:29Z",
+        "workspace_root": "/Users/ashishmishra/Documents/experiments/odoo",
+        "github_sha": null,
+        "github_ref": null,
+        "github_event_name": null,
+        "hermes_rc": "0",
+        "trigger_comment": "",
+        "files": {
+          "agent-loop/agent-loop.json": {
+            "bytes": 97044,
+            "sha256": "5a7afa6656df6ed3f3587a36d3ecc3ac7c682530a27a5d74846dc39bb7395a7d"
+          },
+          "agent-loop/agent-loop.md": {
+            "bytes": 27689,
+            "sha256": "03f491c15255c1f665d53a8a67b1c25a9b9261fa01e8f7037753807ac7f7f21d"
+          },
+          "agent-loop/agent.log": {
+            "bytes": 2401,
+            "sha256": "6ac9bcec8c8bbce73f86fd05dce1d480d3c1b4b03de99a985e6f5e08d79e6343"
+          },
+          "agent-loop/errors.log": {
+            "bytes": 2901,
+            "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+          },
+          "agent-loop/usage.json": {
+            "bytes": 454,
+            "sha256": "1cfb41c3ddedfbce365c794efd6c3d537105313d94ab072146337547a68f94ba"
+          },
+          "agent-loop-attempt1/agent-loop.json": {
+            "bytes": 15827,
+            "sha256": "2e4103c0935798ea3057254f66493812307ec568870488881d30d82181968cff"
+          },
+          "agent-loop-attempt1/agent-loop.md": {
+            "bytes": 4596,
+            "sha256": "e7fe62753d46129be19b7266ee134fe32f252b50823d083905d236842aafaab1"
+          },
+          "agent-loop-attempt1/agent.log": {
+            "bytes": 2401,
+            "sha256": "cd2f9bf55e2f31bd5c4769c472d91917f16fede3adcc992392148568163aeb6e"
+          },
+          "agent-loop-attempt1/errors.log": {
+            "bytes": 2901,
+            "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+          },
+          "agent-loop-attempt1/usage.json": {
+            "bytes": 444,
+            "sha256": "00c6532b865bf2a3ae226401336ceaea9aa12ecf6895dd421bc4c6c616a3e823"
+          },
+          "context.md": {
+            "bytes": 2467,
+            "sha256": "d844c0f18908c82e34ac0f827d94df1ae0c31a6964fd1acc77ebf07f963c251e"
+          },
+          "files.txt": {
+            "bytes": 1345,
+            "sha256": "308685e74e54e5b504d343bea5325e960ee1dc804e549d24807f1f4277f3f636"
+          },
+          "hermes-max-turns.env": {
+            "bytes": 49,
+            "sha256": "6b66a2a2643dbe65337b35ba3df7745af620ba392034d1c7c30c6d487e581097"
+          },
+          "hermes-pin.txt": {
+            "bytes": 41,
+            "sha256": "0ea7b07d1ee10f05f03acb0228b48c579f1f1f89ba622198bbbeda984e9b631a"
+          },
+          "hermes-run.log": {
+            "bytes": 2401,
+            "sha256": "6ac9bcec8c8bbce73f86fd05dce1d480d3c1b4b03de99a985e6f5e08d79e6343"
+          },
+          "hermes-usage.json": {
+            "bytes": 454,
+            "sha256": "1cfb41c3ddedfbce365c794efd6c3d537105313d94ab072146337547a68f94ba"
+          },
+          "hermes.stderr": {
+            "bytes": 15957,
+            "sha256": "0ac4978807769cf5b74269b80b94a01bdd78eea8785e6e98568a6fc9002048f9"
+          },
+          "memory-after.md": {
+            "bytes": 2574,
+            "sha256": "b1a09b867881caab1acb86de9b8f15bc1755da993e5045962a12c9a394af06fb"
+          },
+          "memory-before.md": {
+            "bytes": 2358,
+            "sha256": "b0a00f696d9f8ef44dcf62406e841804eb7047651efe77beeec758fa30349749"
+          },
+          "meta.env": {
+            "bytes": 716,
+            "sha256": "29a71932f9ba35d85b8ba969d6313212747e8867aca4f68cfd152e13129a1bda"
+          },
+          "model-tier.env": {
+            "bytes": 102,
+            "sha256": "0fa92d5883869c977aeda6801249ea1abfd541fdf2cd1f0cb45bbfaf052999a6"
+          },
+          "pr.diff": {
+            "bytes": 52267,
+            "sha256": "eba7912f32b7c85a9173ab7f7e79cc5e82942b66fa07f64813d7737f113d51a5"
+          },
+          "pr.json": {
+            "bytes": 3009,
+            "sha256": "d6fe417e845286612398b6b8a3d3946ea3e0322b2f981b71fd0cf5a506a1cf12"
+          },
+          "preflight-cost.env": {
+            "bytes": 368,
+            "sha256": "0e44b63d360dfdd3503f4024ee704749aec2763b75a0271c67a82dec2e5fadb5"
+          },
+          "prompt-reprompt.md": {
+            "bytes": 9131,
+            "sha256": "90b8e389d65e87931decf807c2b0371d55021d075a44a06a367f86e241be6674"
+          },
+          "prompt.md": {
+            "bytes": 6717,
+            "sha256": "71de9d6be638d8675347f371ea7eecfd60b10b841d4fcd016b7ce3f6152ed4cf"
+          },
+          "review.md": {
+            "bytes": 3024,
+            "sha256": "5941ef42418b6536137bd59a8b5a09cb6a21eb2cf167b08be00073c088410102"
+          },
+          "review.raw.md": {
+            "bytes": 2892,
+            "sha256": "b2cb0ff596cadac0fa6680134668eb9d608a197ce10d476f1387590d9a96e97c"
+          },
+          "severity-calibration.env": {
+            "bytes": 160,
+            "sha256": "fae3c8f7f0bfd17ca999dafaa8fb4f8da37c446bfc53872ecdd35447690ac0e9"
+          },
+          "soul-context-preflight.env": {
+            "bytes": 108,
+            "sha256": "4c0441fe38df5259bae5c8033849b9bff2f757257509cc9d7f79fa64e2789df0"
+          },
+          "soul-context.env": {
+            "bytes": 23,
+            "sha256": "c4cbeffb88797871d982e5fe6c7b24e44e89172a4b605ff56d42a204c49c81c0"
+          },
+          "timings.json": {
+            "bytes": 446,
+            "sha256": "2a3c01ca9e011a110d65f76d1a48537ffed6720e2550c31445d9d4f9878261e1"
+          },
+          "tool-turns-gate.env": {
+            "bytes": 158,
+            "sha256": "a154e34522034182eacf3d3af51168f795e0fb95efb792730e179bd2bdb790dd"
+          },
+          "tool-turns-reprompt.env": {
+            "bytes": 130,
+            "sha256": "4dbfe2bc385e9a91c8f5dd64d17eebef9d89b06791ba3cd12669551d97ee55c6"
+          }
+        }
+      }
+    }
+  }
+}

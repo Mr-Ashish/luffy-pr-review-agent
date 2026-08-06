@@ -1,0 +1,9 @@
+Total: +224 / -8 across 7 files
+
+- `internal/core/src/storage/loon_ffi/util.cpp` (+3/-0)
+- `internal/core/thirdparty/milvus-storage/CMakeLists.txt` (+1/-1)
+- `internal/core/unittest/test_external_take.cpp` (+35/-0)
+- `pkg/util/externalspec/external_spec.go` (+50/-7)
+- `pkg/util/externalspec/external_spec_test.go` (+112/-0)
+- `pkg/util/externalspec/specutil/spec.go` (+7/-0)
+- `pkg/util/externalspec/specutil/spec_test.go` (+16/-0)

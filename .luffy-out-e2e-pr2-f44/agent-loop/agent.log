@@ -1,0 +1,79 @@
+2026-07-31 21:30:02,051 INFO hermes_cli.main: Checkout changed since last launch (unknown -> git:HEAD:53559aaf86b84dadae83cd9bb605ca476f9a0606): cleared 39 stale __pycache__ directories
+2026-07-31 21:30:05,404 INFO hermes_cli.plugins: Plugin 'browser-browser-use' registered browser provider: browser-use
+2026-07-31 21:30:05,407 INFO hermes_cli.plugins: Plugin 'browser-browserbase' registered browser provider: browserbase
+2026-07-31 21:30:05,408 INFO hermes_cli.plugins: Plugin 'browser-firecrawl' registered browser provider: firecrawl
+2026-07-31 21:30:05,579 INFO hermes_cli.plugins: Plugin 'deepinfra' registered image_gen provider: deepinfra
+2026-07-31 21:30:05,580 INFO hermes_cli.plugins: Plugin 'fal' registered image_gen provider: fal
+2026-07-31 21:30:05,583 INFO hermes_cli.plugins: Plugin 'krea' registered image_gen provider: krea
+2026-07-31 21:30:05,585 INFO hermes_cli.plugins: Plugin 'openai' registered image_gen provider: openai
+2026-07-31 21:30:05,588 INFO hermes_cli.plugins: Plugin 'openai-codex' registered image_gen provider: openai-codex
+2026-07-31 21:30:05,590 INFO hermes_cli.plugins: Plugin 'openrouter' registered image_gen provider: openrouter
+2026-07-31 21:30:05,590 INFO hermes_cli.plugins: Plugin 'openrouter' registered image_gen provider: nous
+2026-07-31 21:30:05,594 INFO hermes_cli.plugins: Plugin 'xai' registered image_gen provider: xai
+2026-07-31 21:30:05,635 INFO hermes_cli.plugins: Plugin 'deepinfra' registered video_gen provider: deepinfra
+2026-07-31 21:30:05,637 INFO hermes_cli.plugins: Plugin 'fal' registered video_gen provider: fal
+2026-07-31 21:30:05,640 INFO hermes_cli.plugins: Plugin 'xai' registered video_gen provider: xai
+2026-07-31 21:30:05,644 INFO hermes_cli.plugins: Plugin 'web-brave-free' registered web provider: brave-free
+2026-07-31 21:30:05,646 INFO hermes_cli.plugins: Plugin 'web-ddgs' registered web provider: ddgs
+2026-07-31 21:30:05,648 INFO hermes_cli.plugins: Plugin 'web-exa' registered web provider: exa
+2026-07-31 21:30:05,655 INFO hermes_cli.plugins: Plugin 'web-firecrawl' registered web provider: firecrawl
+2026-07-31 21:30:05,657 INFO hermes_cli.plugins: Plugin 'web-parallel' registered web provider: parallel
+2026-07-31 21:30:05,658 INFO hermes_cli.plugins: Plugin 'web-searxng' registered web provider: searxng
+2026-07-31 21:30:05,660 INFO hermes_cli.plugins: Plugin 'web-tavily' registered web provider: tavily
+2026-07-31 21:30:05,662 INFO hermes_cli.plugins: Plugin 'web-xai' registered web provider: xai
+2026-07-31 21:30:05,727 INFO hermes_cli.plugins: Plugin discovery complete: 54 found, 47 enabled
+2026-07-31 21:30:06,039 INFO hermes_cli.plugins: Plugin 'browser-browser-use' registered browser provider: browser-use
+2026-07-31 21:30:06,039 INFO hermes_cli.plugins: Plugin 'browser-browserbase' registered browser provider: browserbase
+2026-07-31 21:30:06,039 INFO hermes_cli.plugins: Plugin 'browser-firecrawl' registered browser provider: firecrawl
+2026-07-31 21:30:06,094 INFO hermes_cli.plugins: Plugin 'deepinfra' registered image_gen provider: deepinfra
+2026-07-31 21:30:06,094 INFO hermes_cli.plugins: Plugin 'fal' registered image_gen provider: fal
+2026-07-31 21:30:06,095 INFO hermes_cli.plugins: Plugin 'krea' registered image_gen provider: krea
+2026-07-31 21:30:06,095 INFO hermes_cli.plugins: Plugin 'openai' registered image_gen provider: openai
+2026-07-31 21:30:06,095 INFO hermes_cli.plugins: Plugin 'openai-codex' registered image_gen provider: openai-codex
+2026-07-31 21:30:06,095 INFO hermes_cli.plugins: Plugin 'openrouter' registered image_gen provider: openrouter
+2026-07-31 21:30:06,095 INFO hermes_cli.plugins: Plugin 'openrouter' registered image_gen provider: nous
+2026-07-31 21:30:06,096 INFO hermes_cli.plugins: Plugin 'xai' registered image_gen provider: xai
+2026-07-31 21:30:06,099 INFO hermes_cli.plugins: Plugin 'deepinfra' registered video_gen provider: deepinfra
+2026-07-31 21:30:06,099 INFO hermes_cli.plugins: Plugin 'fal' registered video_gen provider: fal
+2026-07-31 21:30:06,100 INFO hermes_cli.plugins: Plugin 'xai' registered video_gen provider: xai
+2026-07-31 21:30:06,101 INFO hermes_cli.plugins: Plugin 'web-brave-free' registered web provider: brave-free
+2026-07-31 21:30:06,101 INFO hermes_cli.plugins: Plugin 'web-ddgs' registered web provider: ddgs
+2026-07-31 21:30:06,101 INFO hermes_cli.plugins: Plugin 'web-exa' registered web provider: exa
+2026-07-31 21:30:06,102 INFO hermes_cli.plugins: Plugin 'web-firecrawl' registered web provider: firecrawl
+2026-07-31 21:30:06,103 INFO hermes_cli.plugins: Plugin 'web-parallel' registered web provider: parallel
+2026-07-31 21:30:06,103 INFO hermes_cli.plugins: Plugin 'web-searxng' registered web provider: searxng
+2026-07-31 21:30:06,103 INFO hermes_cli.plugins: Plugin 'web-tavily' registered web provider: tavily
+2026-07-31 21:30:06,104 INFO hermes_cli.plugins: Plugin 'web-xai' registered web provider: xai
+2026-07-31 21:30:06,115 INFO hermes_cli.plugins: Plugin discovery complete: 54 found, 47 enabled
+2026-07-31 21:30:06,580 WARNING hermes_state: state.db: linked SQLite 3.43.2 is vulnerable to the WAL-reset corruption bug (https://sqlite.org/wal.html#walresetbug) — using journal_mode=DELETE instead of enabling WAL. Upgrade to SQLite 3.51.3+ (or backports 3.50.7 / 3.44.6); Hermes-managed installs can repair the embedded runtime with `hermes update`. See `hermes doctor`. This warning fires once per process per database.
+2026-07-31 21:30:06,748 INFO tools.tirith_security: tirith not found — downloading latest release for aarch64-apple-darwin...
+2026-07-31 21:30:06,775 INFO run_agent: Loaded environment variables from /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/.env
+2026-07-31 21:30:07,258 WARNING hermes_state: state.db (async_delegation): linked SQLite 3.43.2 is vulnerable to the WAL-reset corruption bug (https://sqlite.org/wal.html#walresetbug) — using journal_mode=DELETE instead of enabling WAL. Upgrade to SQLite 3.51.3+ (or backports 3.50.7 / 3.44.6); Hermes-managed installs can repair the embedded runtime with `hermes update`. See `hermes doctor`. This warning fires once per process per database.
+2026-07-31 21:30:08,467 INFO run_agent: OpenAI client created (agent_init, shared=True) thread=MainThread:8713605312 provider=openrouter base_url=https://openrouter.ai/api/v1 model=openai/gpt-4.1-mini
+2026-07-31 21:30:08,468 WARNING tools.registry: check_fn check_bfl_requirements returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,471 WARNING tools.registry: check_fn _browser_cdp_check returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,472 WARNING tools.registry: check_fn _browser_dialog_check returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,581 INFO tools.tirith_security: cosign not on PATH — installing tirith with SHA-256 verification only (install cosign for full supply chain verification)
+2026-07-31 21:30:08,831 INFO agent.auxiliary_client: Vision auto-detect: using main provider openrouter (anthropic/claude-opus-5)
+2026-07-31 21:30:08,832 WARNING tools.registry: check_fn check_close_terminal_requirements returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,849 WARNING tools.registry: check_fn check_computer_use_requirements returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,849 WARNING tools.registry: check_fn check_focus_pane_requirements returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,851 WARNING tools.registry: check_fn check_image_generation_requirements returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,852 WARNING tools.registry: check_fn _check_kanban_mode returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,852 WARNING tools.registry: check_fn _check_kanban_orchestrator_mode returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,852 WARNING tools.registry: check_fn check_open_preview_requirements returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,852 WARNING tools.registry: check_fn check_react_requirements returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,852 WARNING tools.registry: check_fn check_read_terminal_requirements returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:08,858 INFO tools.lazy_deps: Lazy-installing edge-tts==7.2.7 for feature 'tts.edge'
+2026-07-31 21:30:08,891 INFO tools.tirith_security: tirith installed to /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/bin/tirith (SHA-256 only)
+2026-07-31 21:30:09,459 INFO tools.lazy_deps: Lazy install complete for feature 'tts.edge'
+2026-07-31 21:30:11,591 INFO agent.auxiliary_client: Vision auto-detect: using main provider openrouter (anthropic/claude-opus-5)
+2026-07-31 21:30:11,599 WARNING tools.registry: check_fn check_web_api_key returned False; dependent tools will be unavailable this turn
+2026-07-31 21:30:12,141 INFO [20260731_213006_2eb665] agent.turn_context: conversation turn: session=20260731_213006_2eb665 model=openai/gpt-4.1-mini provider=openrouter platform=cli history=0 msg='# Task  You are reviewing a GitHub pull request. Produce a **Markdown PR review ...'
+2026-07-31 21:30:12,148 WARNING [20260731_213006_2eb665] agent.prompt_builder: Context file SOUL.md blocked: prompt_injection
+2026-07-31 21:30:12,927 INFO run_agent: OpenAI client created (chat_completion_stream_request, shared=False) thread=Thread-6 (<lambda>):6197817344 provider=openrouter base_url=https://openrouter.ai/api/v1 model=openai/gpt-4.1-mini
+2026-07-31 21:30:32,352 INFO [20260731_213006_2eb665] agent.conversation_loop: API call #1: model=openai/gpt-4.1-mini provider=openrouter in=17573 out=758 total=18331 latency=19.5s
+2026-07-31 21:30:32,376 INFO [20260731_213006_2eb665] agent.conversation_loop: Turn ended: reason=text_response(finish_reason=stop) model=openai/gpt-4.1-mini api_calls=1/25 budget=1/25 tool_turns=0 last_msg_role=assistant response_len=3619 session=20260731_213006_2eb665
+2026-07-31 21:30:32,648 INFO agent.auxiliary_client: Auxiliary auto-detect: using main provider openrouter (openai/gpt-4.1-mini)
+2026-07-31 21:30:32,648 INFO agent.auxiliary_client: Auxiliary title_generation: using auto (openai/gpt-4.1-mini)
+2026-07-31 21:30:33,331 INFO cli: CLI cleanup calling memory shutdown for session 20260731_213006_2eb665 with 2 message(s)

@@ -1,0 +1,365 @@
+diff --git a/addons/mrp/models/stock_orderpoint.py b/addons/mrp/models/stock_orderpoint.py
+index 219f73329e9218..7253e25949aa2f 100644
+--- a/addons/mrp/models/stock_orderpoint.py
++++ b/addons/mrp/models/stock_orderpoint.py
+@@ -56,9 +56,20 @@ def _compute_deadline_date(self):
+         """ Extend to add more depends values """
+         super()._compute_deadline_date()
+ 
++    @api.depends('bom_id', 'product_id.bom_ids.produce_delay')
++    def _compute_lead_days(self):
++        boms = self._get_lead_days_boms()
++        return super(StockWarehouseOrderpoint, self.with_context(
++            orderpoint_lead_days_boms=boms,
++            orderpoint_preproduction_rules_cache={},
++        ))._compute_lead_days()
++
+     def _get_lead_days_values(self):
+         values = super()._get_lead_days_values()
+-        if self.bom_id:
++        boms = self.env.context.get('orderpoint_lead_days_boms')
++        if boms is not None:
++            values['bom'] = boms[self.id]
++        elif self.bom_id:
+             values['bom'] = self.bom_id
+         return values
+ 
+@@ -67,21 +78,50 @@ def _compute_qty_to_order_computed(self):
+         """ Extend to add more depends values """
+         super()._compute_qty_to_order_computed()
+ 
++    def _get_boms_for_orderpoints(self, orderpoints, **bom_find_kwargs):
++        """Map orderpoints to BoMs, batch-finding those without a selected BoM."""
++        orderpoints_without_bom = orderpoints.filtered(lambda orderpoint: not orderpoint.bom_id)
++        boms = self.env['mrp.bom']._bom_find(
++            orderpoints_without_bom.product_id,
++            bom_type='normal',
++            **bom_find_kwargs,
++        ) if orderpoints_without_bom else {}
++        return {
++            orderpoint.id: orderpoint.bom_id or boms[orderpoint.product_id]
++            for orderpoint in orderpoints
++        }
++
+     def _get_matching_boms(self):
++        """Map orderpoints to selected or company-matching BoMs."""
+         matching_boms = defaultdict(lambda: self.env['mrp.bom'])
+-        orderpoints_by_company = defaultdict(lambda: self.env['stock.warehouse.orderpoint'])
+-        for orderpoint in self.filtered('product_id'):
+-            orderpoints_by_company[orderpoint.company_id.id] |= orderpoint
+-
+-        for company_id, orderpoints in orderpoints_by_company.items():
+-            orderpoints_without_bom = orderpoints.filtered(lambda orderpoint: not orderpoint.bom_id)
+-            boms = self.env['mrp.bom']._bom_find(
+-                orderpoints_without_bom.product_id,
+-                bom_type='normal',
+-                company_id=company_id,
+-            ) if orderpoints_without_bom else {}
+-            for orderpoint in orderpoints:
+-                matching_boms[orderpoint.id] = orderpoint.bom_id or boms[orderpoint.product_id]
++        orderpoints_by_company = self.filtered('product_id').grouped('company_id')
++        for company, orderpoints in orderpoints_by_company.items():
++            matching_boms.update(self._get_boms_for_orderpoints(
++                orderpoints,
++                company_id=company.id,
++            ))
++        return matching_boms
++
++    def _get_lead_days_boms(self):
++        """Map manufacturing orderpoints to BoMs matching their operation type."""
++        def get_manufacture_rule_key(orderpoint):
++            manufacture_rule = orderpoint.rule_ids.filtered(lambda rule: rule.action == 'manufacture')
++            if not manufacture_rule:
++                return False
++            manufacture_rule.ensure_one()
++            return manufacture_rule.company_id, manufacture_rule.picking_type_id
++
++        matching_boms = defaultdict(lambda: self.env['mrp.bom'])
++        orderpoints_by_rule = self.filtered('product_id').grouped(get_manufacture_rule_key)
++        for rule_key, orderpoints in orderpoints_by_rule.items():
++            if not rule_key:
++                continue
++            company, picking_type = rule_key
++            matching_boms.update(self._get_boms_for_orderpoints(
++                orderpoints,
++                picking_type=picking_type,
++                company_id=company.id,
++            ))
+         return matching_boms
+ 
+     def _compute_allowed_replenishment_uom_ids(self):
+diff --git a/addons/mrp/models/stock_rule.py b/addons/mrp/models/stock_rule.py
+index 4e6d16abcea85b..01a0bf6cab2b07 100644
+--- a/addons/mrp/models/stock_rule.py
++++ b/addons/mrp/models/stock_rule.py
+@@ -204,6 +204,46 @@ def _get_date_planned(self, bom_id, values):
+             date_planned = date_planned - relativedelta(hours=1)
+         return date_planned
+ 
++    def _get_preproduction_rules_cache_key(self, product, warehouse):
++        """Return the key grouping equivalent pre-production rule lookups.
++
++        Modules whose warehouse route filtering depends on other product fields
++        should extend this key accordingly.
++        """
++        return (
++            # The lookup domain is built from this location and its parents.
++            product.property_stock_production.id,
++            # The warehouse's pre-production route is the explicit first choice.
++            warehouse.pbm_route_id.id,
++            # Direct product routes are tried before routes inherited from a category.
++            frozenset(product.route_ids.ids),
++            # Category routes are another fallback, but have lower priority than
++            # routes assigned directly to the product.
++            frozenset(product.categ_id.total_route_ids.ids),
++        )
++
++    def _get_preproduction_rules(self, product, warehouse):
++        """Return the rules supplying Production before manufacturing.
++
++        Reuse rule chains for products with equivalent routing configurations
++        when called from the batched orderpoint lead-time computation.
++        """
++        production_location = product.property_stock_production
++        rules_cache = self.env.context.get('orderpoint_preproduction_rules_cache')
++        if rules_cache is None:
++            return product._get_rules_from_location(
++                production_location,
++                route_ids=warehouse.pbm_route_id,
++            )
++
++        cache_key = self._get_preproduction_rules_cache_key(product, warehouse)
++        if cache_key not in rules_cache:
++            rules_cache[cache_key] = product._get_rules_from_location(
++                production_location,
++                route_ids=warehouse.pbm_route_id,
++            )
++        return rules_cache[cache_key]
++
+     def _get_lead_days(self, product, **values):
+         """Add the product and company manufacture delay to the cumulative delay
+         and cumulative description.
+@@ -214,7 +254,13 @@ def _get_lead_days(self, product, **values):
+         if not manufacture_rule:
+             return delays, delay_description
+         manufacture_rule.ensure_one()
+-        bom = values.get('bom') or self.env['mrp.bom']._bom_find(product, picking_type=manufacture_rule.picking_type_id, company_id=manufacture_rule.company_id.id)[product]
++        bom = values.get('bom')
++        if not bom and 'orderpoint_lead_days_boms' not in self.env.context:
++            bom = self.env['mrp.bom']._bom_find(
++                product,
++                picking_type=manufacture_rule.picking_type_id,
++                company_id=manufacture_rule.company_id.id,
++            )[product]
+         if not bom:
+             delays['total_delay'] += 365
+             delays['no_bom_found_delay'] += 365
+@@ -231,7 +277,7 @@ def _get_lead_days(self, product, **values):
+             warehouse = self.location_dest_id.warehouse_id
+             for wh in warehouse:
+                 if wh.manufacture_steps != 'mrp_one_step':
+-                    wh_manufacture_rules = product._get_rules_from_location(product.property_stock_production, route_ids=wh.pbm_route_id)
++                    wh_manufacture_rules = self._get_preproduction_rules(product, wh)
+                     extra_delays, extra_delay_description = (wh_manufacture_rules - self).with_context(global_horizon_days=0)._get_lead_days(product, **values)
+                     for key, value in extra_delays.items():
+                         delays[key] += value
+diff --git a/addons/mrp/tests/test_replenish.py b/addons/mrp/tests/test_replenish.py
+index e48f809eb72951..15bbac0284fd49 100644
+--- a/addons/mrp/tests/test_replenish.py
++++ b/addons/mrp/tests/test_replenish.py
+@@ -208,6 +208,71 @@ def test_global_horizon_days_affect_lead_time_manufacture_rule(self):
+             loads(repl_info.json_lead_days)['lead_horizon_date'], '%m/%d/%Y').date()
+         self.assertEqual(lead_horizon_date, fields.Date.today() + timedelta(days=365))
+ 
++    def test_batch_lead_days_respect_product_routes(self):
++        """Batch lead-time computation must respect each product's routes."""
++        self.env.company.horizon_days = 0
++        warehouse = self.warehouse_1
++        warehouse.manufacture_steps = 'pbm'
++
++        # Both rules move components from Stock to Pre-Production. Each product
++        # selects a different route, so their transfer delays are different.
++        route_a, route_b = self.env['stock.route'].create([{
++            'name': 'Pre-production route A',
++        }, {
++            'name': 'Pre-production route B',
++        }])
++        self.env['stock.rule'].create([{
++            'name': 'Pre-production rule A',
++            'route_id': route_a.id,
++            'location_src_id': warehouse.lot_stock_id.id,
++            'location_dest_id': warehouse.pbm_loc_id.id,
++            'action': 'pull',
++            'procure_method': 'make_to_stock',
++            'delay': 3,
++            'picking_type_id': warehouse.pbm_type_id.id,
++            'warehouse_id': warehouse.id,
++            'company_id': warehouse.company_id.id,
++        }, {
++            'name': 'Pre-production rule B',
++            'route_id': route_b.id,
++            'location_src_id': warehouse.lot_stock_id.id,
++            'location_dest_id': warehouse.pbm_loc_id.id,
++            'action': 'pull',
++            'procure_method': 'make_to_stock',
++            'delay': 7,
++            'picking_type_id': warehouse.pbm_type_id.id,
++            'warehouse_id': warehouse.id,
++            'company_id': warehouse.company_id.id,
++        }])
++        product_a, product_b = self.env['product.product'].create([{
++            'name': 'Manufactured with route A',
++            'is_storable': True,
++            'route_ids': [Command.link(route_a.id)],
++        }, {
++            'name': 'Manufactured with route B',
++            'is_storable': True,
++            'route_ids': [Command.link(route_b.id)],
++        }])
++        self.env['mrp.bom'].create([{
++            'product_tmpl_id': product.product_tmpl_id.id,
++            'product_qty': 1,
++        } for product in (product_a, product_b)])
++        orderpoints = self.env['stock.warehouse.orderpoint'].create([{
++            'product_id': product.id,
++            'location_id': warehouse.lot_stock_id.id,
++            'route_id': warehouse.manufacture_pull_id.route_id.id,
++        } for product in (product_a, product_b)])
++
++        # Establish the lead time expected from each product's own route.
++        for orderpoint in orderpoints:
++            orderpoint._compute_lead_days()
++        individual_lead_days = orderpoints.mapped('lead_days')
++        self.assertEqual(individual_lead_days, [3, 7])
++
++        # Computing both orderpoints together must give the same result.
++        orderpoints._compute_lead_days()
++        self.assertEqual(orderpoints.mapped('lead_days'), individual_lead_days)
++
+     def test_orderpoint_onchange_reordering_rule(self):
+         """ Ensure onchange logic works properly when editing a reordering rule
+             linked to a confirmed MO, which is started but not finished by the
+diff --git a/addons/purchase_mrp/models/stock_rule.py b/addons/purchase_mrp/models/stock_rule.py
+index b599b0e56390e8..6fdeeaaa5f5336 100644
+--- a/addons/purchase_mrp/models/stock_rule.py
++++ b/addons/purchase_mrp/models/stock_rule.py
+@@ -6,6 +6,13 @@
+ class StockRule(models.Model):
+     _inherit = 'stock.rule'
+ 
++    def _get_preproduction_rules_cache_key(self, product, warehouse):
++        return (
++            *super()._get_preproduction_rules_cache_key(product, warehouse),
++            # Buy routes are valid only when the product has at least one vendor.
++            bool(product.seller_ids),
++        )
++
+     def _notify_responsible(self, procurement):
+         super()._notify_responsible(procurement)
+         origin_orders = procurement.values.get('group_id').mrp_production_ids if procurement.values.get('group_id') else False
+diff --git a/addons/purchase_mrp/tests/test_replenishment.py b/addons/purchase_mrp/tests/test_replenishment.py
+index 85ce55dc91de89..fb792f42330786 100644
+--- a/addons/purchase_mrp/tests/test_replenishment.py
++++ b/addons/purchase_mrp/tests/test_replenishment.py
+@@ -2,6 +2,58 @@
+ 
+ 
+ class TestReplenishment(TestStockCommon):
++    def test_batch_lead_days_respect_product_sellers(self):
++        """Batch lead-time computation must respect each product's sellers."""
++        self.env.company.horizon_days = 0
++        self.env.company.days_to_purchase = 0
++        warehouse = self.warehouse_1
++        warehouse.manufacture_steps = 'pbm'
++        # At Stock, prefer Buy when the product has a seller. Without a seller,
++        # the Buy route is unavailable and Manufacture is used instead.
++        warehouse.buy_pull_id.route_id.sequence = 1
++        warehouse.manufacture_pull_id.route_id.sequence = 100
++        # Normally the Stock-to-Pre-Production transfer stops the search for
++        # earlier supply rules. Make it propagate the demand back to Stock so
++        # the Buy-versus-Manufacture choice above becomes part of the lead time.
++        stock_to_preproduction_rule = warehouse.pbm_route_id.rule_ids.filtered(
++            lambda rule: rule.location_dest_id == warehouse.pbm_loc_id
++        )
++        stock_to_preproduction_rule.ensure_one()
++        stock_to_preproduction_rule.procure_method = 'make_to_order'
++
++        product_without_seller, product_with_seller = self.env['product.product'].create([{
++            'name': 'Manufactured without seller',
++            'is_storable': True,
++        }, {
++            'name': 'Manufactured with seller',
++            'is_storable': True,
++        }])
++        # Manufacture is a valid fallback only for products having a normal BoM.
++        self.env['mrp.bom'].create([{
++            'product_tmpl_id': product.product_tmpl_id.id,
++            'product_qty': 1,
++        } for product in (product_without_seller, product_with_seller)])
++        self.env['product.supplierinfo'].create({
++            'product_id': product_with_seller.id,
++            'partner_id': self.partner_1.id,
++            'delay': 10,
++        })
++        orderpoints = self.env['stock.warehouse.orderpoint'].create([{
++            'product_id': product.id,
++            'location_id': warehouse.lot_stock_id.id,
++            'route_id': warehouse.manufacture_pull_id.route_id.id,
++        } for product in (product_without_seller, product_with_seller)])
++
++        # Establish the lead time expected from each product's supply route.
++        for orderpoint in orderpoints:
++            orderpoint._compute_lead_days()
++        individual_lead_days = orderpoints.mapped('lead_days')
++        self.assertEqual(individual_lead_days, [0, 10])
++
++        # Computing both orderpoints together must give the same result.
++        orderpoints._compute_lead_days()
++        self.assertEqual(orderpoints.mapped('lead_days'), individual_lead_days)
++
+     def test_effective_route(self):
+         orderpoint = self.env['stock.warehouse.orderpoint'].create({
+             'product_id': self.productA.id,
+diff --git a/addons/stock/models/stock_orderpoint.py b/addons/stock/models/stock_orderpoint.py
+index 30e7e97f7881e1..9dfe28aa46833a 100644
+--- a/addons/stock/models/stock_orderpoint.py
++++ b/addons/stock/models/stock_orderpoint.py
+@@ -412,19 +412,17 @@ def _search_qty_to_order(self, operator, value):
+                     ('id', 'in', matched_ids)
+                 ]
+ 
+-    @api.depends('replenishment_uom_id', 'product_min_qty', 'product_max_qty',
++    @api.depends('active', 'replenishment_uom_id', 'product_min_qty', 'product_max_qty',
+     'product_id', 'location_id', 'product_id.seller_ids.delay', 'company_id.horizon_days')
+     def _compute_qty_to_order_computed(self):
+         def to_compute(orderpoint):
+             rounding = orderpoint.product_uom.rounding
+             # The check is on purpose. We only want to consider the horizon days if the forecast is negative and
+             # there is already something to resupply base on lead times.
+-            return (
+-                orderpoint.id
+-                and float_compare(orderpoint.qty_forecast, orderpoint.product_min_qty, precision_rounding=rounding) < 0
+-            )
++            return float_compare(orderpoint.qty_forecast, orderpoint.product_min_qty, precision_rounding=rounding) < 0
+ 
+-        orderpoints = self.filtered(to_compute)
++        # Avoid computing `qty_forecast` for archived (prefetched) orderpoints.
++        orderpoints = self.filtered(lambda o: o.id and o.active).with_prefetch().filtered(to_compute)
+         qty_in_progress_by_orderpoint = orderpoints._quantity_in_progress()
+         for orderpoint in orderpoints:
+             orderpoint.qty_to_order_computed = orderpoint._get_qty_to_order(qty_in_progress_by_orderpoint=qty_in_progress_by_orderpoint)
+diff --git a/addons/stock/tests/test_proc_rule.py b/addons/stock/tests/test_proc_rule.py
+index c56002a859d169..193178137b923e 100644
+--- a/addons/stock/tests/test_proc_rule.py
++++ b/addons/stock/tests/test_proc_rule.py
+@@ -651,6 +651,10 @@ def test_compute_qty_to_order(self):
+         })
+         stock_move._action_confirm()
+         self.assertEqual(orderpoint.qty_to_order, 6)
++        orderpoint.active = False
++        self.assertEqual(orderpoint.qty_to_order_computed, 0)
++        orderpoint.active = True
++        self.assertEqual(orderpoint.qty_to_order, 6)
+ 
+     def test_compute_qty_to_order_after_receipt_line_deletion(self):
+         """Test that deleting a confirmed incoming receipt move updates the orderpoint."""

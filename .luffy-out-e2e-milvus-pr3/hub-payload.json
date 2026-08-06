@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "event": "luffy-run",
+  "source_repo": "Mr-Ashish/milvus",
+  "pr_number": "3",
+  "run_id": "local",
+  "run_attempt": "1",
+  "trace_id": "pr3-runlocal-a1",
+  "model": "openai/gpt-4.1-mini",
+  "status": "success",
+  "verdict": "APPROVE",
+  "trigger_comment": "",
+  "review_truncated": false,
+  "review_md": "<!-- luffy-review pr=3 run=local -->\n## \ud83c\udff4\u200d\u2620\ufe0f Luffy Review \u2014 PR #3\n\n**Verdict:** APPROVE  \n**Confidence:** high  \n**Score:** 95/100  \n**Review effort:** 3/5\n\n### Summary\nThis PR adds support for Azure credential broker in external tables by extending the external specs to accept Azure-specific credentials (`azure_client_id`, `azure_tenant_id`, `azure_credential_endpoint`), validating them as a distinct complete mode, and pinning the corresponding milvus-storage dependency commit with broker implementation. It includes validation for endpoint URLs, cloud provider scheme matching, and mutual exclusivity of credential modes. The PR is well-covered by extensive tests validating correct acceptance, rejection of invalid inputs, and edge cases. The core changes spread through Go external spec parsing/validation, C++ allowlist injection, and test code in both Go and C++.\n\n### Walkthrough\n- Adds new Azure credential keys in C++ `kAllowedExtfsSpecKeys` for FFI allowlisted external spec keys (`internal/core/src/storage/loon_ffi/util.cpp`)\n- Updates the pinned milvus-storage commit in CMakeLists to include the Azure broker implementation\n- Adds a C++ unit test injecting Azure broker credentials and asserting the injected properties (`internal/core/unittest/test_external_take.cpp`)\n- Extends Go external spec validation to support Azure broker mode exclusively when scheme and cloud_provider are \"azure\", requiring all relevant fields including access key and region (`pkg/util/externalspec/external_spec.go`)\n- Adds detailed validation error messages if keys are missing, broker endpoint is malformed, or modes are mixed\n- Introduces comprehensive Go unit tests that assert success and failure modes for the Azure broker validation logic (`external_spec_test.go`)\n- Adds Azure keys to allowed extfs keys maps for parsing in Go external spec utilities (`specutil/spec.go`)\n- Adds parsing test for Azure broker keys in extfs (`specutil/spec_test.go`)\n\n### Architecture diagram\n<!-- luffy-mermaid -->\n\n_Auto-generated from 7 changed file(s) (F57). Edges between groups are adjacency, not proven runtime dependencies._\n\n```mermaid\nflowchart LR\n  %% PR changed modules (7 files, 2 groups)\n  subgraph g_pkg_util[\"pkg/util\"]\n    f_pkg_util_externalspec_external_spec_go[\"external_spec.go\"]\n    %% pkg/util/externalspec/external_spec.go\n    f_pkg_util_externalspec_external_spec_test_go[\"external_spec_test.go\"]\n    %% pkg/util/externalspec/external_spec_test.go\n    f_pkg_util_externalspec_specutil_spec_go[\"spec.go\"]\n    %% pkg/util/externalspec/specutil/spec.go\n    f_pkg_util_externalspec_specutil_spec_test_go[\"spec_test.go\"]\n    %% pkg/util/externalspec/specutil/spec_test.go\n  end\n  subgraph g_internal[\"internal\"]\n    f_internal_core_src_storage_loon_ffi_util_cpp[\"util.cpp\"]\n    %% internal/core/src/storage/loon_ffi/util.cpp\n    f_internal_core_thirdparty_milvus_storage_CMakeLists_txt[\"CMakeLists.txt\"]\n    %% internal/core/thirdparty/milvus-storage/CMakeLists.txt\n    f_internal_core_unittest_test_external_take_cpp[\"test_external_take.cpp\"]\n    %% internal/core/unittest/test_external_take.cpp\n  end\n  %% group adjacency (not runtime deps)\n  g_pkg_util -.-> g_internal\n```\n\n<details><summary>Files in diagram</summary>\n\n- `internal/core/src/storage/loon_ffi/util.cpp`\n- `internal/core/thirdparty/milvus-storage/CMakeLists.txt`\n- `internal/core/unittest/test_external_take.cpp`\n- `pkg/util/externalspec/external_spec.go`\n- `pkg/util/externalspec/external_spec_test.go`\n- `pkg/util/externalspec/specutil/spec.go`\n- `pkg/util/externalspec/specutil/spec_test.go`\n\n</details>\n\n\n### Blocking\n- None\n\n### Key findings\nNone \u2014 no high-confidence defects in new code.\n\n### Security audit\nNo security concerns found. Validation of Azure broker credentials is strict, including full required key presence checks, rejection of malformed broker endpoints, and strict mutual exclusion from other credential modes.\n\n### Multi-lens checklist\n| Lens         | Status  | Note                                                             |\n|--------------|---------|------------------------------------------------------------------|\n| correctness  | ok      | Clear validation paths and error handling for mode and endpoint |\n| security     | ok      | Credential validation and URI checks prevent injection/exploit  |\n| tests        | ok      | Extensive tests cover valid and invalid Azure broker specs       |\n| performance  | n/a     | No expensive or unbounded loops introduced                       |\n| api_contracts| ok      | Backwards compatible with existing extfs spec; new keys added    |\n| concurrency  | n/a     | No concurrency primitives involved                               |\n| maintainability| ok    | Clean separation and coverage facilitates future changes          |\n\n### Suggestions\n- Consider adding doc comments in code on the Azure broker mode fields for easier developer onboarding.\n\n### Code suggestions\nNone\n\n### Nits\n- None\n\n### Tests & risk\n- Relevant tests added/updated: yes (Go unit tests for spec validation + C++ tests for property injection)\n- Coverage: Very thorough for Azure broker credential paths, failure modes, and boundary conditions\n- Risk: low \u2014 well-contained feature addition with good validation and test coverage\n- Rollback: easy \u2014 single commit pin bump and code additions\n\n### What I checked\n- Inspecting the diff patch for Go external spec validation and test code additions\n- Inspecting C++ allowlist and unittest for Azure broker key injection\n- Checking related CMakeLists pin bump and test coverage for secure, robust validation of Azure broker mode\n\n---\n*Luffy \u00b7 Hermes Agent \u00b7 OpenRouter \u00b7 memory-backed review*\n*Cost / usage: model=`openai/gpt-4.1-mini` \u00b7 ~$0.02 (estimated) \u00b7 149k tokens \u00b7 11 API calls*\n",
+  "memory_block": "## Review run pr3-runlocal-a1\n- Source: `Mr-Ashish/milvus` PR #3\n- Status: success\n- Model: openai/gpt-4.1-mini\n- Verdict: APPROVE\n- Blocking: - None\n- Summary: This PR adds support for Azure credential broker in external tables by extending the external specs to accept Azure-specific credentials (`azure_client_id`, `azure_tenant_id`, `azure_credential_endpoint`), validating them as a distinct complete mode, and pinning the corresponding milvus-storage dependency commit with broker implementation. It includes validation for endpoint URLs, cloud provider scheme matching, and mutual exclusivity of credential modes. The PR is well-covered by extensive tests validating correct acceptance, rejection of invalid inputs, and edge cases. The core changes spread through Go external spec parsing/validation, C++ allowlist injection, and test code in both Go and C++.\n- Trigger: \n",
+  "timings": {
+    "started_at": "2026-07-31T18:31:15Z",
+    "ended_at": "2026-07-31T18:32:18Z",
+    "total_seconds": 63,
+    "stages": [
+      {
+        "name": "preload_memory",
+        "seconds": 1,
+        "exit_code": 0
+      },
+      {
+        "name": "assemble",
+        "seconds": 3,
+        "exit_code": 0
+      },
+      {
+        "name": "hermes",
+        "seconds": 59,
+        "exit_code": 0
+      },
+      {
+        "name": "distill",
+        "seconds": 0,
+        "exit_code": 0
+      }
+    ]
+  },
+  "meta": {
+    "github_sha": null,
+    "github_ref": null,
+    "github_event_name": null,
+    "started_at": "2026-07-31T18:31:15Z",
+    "trace_meta": {
+      "trace_id": "pr3-runlocal-a1",
+      "schema_version": 1,
+      "repo": "Mr-Ashish/milvus",
+      "pr_number": "3",
+      "run_id": "local",
+      "run_attempt": "1",
+      "model": "openai/gpt-4.1-mini",
+      "status": "success",
+      "started_at": "2026-07-31T18:31:15Z",
+      "ended_at": "2026-07-31T18:32:18Z",
+      "workspace_root": "/Users/ashishmishra/Documents/experiments/pr-review-agent",
+      "github_sha": null,
+      "github_ref": null,
+      "github_event_name": null,
+      "hermes_rc": "0",
+      "trigger_comment": "",
+      "files": {
+        "agent-loop/agent-loop.json": {
+          "bytes": 86742,
+          "sha256": "0d50b7af92502270693bf00cd0fef2df921dd0f13af01943dca90e38ccc5fb32"
+        },
+        "agent-loop/agent-loop.md": {
+          "bytes": 18171,
+          "sha256": "a8093654407144cb745de94f63f323d6ff4b33da97373132860f52f4b8a3e5ba"
+        },
+        "agent-loop/agent.log": {
+          "bytes": 2401,
+          "sha256": "b5c0d1d39177ad37ea12aaba77d91feb8eedd5271751c26bd63fbef7de438d03"
+        },
+        "agent-loop/errors.log": {
+          "bytes": 2901,
+          "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+        },
+        "agent-loop/usage.json": {
+          "bytes": 465,
+          "sha256": "121c233df3d697c2958ba892777f060d59c209c299290e69fcaa0c9fdd2f685e"
+        },
+        "agent-loop-attempt1/agent-loop.json": {
+          "bytes": 27457,
+          "sha256": "6631a9c547cfcdb92b2161a21bc204a3fce96f1a7716489d66ba35b23bde9206"
+        },
+        "agent-loop-attempt1/agent-loop.md": {
+          "bytes": 4611,
+          "sha256": "411dde3098b4b71b83661f5571059de2e6199af3fbeac1a424b40ba1c687e3a8"
+        },
+        "agent-loop-attempt1/agent.log": {
+          "bytes": 2401,
+          "sha256": "81f928250a047b3c2a5ff25b740d61fa1e58cd52c818c9b7a8c62ff90f065d47"
+        },
+        "agent-loop-attempt1/errors.log": {
+          "bytes": 2901,
+          "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+        },
+        "agent-loop-attempt1/usage.json": {
+          "bytes": 448,
+          "sha256": "7195d198c96eb9433c5093525e6c2394bbe5aec59f8ebb91cb14b8ea05b649e3"
+        },
+        "context.md": {
+          "bytes": 7469,
+          "sha256": "0be17eaec59e578ed2e8cbe485b9adcf6f1b7b79811741600301517fdfad98ea"
+        },
+        "files.txt": {
+          "bytes": 433,
+          "sha256": "863c7873427e3c44b41d7abb0c82de4e52b4f8f5b78db282ee7a0328f0862601"
+        },
+        "hermes-max-turns.env": {
+          "bytes": 49,
+          "sha256": "6b66a2a2643dbe65337b35ba3df7745af620ba392034d1c7c30c6d487e581097"
+        },
+        "hermes-pin.txt": {
+          "bytes": 41,
+          "sha256": "0ea7b07d1ee10f05f03acb0228b48c579f1f1f89ba622198bbbeda984e9b631a"
+        },
+        "hermes-run.log": {
+          "bytes": 2401,
+          "sha256": "b5c0d1d39177ad37ea12aaba77d91feb8eedd5271751c26bd63fbef7de438d03"
+        },
+        "hermes-usage.json": {
+          "bytes": 465,
+          "sha256": "121c233df3d697c2958ba892777f060d59c209c299290e69fcaa0c9fdd2f685e"
+        },
+        "hermes.stderr": {
+          "bytes": 33997,
+          "sha256": "c04bae997a494211d3e377acf61ce7120a30ce110ddfc14cfe6d8a136b6d822c"
+        },
+        "linked-issue-context.env": {
+          "bytes": 233,
+          "sha256": "41576c612432692d4f4546a568cf70f6ff8b9074fdb63770a07204f13e4cc957"
+        },
+        "linked-issues.md": {
+          "bytes": 5708,
+          "sha256": "df08940d053771f3625d16d455efb1037f83d5c59441de174339a4ac95440246"
+        },
+        "memory-after.md": {
+          "bytes": 5215,
+          "sha256": "22870f8ae3a6d4faef48ecc0b8b67ecb0641694ec1dcef6bbe168ecb9a9a25de"
+        },
+        "memory-before.md": {
+          "bytes": 3651,
+          "sha256": "f7ca34c38fbbaa4ed7dc6276ebf24ffd861496f6348851f2211fe3600b6cc3ca"
+        },
+        "meta.env": {
+          "bytes": 939,
+          "sha256": "e7fa13896dbd5dbcfa4f4cb1803872d89baf5232e1b433c025dbf1b23296f2c9"
+        },
+        "model-tier.env": {
+          "bytes": 101,
+          "sha256": "eb336a2f03e52e84027adf60000a3f4a5aa0d6c7b310c7ac6cb2fcd3e79aed6f"
+        },
+        "pr.diff": {
+          "bytes": 15505,
+          "sha256": "c7a094524c221b113cd18b5accf00fb99e595bb713b19f9fa61f72efc7501070"
+        },
+        "pr.json": {
+          "bytes": 4404,
+          "sha256": "6bbe40cc857c06ac0f621e1ada4291a7afa41b3b818231bf57df5bcd5c01fa14"
+        },
+        "preflight-cost.env": {
+          "bytes": 367,
+          "sha256": "eec8576d0df373603ad77ea2a79ef719ad62791ea2067258e37ded0db2063d4e"
+        },
+        "prompt-reprompt.md": {
+          "bytes": 17787,
+          "sha256": "2762df268c13fd2e713239bfc09826d4b8b5c4c9fbb7d9a6032c63db6b126e86"
+        },
+        "prompt.md": {
+          "bytes": 16101,
+          "sha256": "f7b9592a47ab4681bd8e5200712adb8bf0196ba9e7d3747ce7e432f59d64dc21"
+        },
+        "review.md": {
+          "bytes": 5783,
+          "sha256": "d9631a875d398fecab7af8160d60042b71011260d1f4d12e78bb72e6790a0665"
+        },
+        "review.raw.md": {
+          "bytes": 4752,
+          "sha256": "c9c0e13464fbfd9b8eb8ec3c1fa9f67520a862adc9a797245f85fc4566c1707b"
+        },
+        "severity-calibration.env": {
+          "bytes": 160,
+          "sha256": "fae3c8f7f0bfd17ca999dafaa8fb4f8da37c446bfc53872ecdd35447690ac0e9"
+        },
+        "soul-context-preflight.env": {
+          "bytes": 108,
+          "sha256": "4c0441fe38df5259bae5c8033849b9bff2f757257509cc9d7f79fa64e2789df0"
+        },
+        "soul-context.env": {
+          "bytes": 23,
+          "sha256": "c4cbeffb88797871d982e5fe6c7b24e44e89172a4b605ff56d42a204c49c81c0"
+        },
+        "timings.json": {
+          "bytes": 446,
+          "sha256": "5d2f2495941454c40e5c96e29d3790103612523fa7f6c662e95c153c551cdb99"
+        },
+        "tool-turns-gate.env": {
+          "bytes": 157,
+          "sha256": "5035cd1df994a18c5ad6af09f6e139c343fa55ccd65d6edefd4ab49831b67eb2"
+        },
+        "tool-turns-reprompt.env": {
+          "bytes": 129,
+          "sha256": "b2f6eca11efae88fc749ff30fe1c2de2e5b7add4cba3d2e760625c7b823647f9"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,108 @@
+✓ Initialized. View run at 
+https://modal.com/apps/mr-ashish/main/ap-YVigp07hVfEvnbSBpjHNKL
+✓ Created objects.
+├── 🔨 Created mount 
+│   /Users/ashishmishra/Documents/experiments/pr-review-agent/modal_app/app.py
+├── 🔨 Created mount 
+│   /Users/ashishmishra/Documents/experiments/pr-review-agent/agent
+├── 🔨 Created mount 
+│   /Users/ashishmishra/Documents/experiments/pr-review-agent/scripts
+├── 🔨 Created function health.
+├── 🔨 Created web function health_http => 
+│   https://mr-ashish--luffy-pr-review-health-http-dev.modal.run
+├── 🔨 Created function probe_clone.
+├── 🔨 Created function review_pr.
+├── 🔨 Created function enqueue_review.
+└── 🔨 Created web function review_webhook => 
+    https://mr-ashish--luffy-pr-review-review-webhook-dev.modal.run
+CHEAP review_pr Mr-Ashish/milvus#1 model=openai/gpt-4.1-mini
+{
+  "ok": true,
+  "bit": 3,
+  "profile": "cheap",
+  "version": "0.6.1-f41",
+  "repo": "Mr-Ashish/milvus",
+  "pr_number": 1,
+  "head": "cbb3f66",
+  "model": "openai/gpt-4.1-mini",
+  "orch_rc": 0,
+  "post_rc": 0,
+  "verdict_rc": 2,
+  "path_skip": {
+    "skip": false,
+    "allowed": "true",
+    "reason": "disabled",
+    "matched_n": "0",
+    "total_n": "6",
+    "globs": "",
+    "sample": ""
+  },
+  "skipped_paid": false,
+  "review_path": "/tmp/luffy-run-1-1785524569/luffy/.luffy-out/review-1.md",
+  "run_bundle": "/tmp/luffy-run-1-1785524569/luffy/.luffy-out/run-bundle.json",
+  "orch_stderr_tail": "-1.md\n::notice::F50 severity calibration \u00b7 
+reason=approve_with_test_gap match=coverage_gap:tests & risk mutated=true\nF50 
+severity calibration \u00b7 reason=approve_with_test_gap 
+match=coverage_gap:tests & risk mutated=true\n::notice::Review written: 
+/tmp/luffy-run-1-1785524569/luffy/.luffy-out/review-1.md (7575 bytes)\nReview 
+written: /tmp/luffy-run-1-1785524569/luffy/.luffy-out/review-1.md (7575 
+bytes)\n::notice::Agent loop captured: 
+/tmp/luffy-run-1-1785524569/luffy/.luffy-out/agent-loop\nAgent loop captured: 
+/tmp/luffy-run-1-1785524569/luffy/.luffy-out/agent-loop\n::notice::Luffy stage: 
+distill\nMemory distilled \u2192 
+/tmp/luffy-run-1-1785524569/hermes-home/memories/MEMORY.md (3564 
+bytes)\n::notice::Luffy stage: fp_resolve_update\n::notice::Luffy stage: 
+save_trace\nIncluded agent-loop package \u2192 
+/tmp/luffy-run-1-1785524569/luffy/.luffy-out/traces/pr1-runlocal-a1/agent-loop\n
+Trace stored at 
+/tmp/luffy-run-1-1785524569/luffy/.luffy-out/traces/pr1-runlocal-a1 
+(345K)\n::notice::Luffy stage: publish_local\nLUFFY_LOCAL_PUBLISH=0; skip local 
+.luffy publish\n::notice::Luffy stage: publish_hub\nLUFFY_HUB_PUBLISH=0 
+(mode=local); skip hub publish\n::notice::Luffy stage: 
+pack_ui_bundle\nhost=modal trace=pr1-runlocal-a1 verdict=REQUEST CHANGES 
+files=36\n::notice::Luffy stage: post_comment\nLooking for prior Luffy comments 
+with marker: <!-- luffy-review pr=1\nNo prior Luffy comments to replace\nPosting
+review to Mr-Ashish/milvus#1 from 
+/tmp/luffy-run-1-1785524569/luffy/.luffy-out/review-1.md\nPosted PR comment on 
+#1\n",
+  "orch_stdout_tail": 
+"IR=/tmp/luffy-run-1-1785524569/luffy/.luffy-out/traces/pr1-runlocal-a1\nTRACE_I
+D=pr1-runlocal-a1\nLOCAL_PUBLISH=skipped\nHUB_PUBLISH=skipped\n/tmp/luffy-run-1-
+1785524569/luffy/.luffy-out/run-bundle.json\n/tmp/luffy-run-1-1785524569/luffy/.
+luffy-out/traces/pr1-runlocal-a1/run-bundle.json\nRUN_BUNDLE=/tmp/luffy-run-1-17
+85524569/luffy/.luffy-out/run-bundle.json\nhttps://github.com/Mr-Ashish/milvus/p
+ull/1#issuecomment-5146511740\nREVIEW_FILE=/tmp/luffy-run-1-1785524569/luffy/.lu
+ffy-out/review-1.md\nLUFFY_STATUS=success\nTRACE_DIR=/tmp/luffy-run-1-1785524569
+/luffy/.luffy-out/traces/pr1-runlocal-a1\nRUN_BUNDLE=/tmp/luffy-run-1-1785524569
+/luffy/.luffy-out/run-bundle.json\n--- memory-health 
+---\nMEMORY_MODE=local\nMEMORY_PATH=.luffy\nMEMORY_SOURCE=local\nFP_RULES=missin
+g\nLOCAL_PUBLISH=skipped\nHUB_PUBLISH=skipped\n",
+  "elapsed_s": 119.5,
+  "trace_volume_path": "/traces/Mr-Ashish--milvus-pr1-1785524569",
+  "trace_volume_error": null,
+  "resources": "default-min (no cpu/memory reservation)"
+}
+--- preview ---
+<!-- luffy-review pr=1 run=local head=cbb3f667bf984b037af7313731cd54a8c0862a82 
+-->
+## 🏴‍☠️ Luffy Review — PR #1
+
+**Verdict:** REQUEST CHANGES
+**Confidence:** medium  
+**Score:** 69/100
+**Review effort:** 3/5
+
+> ⚠️ **Severity calibration (F50 / H20):** Review self-reported a **test gap** 
+while verdict was APPROVE (`approve_with_test_gap` · match=`coverage_gap:tests &
+risk`). Luffy upgrades to **REQUEST CHANGES** — missing tests for new production
+behavior are blocking, not Suggestions. Signal: _Coverage: new branches around 
+skipping insert body parsing without functions and error conditions..._
+
+### Summary
+This PR moves WAL insert body parsing logic into `FunctionRunnerManager` and 
+optimizes it to skip parsing when the selected schema contains no runner-backed 
+functions (e.g., no BM25/MinH
+BIT3_OK
+Stopping app - local entrypoint completed.
+✓ App completed. View run at 
+https://modal.com/apps/mr-ashish/main/ap-YVigp07hVfEvnbSBpjHNKL

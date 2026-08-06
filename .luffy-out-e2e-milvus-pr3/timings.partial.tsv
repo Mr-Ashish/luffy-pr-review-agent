@@ -1,0 +1,8 @@
+preload_memory	1	0
+assemble	3	0
+hermes	59	0
+distill	0	0
+save_trace	1	0
+publish_local	12	0
+publish_hub	0	0
+pack_ui_bundle	1	0

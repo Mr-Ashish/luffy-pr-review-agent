@@ -1,0 +1,10 @@
+Total: +259 / -37 across 8 files
+
+- `client/milvusclient/bloom_filter.go` (+8/-4)
+- `client/sbbf/sbbf.go` (+6/-2)
+- `configs/milvus.yaml` (+2/-2)
+- `docs/design-docs/design_docs/20260707-bloom-filter-expression.md` (+21/-13)
+- `internal/core/src/exec/expression/BloomFilterExpr.cpp` (+1/-1)
+- `internal/parser/planparserv2/bloom_match.go` (+52/-7)
+- `internal/parser/planparserv2/bloom_match_hint_test.go` (+148/-0)
+- `pkg/util/paramtable/component_param.go` (+21/-8)

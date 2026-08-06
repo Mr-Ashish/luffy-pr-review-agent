@@ -1,0 +1,145 @@
+diff --git a/addons/web/static/src/model/relational_model/utils.js b/addons/web/static/src/model/relational_model/utils.js
+index 9f828f262073b9..4e287f50ae4349 100644
+--- a/addons/web/static/src/model/relational_model/utils.js
++++ b/addons/web/static/src/model/relational_model/utils.js
+@@ -366,13 +366,19 @@ export function getFieldsSpec(activeFields, fields, evalContext, { orderBys, wit
+     const fieldsSpec = {};
+     const properties = [];
+     for (const fieldName in activeFields) {
+-        if (fields[fieldName].relatedPropertyField) {
++        // activeFields may reference names absent from `fields` (e.g. KanbanSampleModel /
++        // bank reconciliation empty state). Skip rather than crash on undefined.
++        const field = fields[fieldName];
++        if (!field) {
++            continue;
++        }
++        if (field.relatedPropertyField) {
+             continue;
+         }
+         const { related, limit, defaultOrderBy, invisible } = activeFields[fieldName];
+         const isAlwaysInvisible = invisible === "True" || invisible === "1";
+         fieldsSpec[fieldName] = {};
+-        switch (fields[fieldName].type) {
++        switch (field.type) {
+             case "one2many":
+             case "many2many": {
+                 if (related && (withInvisible || !isAlwaysInvisible)) {
+@@ -441,7 +447,11 @@ export function getFieldsSpec(activeFields, fields, evalContext, { orderBys, wit
+     }
+ 
+     for (const fieldName of properties) {
+-        const fieldSpec = fieldsSpec[fields[fieldName].definition_record];
++        const definitionRecord = fields[fieldName]?.definition_record;
++        if (!definitionRecord) {
++            continue;
++        }
++        const fieldSpec = fieldsSpec[definitionRecord];
+         if (fieldSpec) {
+             if (!fieldSpec.fields) {
+                 fieldSpec.fields = {};
+diff --git a/addons/web/static/src/views/fields/float/float_field.js b/addons/web/static/src/views/fields/float/float_field.js
+index fe99fdb153dfdb..8061ee5b6424cd 100644
+--- a/addons/web/static/src/views/fields/float/float_field.js
++++ b/addons/web/static/src/views/fields/float/float_field.js
+@@ -150,10 +150,16 @@ export const floatField = {
+         }
+ 
+         return {
+-            formatNumber:
+-                options?.enable_formatting !== undefined
+-                    ? Boolean(options.enable_formatting)
+-                    : true,
++            formatNumber: (() => {
++                if (options?.enable_formatting !== undefined) {
++                    return Boolean(options.enable_formatting);
++                }
++                // Legacy/docs alias used in stock views: options="{'format': false}"
++                if (options?.format !== undefined) {
++                    return Boolean(options.format);
++                }
++                return true;
++            })(),
+             inputType: options.type,
+             humanReadable: !!options.human_readable,
+             step: options.step,
+diff --git a/addons/web/static/src/views/fields/integer/integer_field.js b/addons/web/static/src/views/fields/integer/integer_field.js
+index 66f80ab058ef60..fa6b270ad2d536 100644
+--- a/addons/web/static/src/views/fields/integer/integer_field.js
++++ b/addons/web/static/src/views/fields/integer/integer_field.js
+@@ -112,8 +112,16 @@ export const integerField = {
+     supportedTypes: ["integer"],
+     isEmpty: (record, fieldName) => record.data[fieldName] === false,
+     extractProps: ({ options }) => ({
+-        formatNumber:
+-            options?.enable_formatting !== undefined ? Boolean(options.enable_formatting) : true,
++        // Support legacy/docs option `format` as alias of `enable_formatting` (see #275937)
++        formatNumber: (() => {
++            if (options?.enable_formatting !== undefined) {
++                return Boolean(options.enable_formatting);
++            }
++            if (options?.format !== undefined) {
++                return Boolean(options.format);
++            }
++            return true;
++        })(),
+         humanReadable: !!options.human_readable,
+         inputType: options.type,
+         min: options.min,
+diff --git a/addons/web/static/tests/model/get_fields_spec.test.js b/addons/web/static/tests/model/get_fields_spec.test.js
+new file mode 100644
+index 00000000000000..5f4d2c4db2c9c9
+--- /dev/null
++++ b/addons/web/static/tests/model/get_fields_spec.test.js
+@@ -0,0 +1,52 @@
++import { expect, test } from "@odoo/hoot";
++
++import { getFieldsSpec } from "@web/model/relational_model/utils";
++
++test("getFieldsSpec skips activeFields missing from fields (sample/empty state)", () => {
++    // Reproduces bank-rec KanbanSampleModel crash path (#276570): activeFields can
++    // contain keys that are not present on the fields meta dict.
++    const activeFields = {
++        name: { invisible: "False" },
++        ghost_field: { invisible: "False" },
++        partner_id: {
++            invisible: "False",
++            related: {
++                activeFields: { display_name: { invisible: "False" } },
++                fields: { display_name: { type: "char", name: "display_name" } },
++            },
++        },
++    };
++    const fields = {
++        name: { type: "char", name: "name" },
++        partner_id: { type: "many2one", name: "partner_id", relation: "res.partner" },
++        // ghost_field intentionally omitted
++    };
++
++    let spec;
++    expect(() => {
++        spec = getFieldsSpec(activeFields, fields, {});
++    }).not.toThrow();
++
++    expect("name" in spec).toBe(true);
++    expect("partner_id" in spec).toBe(true);
++    expect("ghost_field" in spec).toBe(false);
++    expect("display_name" in (spec.partner_id.fields || {})).toBe(true);
++});
++
++test("getFieldsSpec skips relatedPropertyField entries safely", () => {
++    const activeFields = {
++        x: { invisible: "False" },
++        prop_like: { invisible: "False" },
++    };
++    const fields = {
++        x: { type: "char", name: "x" },
++        prop_like: {
++            type: "char",
++            name: "prop_like",
++            relatedPropertyField: { name: "properties" },
++        },
++    };
++    const spec = getFieldsSpec(activeFields, fields, {});
++    expect("x" in spec).toBe(true);
++    expect("prop_like" in spec).toBe(false);
++});

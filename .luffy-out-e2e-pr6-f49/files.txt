@@ -1,0 +1,16 @@
+Total: +138 / -100 across 14 files
+
+- `addons/base_address_extended/tests/test_street_fields.py` (+18/-12)
+- `addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_child_partner.xml` (+7/-7)
+- `addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_discount.xml` (+7/-7)
+- `addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_be.xml` (+7/-7)
+- `addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_fr.xml` (+7/-7)
+- `addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_invoice_partner_dk.xml` (+7/-7)
+- `addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_refund_foreign_partner_fr.xml` (+7/-7)
+- `addons/l10n_dk_nemhandel/tests/test_files/from_odoo/oioubl_out_refund_partner_dk.xml` (+7/-7)
+- `addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_be.xml` (+7/-7)
+- `addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_foreign_partner_fr.xml` (+7/-7)
+- `addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_invoice_partner_dk.xml` (+7/-7)
+- `addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_refund_foreign_partner_fr.xml` (+6/-6)
+- `addons/l10n_dk_oioubl/tests/test_files/from_odoo/oioubl_out_refund_partner_dk.xml` (+6/-6)
+- `odoo/tools/misc.py` (+38/-6)

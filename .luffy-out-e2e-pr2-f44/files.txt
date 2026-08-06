@@ -1,0 +1,6 @@
+Total: +85 / -9 across 4 files
+
+- `addons/web/static/src/model/relational_model/utils.js` (+13/-3)
+- `addons/web/static/src/views/fields/float/float_field.js` (+10/-4)
+- `addons/web/static/src/views/fields/integer/integer_field.js` (+10/-2)
+- `addons/web/static/tests/model/get_fields_spec.test.js` (+52/-0)

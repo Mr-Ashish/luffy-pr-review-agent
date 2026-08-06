@@ -1,0 +1,56 @@
+::notice::Luffy orchestrator · root=/Users/ashishmishra/Documents/experiments/pr-review-agent workspace=/Users/ashishmishra/Documents/experiments/odoo
+::notice::Luffy stage: preload_memory
+MEMORY_MODE=local
+MEMORY_PATH=.luffy
+No local memory yet at Mr-Ashish/odoo/.luffy/MEMORY.md (HTTP 404)
+Hub preload skipped (mode=local, LUFFY_HUB_PUBLISH=0)
+MEMORY_SOURCE=seed
+HUB_MEMORY=skipped
+::notice::Luffy stage: assemble
+Assembling context for Mr-Ashish/odoo#6 → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/prompt.md
+Context ready: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/prompt.md (diff_truncated=false)
+::notice::Luffy stage: hermes
+::notice::F43 preflight cost · decision=allow reason=no_budget est=$0.015989 model=openai/gpt-4.1-mini
+F43 preflight cost · decision=allow reason=no_budget est=$0.015989 model=openai/gpt-4.1-mini
+::notice::hermes version matches pin 53559aaf: /Users/ashishmishra/.local/bin/hermes
+hermes version matches pin 53559aaf: /Users/ashishmishra/.local/bin/hermes
+::notice::F46 SOUL context scan clean (Hermes will load reviewer contract)
+F46 SOUL context scan clean (Hermes will load reviewer contract)
+::notice::Hermes review · model=openai/gpt-4.1-mini tier=explicit toolsets=terminal workspace=/Users/ashishmishra/Documents/experiments/odoo hermes_home=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home timeout=1500s max_turns=40
+Hermes review · model=openai/gpt-4.1-mini tier=explicit toolsets=terminal workspace=/Users/ashishmishra/Documents/experiments/odoo hermes_home=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home timeout=1500s max_turns=40
+hermes-run.log bytes=2401
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/agent-loop
+captured steps=2 messages=2 tool_turns=0 session=20260731_230213_7d82f2
+::notice::F49 soft re-prompt · tool_turns=0 files=14 (H15 zero-tool multi-file)
+F49 soft re-prompt · tool_turns=0 files=14 (H15 zero-tool multi-file)
+hermes-run.log (reprompt) bytes=2401
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/agent-loop
+captured steps=38 messages=38 tool_turns=17 session=20260731_230226_bba7bf
+::notice::F49 soft re-prompt recovered tool_turns=17 (was 0)
+F49 soft re-prompt recovered tool_turns=17 (was 0)
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/review-6.md
+usage-summary: updated /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/review-6.md
+REVIEW_FILE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/review-6.md
+AGENT_LOOP_DIR=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/agent-loop
+::notice::Review written: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/review-6.md (3024 bytes)
+Review written: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/review-6.md (3024 bytes)
+::notice::Agent loop captured: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/agent-loop
+Agent loop captured: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/agent-loop
+::notice::Luffy stage: distill
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/memories/MEMORY.md
+Memory distilled → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/memories/MEMORY.md (2574 bytes)
+::notice::Luffy stage: save_trace
+Included agent-loop package → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/traces/pr6-runlocal-a1/agent-loop
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/traces/pr6-runlocal-a1
+TRACE_DIR=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/traces/pr6-runlocal-a1
+TRACE_ID=pr6-runlocal-a1
+Trace stored at /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/traces/pr6-runlocal-a1 (352K)
+::notice::Luffy stage: publish_local
+MEMORY_MODE=local
+MEMORY_PATH=.luffy
+payload_bytes=10536
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/hub-payload.json
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr6-f51/client_payload.json
+::notice::Local memory publish → Mr-Ashish/odoo@19.0 path=.luffy
+Local memory publish → Mr-Ashish/odoo@19.0 path=.luffy

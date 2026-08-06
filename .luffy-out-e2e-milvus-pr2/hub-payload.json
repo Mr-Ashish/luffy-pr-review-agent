@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "event": "luffy-run",
+  "source_repo": "Mr-Ashish/milvus",
+  "pr_number": "2",
+  "run_id": "local",
+  "run_attempt": "1",
+  "trace_id": "pr2-runlocal-a1",
+  "model": "openai/gpt-4.1-mini",
+  "status": "success",
+  "verdict": "APPROVE",
+  "trigger_comment": "",
+  "review_truncated": false,
+  "review_md": "<!-- luffy-review pr=2 run=local -->\n## \ud83c\udff4\u200d\u2620\ufe0f Luffy Review \u2014 PR #2\n\n**Verdict:** APPROVE  \n**Confidence:** medium  \n**Score:** 85/100  \n**Review effort:** 3/5\n\n### Summary\nThis PR raises the proxy limits for bloom_match filter blobs from 32 MiB to 64 MiB, effectively increasing the maximum number of members representable at the default false-positive rate from ~24M to ~48.6M. It adjusts client, config, and documentation accordingly and adds guidance for handling cases where the bloom filter exceeds the new size limit with a suggested minimum false positive rate. The changes are consistent with the upstream Milvus PR #51962 and include test coverage to verify sizing and rejection behavior.\n\n### Walkthrough\n- Updated the bloom filter client code to reflect the new maximum bloom filter body size and adjusted handling of false positive rates to accommodate larger member counts. (`client/milvusclient/bloom_filter.go`, `client/sbbf/sbbf.go`)\n- Raised proxy configuration parameters for `maxBloomFilterSize` and `serverMaxRecvSize` in configuration YAML to handle larger filter blobs. (`configs/milvus.yaml`)\n- Updated design documents to describe the new capacity tiers and sizing rules for bloom filter bodies. (`docs/design-docs/design_docs/20260707-bloom-filter-expression.md`)\n- Added logic to produce actionable error hints when a bloom filter blob exceeds the allowed size, advising users on minimum false positive rates needed to fit their filters. New tests verify the correctness of these hints and the relevant boundary conditions. (`internal/parser/planparserv2/bloom_match.go` and related test `bloom_match_hint_test.go`)\n- Adjusted related parameters to reflect the expanded bloom filter size budget as detailed in `pkg/util/paramtable/component_param.go`.\n\n### Architecture diagram\n<!-- luffy-mermaid -->\n\n_Auto-generated from 8 changed file(s) (F57). Edges between groups are adjacency, not proven runtime dependencies._\n\n```mermaid\nflowchart LR\n  %% PR changed modules (8 files, 5 groups)\n  subgraph g_internal[\"internal\"]\n    f_internal_core_src_exec_expression_BloomFilterExpr_cpp[\"BloomFilterExpr.cpp\"]\n    %% internal/core/src/exec/expression/BloomFilterExpr.cpp\n    f_internal_parser_planparserv2_bloom_match_go[\"bloom_match.go\"]\n    %% internal/parser/planparserv2/bloom_match.go\n    f_internal_parser_planparserv2_bloom_match_hint_test_go[\"bloom_match_hint_test.go\"]\n    %% internal/parser/planparserv2/bloom_match_hint_test.go\n  end\n  subgraph g_client[\"client\"]\n    f_client_milvusclient_bloom_filter_go[\"bloom_filter.go\"]\n    %% client/milvusclient/bloom_filter.go\n    f_client_sbbf_sbbf_go[\"sbbf.go\"]\n    %% client/sbbf/sbbf.go\n  end\n  subgraph g_configs[\"configs\"]\n    f_configs_milvus_yaml[\"milvus.yaml\"]\n    %% configs/milvus.yaml\n  end\n  subgraph g_docs[\"docs\"]\n    f_docs_design_docs_design_docs_20260707_bloom_filter_expression_[\"20260707-bloom-filter-expression.md\"]\n    %% docs/design-docs/design_docs/20260707-bloom-filter-expression.md\n  end\n  subgraph g_pkg_util[\"pkg/util\"]\n    f_pkg_util_paramtable_component_param_go[\"component_param.go\"]\n    %% pkg/util/paramtable/component_param.go\n  end\n  %% group adjacency (not runtime deps)\n  g_internal -.-> g_client\n  g_client -.-> g_configs\n  g_configs -.-> g_docs\n  g_docs -.-> g_pkg_util\n```\n\n<details><summary>Files in diagram</summary>\n\n- `client/milvusclient/bloom_filter.go`\n- `client/sbbf/sbbf.go`\n- `configs/milvus.yaml`\n- `docs/design-docs/design_docs/20260707-bloom-filter-expression.md`\n- `internal/core/src/exec/expression/BloomFilterExpr.cpp`\n- `internal/parser/planparserv2/bloom_match.go`\n- `internal/parser/planparserv2/bloom_match_hint_test.go`\n- `pkg/util/paramtable/component_param.go`\n\n</details>\n\n\n### Blocking\n- None\n\n### Key findings\nNone \u2014 no high-confidence defects in new code.\n\n### Security audit\nNo security concerns detected. The changes are mostly configuration and limit increases, with error reporting improvements. No unsafe deserialization or injection risks identified.\n\n### Multi-lens checklist\n| Lens          | Status  | Note                                         |\n|---------------|---------|----------------------------------------------|\n| correctness   | ok      | Boundary and edge cases for bloom filter sizing handled. |\n| security      | ok      | No new security risks introduced.            |\n| tests        | ok      | Tests cover the new sizing and error hint logic. |\n| performance   | n/a     | No performance regressions apparent.         |\n| api_contracts | ok      | No public API breaks; configuration extended. |\n| concurrency  | n/a     | No concurrency concerns from limits changes. |\n| maintainability| ok     | Documentation and comments improve clarity.   |\n\n### Suggestions\n- Consider including a dedicated end-to-end test that sends a real bloom filter request close to or at the new 64 MiB size limit, verifying acceptance through the entire proxy and query stack. This would provide additional risk coverage for the sizing increase, especially for large-scale deployments.\n\n### Code suggestions\nNone\n\n### Nits\n- None\n\n### Tests & risk\n- Relevant tests added/updated: yes (new validation and hint tests)\n- Coverage: Good coverage on size boundaries and error paths; no direct e2e bloom match request test at largest new size.\n- Risk: Low-medium due to size limit doubles and more network resource usage; mitigated by existing limits on aggregate plan size and error handling.\n- Rollback: Easy, by resetting size limits and config to previous values.\n\n### What I checked\n- PR diff file `.luffy-out-e2e-milvus-pr2/pr.diff` focusing on bloom filter client, config, and documentation changes.\n- Verified the message comments and sizing logic in the client and sbbf source code.\n- Reviewed design document and proxy configuration updates.\n- Confirmed presence of dedicated test file for bloom_match hint behavior described in the PR summary.\n- Could not locate some internal parser source files in local workspace, but claims and structure confirmed from diff and context.\n\n---\n*Luffy \u00b7 Hermes Agent \u00b7 OpenRouter \u00b7 memory-backed review*\n*Cost / usage: model=`openai/gpt-4.1-mini` \u00b7 ~$0.10 (estimated) \u00b7 884k tokens \u00b7 37 API calls*\n",
+  "memory_block": "## Review run pr2-runlocal-a1\n- Source: `Mr-Ashish/milvus` PR #2\n- Status: success\n- Model: openai/gpt-4.1-mini\n- Verdict: APPROVE\n- Blocking: - None\n- Summary: This PR raises the proxy limits for bloom_match filter blobs from 32 MiB to 64 MiB, effectively increasing the maximum number of members representable at the default false-positive rate from ~24M to ~48.6M. It adjusts client, config, and documentation accordingly and adds guidance for handling cases where the bloom filter exceeds the new size limit with a suggested minimum false positive rate. The changes are consistent with the upstream Milvus PR #51962 and include test coverage to verify sizing and rejection behavior.\n- Trigger: \n",
+  "timings": {
+    "started_at": "2026-07-31T18:27:08Z",
+    "ended_at": "2026-07-31T18:29:01Z",
+    "total_seconds": 113,
+    "stages": [
+      {
+        "name": "preload_memory",
+        "seconds": 0,
+        "exit_code": 0
+      },
+      {
+        "name": "assemble",
+        "seconds": 4,
+        "exit_code": 0
+      },
+      {
+        "name": "hermes",
+        "seconds": 109,
+        "exit_code": 0
+      },
+      {
+        "name": "distill",
+        "seconds": 0,
+        "exit_code": 0
+      }
+    ]
+  },
+  "meta": {
+    "github_sha": null,
+    "github_ref": null,
+    "github_event_name": null,
+    "started_at": "2026-07-31T18:27:08Z",
+    "trace_meta": {
+      "trace_id": "pr2-runlocal-a1",
+      "schema_version": 1,
+      "repo": "Mr-Ashish/milvus",
+      "pr_number": "2",
+      "run_id": "local",
+      "run_attempt": "1",
+      "model": "openai/gpt-4.1-mini",
+      "status": "success",
+      "started_at": "2026-07-31T18:27:08Z",
+      "ended_at": "2026-07-31T18:29:01Z",
+      "workspace_root": "/Users/ashishmishra/Documents/experiments/pr-review-agent",
+      "github_sha": null,
+      "github_ref": null,
+      "github_event_name": null,
+      "hermes_rc": "0",
+      "trigger_comment": "",
+      "files": {
+        "agent-loop/agent-loop.json": {
+          "bytes": 215672,
+          "sha256": "81ae61c86fb41f0a3054da60d7b116409035da010c479ef758e9039d7eeb69bc"
+        },
+        "agent-loop/agent-loop.md": {
+          "bytes": 38836,
+          "sha256": "9646bcacc33c9312de4cb2b9bb6f76545e83982a7fb765826b220b4e4fcac26c"
+        },
+        "agent-loop/agent.log": {
+          "bytes": 2401,
+          "sha256": "100b0879346b6051e778d96b4f5c2e8a5ac34ecc7c3e8322b17673a170daa2f2"
+        },
+        "agent-loop/errors.log": {
+          "bytes": 2901,
+          "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+        },
+        "agent-loop/usage.json": {
+          "bytes": 464,
+          "sha256": "79906823f621150b32debeb619022addfc6d35ace7d3e8efd70c8a1f3ae2f7cb"
+        },
+        "agent-loop-attempt1/agent-loop.json": {
+          "bytes": 31381,
+          "sha256": "39ca07c8939e3964b04f96af975f778d2c415143c55f856eac25a06d9a784e29"
+        },
+        "agent-loop-attempt1/agent-loop.md": {
+          "bytes": 4611,
+          "sha256": "38d0bea2b4af730727c039f398e263c8dd9abb8482d283f7e89700e38bc749d3"
+        },
+        "agent-loop-attempt1/agent.log": {
+          "bytes": 2401,
+          "sha256": "da9a3f574f33b8d9eebb15a7a4037cb297259f03d67789a42ef46f2ca61744b4"
+        },
+        "agent-loop-attempt1/errors.log": {
+          "bytes": 2901,
+          "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+        },
+        "agent-loop-attempt1/usage.json": {
+          "bytes": 445,
+          "sha256": "fa025770ad070fbf4a188da5468fdbcea02cbcbdb96af3123729c569cab5385b"
+        },
+        "context.md": {
+          "bytes": 11241,
+          "sha256": "83635e22a0564cfb86d947f812d0e896ee6a7ef13745297a0152bd2a1ac7610b"
+        },
+        "files.txt": {
+          "bytes": 468,
+          "sha256": "e2d8d90e6d8f0475ff83beaad6c59b3f95238b23ce5c6b2255b984521f63a9a0"
+        },
+        "hermes-max-turns.env": {
+          "bytes": 49,
+          "sha256": "6b66a2a2643dbe65337b35ba3df7745af620ba392034d1c7c30c6d487e581097"
+        },
+        "hermes-pin.txt": {
+          "bytes": 41,
+          "sha256": "0ea7b07d1ee10f05f03acb0228b48c579f1f1f89ba622198bbbeda984e9b631a"
+        },
+        "hermes-run.log": {
+          "bytes": 2401,
+          "sha256": "100b0879346b6051e778d96b4f5c2e8a5ac34ecc7c3e8322b17673a170daa2f2"
+        },
+        "hermes-usage.json": {
+          "bytes": 464,
+          "sha256": "79906823f621150b32debeb619022addfc6d35ace7d3e8efd70c8a1f3ae2f7cb"
+        },
+        "hermes.stderr": {
+          "bytes": 42190,
+          "sha256": "2e9352939d9d9ceb17d6ef27069df29810919dcc146f719211749f6ac48f4acc"
+        },
+        "linked-issue-context.env": {
+          "bytes": 233,
+          "sha256": "ec5dcfb485b8fecc93aa7690d273091ea02f5f364602a6f802603d3ea7bd1c8a"
+        },
+        "linked-issues.md": {
+          "bytes": 9179,
+          "sha256": "636dbc1340fe51107dfe75c3df1eacb15683a724ee717a3607a863baac96c1a9"
+        },
+        "memory-after.md": {
+          "bytes": 3651,
+          "sha256": "f7ca34c38fbbaa4ed7dc6276ebf24ffd861496f6348851f2211fe3600b6cc3ca"
+        },
+        "memory-before.md": {
+          "bytes": 2790,
+          "sha256": "6e61cec423c1f110b28c99eb9ec1afa517a2f05ae71faf9f75846db0110be601"
+        },
+        "meta.env": {
+          "bytes": 936,
+          "sha256": "f5aafaf688a09f3518aa4217a0d725e2d45cc7465439c62aa3af3ed4346bb6e4"
+        },
+        "model-tier.env": {
+          "bytes": 101,
+          "sha256": "694385374169eef4c5490cda2dd54934748cff90a3071db7358d4d7b24400df3"
+        },
+        "pr.diff": {
+          "bytes": 24967,
+          "sha256": "02c92e2e2fe690bfec037e92b980cd93bb20f4c1c5dfe50d960aa042d4533990"
+        },
+        "pr.json": {
+          "bytes": 5981,
+          "sha256": "c7c7f81a8f0139bbbcb3fc5a03907870ff06b5bb3f7cc4f2ba59381d2b9729a6"
+        },
+        "preflight-cost.env": {
+          "bytes": 367,
+          "sha256": "fc36da765ad08cf26e4342ee2a016f8a5b3ddb8d98c17a4a1fb8cecdc18d19b5"
+        },
+        "prompt-reprompt.md": {
+          "bytes": 21904,
+          "sha256": "80b9cabeffc095eee42bec196dab00f12b4d467e7c112653e753e0dfd1132cc4"
+        },
+        "prompt.md": {
+          "bytes": 20177,
+          "sha256": "dee19cb6e50abdc3c4dbd3a2d65f4669a048b2a5bbcf20a1b2f907597a535062"
+        },
+        "review.md": {
+          "bytes": 6203,
+          "sha256": "3008c5c83add285d7e18c058c550f8cc4196fae6d76a94e5c514d58082d8257a"
+        },
+        "review.raw.md": {
+          "bytes": 4977,
+          "sha256": "20db9c8b42dd840db8f340803f9a059a18130303b5f41d42786598f8075468ba"
+        },
+        "severity-calibration.env": {
+          "bytes": 160,
+          "sha256": "fae3c8f7f0bfd17ca999dafaa8fb4f8da37c446bfc53872ecdd35447690ac0e9"
+        },
+        "soul-context-preflight.env": {
+          "bytes": 108,
+          "sha256": "4c0441fe38df5259bae5c8033849b9bff2f757257509cc9d7f79fa64e2789df0"
+        },
+        "soul-context.env": {
+          "bytes": 23,
+          "sha256": "c4cbeffb88797871d982e5fe6c7b24e44e89172a4b605ff56d42a204c49c81c0"
+        },
+        "timings.json": {
+          "bytes": 448,
+          "sha256": "51427a9e7cf70c18f36970a7816f3a03742558f951788356425a4ae7131e8870"
+        },
+        "tool-turns-gate.env": {
+          "bytes": 157,
+          "sha256": "92de00b73f701bda7e3611caafd80a3702a70535c8058c2d6c1b42f0b80218a3"
+        },
+        "tool-turns-reprompt.env": {
+          "bytes": 129,
+          "sha256": "b1535cfbb8eaaa586e32e3c2d84e42e545c4cfec5a218f2a1d6e50a61e8aab20"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "trace_id": "pr2-runlocal-a1",
+  "schema_version": 1,
+  "repo": "Mr-Ashish/odoo",
+  "pr_number": "2",
+  "run_id": "local",
+  "run_attempt": "1",
+  "model": "openai/gpt-4.1-mini",
+  "status": "success",
+  "started_at": "2026-07-31T15:58:37Z",
+  "ended_at": "2026-07-31T16:00:34Z",
+  "workspace_root": "/Users/ashishmishra/Documents/experiments/odoo",
+  "github_sha": null,
+  "github_ref": null,
+  "github_event_name": null,
+  "hermes_rc": "0",
+  "trigger_comment": "",
+  "files": {
+    "agent-loop/agent-loop.json": {
+      "bytes": 14711,
+      "sha256": "3c664f0962e2e2c370efb9be075ac834f1deba76215a5e2d7f4a2e2ec3b2b888"
+    },
+    "agent-loop/agent-loop.md": {
+      "bytes": 4571,
+      "sha256": "65307319bf48bfe49e6f0020df3322aac92c384467b34fabad5370f544182255"
+    },
+    "agent-loop/agent.log": {
+      "bytes": 10509,
+      "sha256": "03920968d4f5a2d7dc035daa02bf24ecf78607ab6b690b16bc53c1c110b6f4ce"
+    },
+    "agent-loop/errors.log": {
+      "bytes": 2901,
+      "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+    },
+    "context.md": {
+      "bytes": 1943,
+      "sha256": "743d2ef3b8171435ac0d14f2f2404127cb20bbdb3b0a0829d6dbf1a270b21eb5"
+    },
+    "files.txt": {
+      "bytes": 308,
+      "sha256": "57e2132fbe21a7b15c9604a3e0a4403e7ac53844cc8bf6f147008dc42b4f4401"
+    },
+    "hermes-pin.txt": {
+      "bytes": 41,
+      "sha256": "0ea7b07d1ee10f05f03acb0228b48c579f1f1f89ba622198bbbeda984e9b631a"
+    },
+    "hermes-run.log": {
+      "bytes": 10323,
+      "sha256": "519540724c6e81841eb1966d62058f08871ce1161e114e1b333bfeb140f3a4eb"
+    },
+    "hermes.stderr": {
+      "bytes": 7069,
+      "sha256": "89a75d2c025942870d7b8d5daa9dcf448eea0d6af0ed9bf4970700961c7cf6b7"
+    },
+    "memory-after.md": {
+      "bytes": 937,
+      "sha256": "31ff54eaadd0872093cd7fc0b154f3386becdde89cf8ac945775e95a21312fd6"
+    },
+    "meta.env": {
+      "bytes": 717,
+      "sha256": "c278c710e724ebc9ff3c9ba88cd2474733b29c5625856f95b1bbec6798edb589"
+    },
+    "pr.diff": {
+      "bytes": 6236,
+      "sha256": "b998c514897df4ea3f4c19665fa5e57d17e18ff1674c34ccc5f0c990f7546710"
+    },
+    "pr.json": {
+      "bytes": 2367,
+      "sha256": "dfce5abc0fa68e445fa0c79e2085034e72744716fc05e1ae1b044f201d994ab6"
+    },
+    "prompt.md": {
+      "bytes": 5283,
+      "sha256": "3b1a03257059168be564e9e74ce47cbb787a4a6113a1276aec7891617c9e023b"
+    },
+    "review.md": {
+      "bytes": 9772,
+      "sha256": "0824049bae0b0d123446ee62346dc590b1701edb2b1e3a9e5484888c7edaec28"
+    },
+    "review.raw.md": {
+      "bytes": 9827,
+      "sha256": "6d6f81a05e714d0a6a5d21a341e4827291faea5c657d2f42538b3e90a3cd3a60"
+    },
+    "timings.json": {
+      "bytes": 448,
+      "sha256": "de774048cae351c0a4602e4802834d89341f0bf77e2609aedc5a24e9373931bf"
+    }
+  }
+}

@@ -1,0 +1,352 @@
+diff --git a/internal/core/src/storage/loon_ffi/util.cpp b/internal/core/src/storage/loon_ffi/util.cpp
+index d28d02dd8e3f7..a17c8e310a60f 100644
+--- a/internal/core/src/storage/loon_ffi/util.cpp
++++ b/internal/core/src/storage/loon_ffi/util.cpp
+@@ -290,6 +290,9 @@ static const std::unordered_set<std::string> kAllowedExtfsSpecKeys = {
+     "gcp_target_service_account",
+     "bucket_name",
+     "anonymous",
++    "azure_client_id",
++    "azure_tenant_id",
++    "azure_credential_endpoint",
+ };
+ 
+ // kExtfsFields is the contract with Go extfsFields in
+diff --git a/internal/core/thirdparty/milvus-storage/CMakeLists.txt b/internal/core/thirdparty/milvus-storage/CMakeLists.txt
+index 4263dc159e0fe..9c2dd4408559b 100644
+--- a/internal/core/thirdparty/milvus-storage/CMakeLists.txt
++++ b/internal/core/thirdparty/milvus-storage/CMakeLists.txt
+@@ -14,7 +14,7 @@
+ # Update milvus-storage_VERSION for the first occurrence
+ milvus_add_pkg_config("milvus-storage")
+ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES "")
+-set( milvus-storage_VERSION f9f5bd1)
++set( milvus-storage_VERSION a95f6c0821d80081308116735678188a5476876d)
+ set( GIT_REPOSITORY  "https://github.com/milvus-io/milvus-storage.git")
+ message(STATUS "milvus-storage repo: ${GIT_REPOSITORY}")
+ message(STATUS "milvus-storage version: ${milvus-storage_VERSION}")
+diff --git a/internal/core/unittest/test_external_take.cpp b/internal/core/unittest/test_external_take.cpp
+index 17035a3df149c..99032ac05e359 100644
+--- a/internal/core/unittest/test_external_take.cpp
++++ b/internal/core/unittest/test_external_take.cpp
+@@ -2967,6 +2967,41 @@ TEST(InjectExtfsAllowlist, AzurePublicCloudWithExplicitRegion) {
+               "azure");
+ }
+ 
++TEST(InjectExtfsAllowlist, AzureCredentialBrokerProperties) {
++    milvus_storage::api::Properties props;
++    const int64_t coll_id = 42;
++    std::string spec = R"({
++        "format":"parquet",
++        "extfs":{
++            "access_key_id":"myacct",
++            "cloud_provider":"azure",
++            "region":"westus3",
++            "azure_client_id":"client",
++            "azure_tenant_id":"tenant",
++            "azure_credential_endpoint":"https://broker.example.com/v1/credentials/assume-role"
++        }
++    })";
++
++    ::InjectExternalSpecProperties(
++        props, coll_id, "azure://core.windows.net/container/path", spec);
++
++    EXPECT_EQ(std::get<std::string>(props.at("extfs.42.address")),
++              "core.windows.net");
++    EXPECT_EQ(std::get<std::string>(props.at("extfs.42.bucket_name")),
++              "container");
++    EXPECT_EQ(std::get<std::string>(props.at("extfs.42.access_key_id")),
++              "myacct");
++    EXPECT_EQ(std::get<std::string>(props.at("extfs.42.azure_client_id")),
++              "client");
++    EXPECT_EQ(std::get<std::string>(props.at("extfs.42.azure_tenant_id")),
++              "tenant");
++    EXPECT_EQ(
++        std::get<std::string>(props.at("extfs.42.azure_credential_endpoint")),
++        "https://broker.example.com/v1/credentials/assume-role");
++    EXPECT_EQ(props.count("extfs.42.access_key_value"), 0u);
++    EXPECT_EQ(props.count("extfs.42.request_timeout_ms"), 0u);
++}
++
+ TEST(InjectExtfsAllowlist, AzureSovereignCloudEndpoints) {
+     struct Case {
+         std::string region;
+diff --git a/pkg/util/externalspec/external_spec.go b/pkg/util/externalspec/external_spec.go
+index 08c3529baa3fd..bdc955bb04135 100644
+--- a/pkg/util/externalspec/external_spec.go
++++ b/pkg/util/externalspec/external_spec.go
+@@ -58,6 +58,9 @@ const (
+ 	ExtfsKeyUseSSL                  = specutil.ExtfsKeyUseSSL
+ 	ExtfsKeyUseVirtualHost          = specutil.ExtfsKeyUseVirtualHost
+ 	ExtfsKeyLoadFrequency           = specutil.ExtfsKeyLoadFrequency
++	ExtfsKeyAzureClientID           = specutil.ExtfsKeyAzureClientID
++	ExtfsKeyAzureTenantID           = specutil.ExtfsKeyAzureTenantID
++	ExtfsKeyAzureCredentialEndpoint = specutil.ExtfsKeyAzureCredentialEndpoint
+ )
+ 
+ // Scheme* are URL schemes accepted in external_source.
+@@ -211,8 +214,9 @@ func ValidateSourceAndSpec(externalSource, externalSpec string) error {
+ 
+ // ValidateExtfsComplete requires spec.extfs to be self-sufficient: exactly one
+ // credential mode (AK/SK, role_arn, use_iam=true, gcp_target_service_account,
+-// anonymous=true), and region for AWS-family schemes. role_arn subsumes
+-// use_iam (do not double-count). No inheritance from Milvus fs.* config.
++// Azure credential broker, anonymous=true), and region for AWS-family
++// schemes. role_arn subsumes use_iam (do not double-count). No inheritance
++// from Milvus fs.* config.
+ func ValidateExtfsComplete(externalSource string, extfs map[string]string) error {
+ 	// Parse once; caller's ValidateExternalSource has already guaranteed a scheme.
+ 	u, err := url.Parse(externalSource)
+@@ -226,7 +230,12 @@ func ValidateExtfsComplete(externalSource string, extfs map[string]string) error
+ 	// a local classification only; it is not written back to external_spec.
+ 	// Inferring cloud_provider from s3:// is ambiguous (AWS S3 vs self-hosted
+ 	// MinIO), so s3-family URIs still require the caller to be explicit.
+-	cp := strings.ToLower(extfs[ExtfsKeyCloudProvider])
++	rawCP := extfs[ExtfsKeyCloudProvider]
++	cp := strings.ToLower(rawCP)
++	if rawCP != cp {
++		return merr.WrapErrParameterInvalidMsg(
++			"extfs.cloud_provider=%q must use the canonical lowercase value %q", rawCP, cp)
++	}
+ 	if scheme == SchemeMinIO && cp == "" {
+ 		cp = CloudProviderMinIO
+ 	}
+@@ -240,8 +249,42 @@ func ValidateExtfsComplete(externalSource string, extfs map[string]string) error
+ 		return merr.WrapErrParameterInvalidMsg("scheme=minio requires extfs.cloud_provider=%q, got %q", CloudProviderMinIO, cp)
+ 	}
+ 
++	hasAzureBroker := extfs[ExtfsKeyAzureClientID] != "" ||
++		extfs[ExtfsKeyAzureTenantID] != "" ||
++		extfs[ExtfsKeyAzureCredentialEndpoint] != ""
++	if hasAzureBroker {
++		if cp != CloudProviderAzure || scheme != SchemeAzure {
++			return merr.WrapErrParameterInvalidMsg(
++				"Azure credential broker mode requires scheme=%q and extfs.cloud_provider=%q, got scheme=%q cloud_provider=%q",
++				SchemeAzure, CloudProviderAzure, scheme, cp)
++		}
++		for _, required := range []struct {
++			key   string
++			value string
++		}{
++			{ExtfsKeyAzureClientID, extfs[ExtfsKeyAzureClientID]},
++			{ExtfsKeyAzureTenantID, extfs[ExtfsKeyAzureTenantID]},
++			{ExtfsKeyAzureCredentialEndpoint, extfs[ExtfsKeyAzureCredentialEndpoint]},
++			{ExtfsKeyAccessKeyID, extfs[ExtfsKeyAccessKeyID]},
++			{ExtfsKeyRegion, extfs[ExtfsKeyRegion]},
++		} {
++			if required.value == "" {
++				return merr.WrapErrParameterMissingMsg(
++					"extfs.%s is required for Azure credential broker mode", required.key)
++			}
++		}
++
++		brokerEndpoint, err := url.Parse(extfs[ExtfsKeyAzureCredentialEndpoint])
++		if err != nil || brokerEndpoint.Host == "" ||
++			(brokerEndpoint.Scheme != "http" && brokerEndpoint.Scheme != "https") {
++			return merr.WrapErrParameterInvalidMsg(
++				"extfs.%s must be a valid HTTP(S) URL", ExtfsKeyAzureCredentialEndpoint)
++		}
++	}
++
+ 	hasAKSK := extfs[ExtfsKeyAccessKeyID] != "" && extfs[ExtfsKeyAccessKeyValue] != ""
+-	hasAKOnly := (extfs[ExtfsKeyAccessKeyID] != "") != (extfs[ExtfsKeyAccessKeyValue] != "")
++	hasAKOnly := !hasAzureBroker &&
++		((extfs[ExtfsKeyAccessKeyID] != "") != (extfs[ExtfsKeyAccessKeyValue] != ""))
+ 	hasRoleARN := extfs[ExtfsKeyRoleARN] != ""
+ 	hasUseIAMAlone := extfs[ExtfsKeyUseIAM] == "true" && !hasRoleARN
+ 	hasGCPImpersonation := extfs[ExtfsKeyGCPTargetServiceAccount] != ""
+@@ -252,16 +295,16 @@ func ValidateExtfsComplete(externalSource string, extfs map[string]string) error
+ 	}
+ 
+ 	modes := 0
+-	for _, set := range []bool{hasAKSK, hasRoleARN, hasUseIAMAlone, hasGCPImpersonation, hasAnonymous} {
++	for _, set := range []bool{hasAKSK, hasRoleARN, hasUseIAMAlone, hasGCPImpersonation, hasAzureBroker, hasAnonymous} {
+ 		if set {
+ 			modes++
+ 		}
+ 	}
+ 	if modes == 0 {
+-		return merr.WrapErrParameterInvalidMsg("extfs credential mode missing: set exactly one of {access_key_id+access_key_value}, role_arn, use_iam=true, gcp_target_service_account, or anonymous=true")
++		return merr.WrapErrParameterInvalidMsg("extfs credential mode missing: set exactly one of {access_key_id+access_key_value}, role_arn, use_iam=true, gcp_target_service_account, Azure credential broker, or anonymous=true")
+ 	}
+ 	if modes > 1 {
+-		return merr.WrapErrParameterInvalidMsg("extfs credential modes are mutually exclusive: set exactly one of AK/SK, role_arn, use_iam=true, gcp_target_service_account, or anonymous=true")
++		return merr.WrapErrParameterInvalidMsg("extfs credential modes are mutually exclusive: set exactly one of AK/SK, role_arn, use_iam=true, gcp_target_service_account, Azure credential broker, or anonymous=true")
+ 	}
+ 
+ 	if hasGCPImpersonation {
+diff --git a/pkg/util/externalspec/external_spec_test.go b/pkg/util/externalspec/external_spec_test.go
+index 5153829885837..2d797765143d9 100644
+--- a/pkg/util/externalspec/external_spec_test.go
++++ b/pkg/util/externalspec/external_spec_test.go
+@@ -525,6 +525,118 @@ func TestParseExternalSpec_ArnKeys(t *testing.T) {
+ }
+ 
+ func TestValidateExtfsComplete_Azure(t *testing.T) {
++	azureBrokerSpec := func() map[string]string {
++		return map[string]string{ //nolint:gosec // synthetic test values, not credentials
++			"access_key_id":             "mystorageacct",
++			"cloud_provider":            "azure",
++			"region":                    "westus3",
++			"azure_client_id":           "client",
++			"azure_tenant_id":           "tenant",
++			"azure_credential_endpoint": "https://broker.example.com/v1/credentials/assume-role",
++		}
++	}
++
++	t.Run("azure_credential_broker", func(t *testing.T) {
++		err := ValidateExtfsComplete(
++			"azure://core.windows.net/container/path",
++			azureBrokerSpec(),
++		)
++		assert.NoError(t, err)
++	})
++
++	t.Run("azure_credential_broker_rejects_noncanonical_provider_case", func(t *testing.T) {
++		extfs := azureBrokerSpec()
++		extfs["cloud_provider"] = "Azure"
++		err := ValidateExtfsComplete("azure://core.windows.net/container/path", extfs)
++		require.Error(t, err)
++		assert.Contains(t, err.Error(), "must use the canonical lowercase value \"azure\"")
++	})
++
++	t.Run("azure_credential_mode_missing", func(t *testing.T) {
++		err := ValidateExtfsComplete("azure://core.windows.net/container/path", map[string]string{
++			"cloud_provider": "azure",
++		})
++		require.Error(t, err)
++		assert.Contains(t, err.Error(), "credential mode missing")
++	})
++
++	t.Run("azure_credential_broker_missing_required_field", func(t *testing.T) {
++		for _, key := range []string{
++			"access_key_id",
++			"region",
++			"azure_client_id",
++			"azure_tenant_id",
++			"azure_credential_endpoint",
++		} {
++			t.Run(key, func(t *testing.T) {
++				extfs := azureBrokerSpec()
++				delete(extfs, key)
++				err := ValidateExtfsComplete("azure://core.windows.net/container/path", extfs)
++				require.Error(t, err)
++				assert.Contains(t, err.Error(), "is required for Azure credential broker mode")
++			})
++		}
++	})
++
++	t.Run("azure_credential_broker_invalid_endpoint", func(t *testing.T) {
++		for _, endpoint := range []string{
++			"file:///tmp/credentials",
++			"http:///v1/credentials/assume-role",
++			"not-a-url",
++		} {
++			t.Run(endpoint, func(t *testing.T) {
++				extfs := azureBrokerSpec()
++				extfs["azure_credential_endpoint"] = endpoint
++				err := ValidateExtfsComplete("azure://core.windows.net/container/path", extfs)
++				require.Error(t, err)
++				assert.Contains(t, err.Error(), "must be a valid HTTP(S) URL")
++			})
++		}
++	})
++
++	t.Run("azure_credential_broker_requires_azure_provider_and_scheme", func(t *testing.T) {
++		tests := []struct {
++			name     string
++			source   string
++			provider string
++		}{
++			{name: "wrong_provider", source: "azure://core.windows.net/container/path", provider: "aws"},
++			{name: "wrong_scheme", source: "s3://bucket/path", provider: "azure"},
++		}
++		for _, test := range tests {
++			t.Run(test.name, func(t *testing.T) {
++				extfs := azureBrokerSpec()
++				extfs["cloud_provider"] = test.provider
++				err := ValidateExtfsComplete(test.source, extfs)
++				require.Error(t, err)
++				assert.Contains(t, err.Error(), "requires scheme=\"azure\"")
++			})
++		}
++	})
++
++	t.Run("azure_credential_broker_rejects_other_credential_modes", func(t *testing.T) {
++		tests := []struct {
++			name  string
++			key   string
++			value string
++		}{
++			{name: "account_key", key: "access_key_value", value: "base64key"},
++			{name: "workload_identity", key: "use_iam", value: "true"},
++			{name: "role_arn", key: "role_arn", value: "arn:aws:iam::1:role/r"},
++			{name: "gcp_impersonation", key: "gcp_target_service_account", value: "sa@proj.iam.gserviceaccount.com"},
++			{name: "anonymous", key: "anonymous", value: "true"},
++		}
++		for _, test := range tests {
++			t.Run(test.name, func(t *testing.T) {
++				extfs := azureBrokerSpec()
++				extfs[test.key] = test.value
++				err := ValidateExtfsComplete("azure://core.windows.net/container/path", extfs)
++				require.Error(t, err)
++				assert.Contains(t, err.Error(), "credential modes are mutually exclusive")
++			})
++		}
++	})
++
+ 	t.Run("azure_shared_key", func(t *testing.T) {
+ 		err := ValidateExtfsComplete("azure://core.windows.net/container/path", map[string]string{
+ 			"access_key_id":    "mystorageacct",
+diff --git a/pkg/util/externalspec/specutil/spec.go b/pkg/util/externalspec/specutil/spec.go
+index e51cde176c769..e2588751b91d0 100644
+--- a/pkg/util/externalspec/specutil/spec.go
++++ b/pkg/util/externalspec/specutil/spec.go
+@@ -59,6 +59,10 @@ const (
+ 	ExtfsKeyUseSSL                  = "use_ssl"
+ 	ExtfsKeyUseVirtualHost          = "use_virtual_host"
+ 	ExtfsKeyLoadFrequency           = "load_frequency"
++	ExtfsKeyAzureClientID           = "azure_client_id"
++	ExtfsKeyAzureTenantID           = "azure_tenant_id"
++	// #nosec G101 -- configuration key name, not a credential.
++	ExtfsKeyAzureCredentialEndpoint = "azure_credential_endpoint"
+ )
+ 
+ // ExternalSpec represents the parsed external collection specification.
+@@ -155,6 +159,9 @@ var allowedExtfsKeys = map[string]bool{
+ 	ExtfsKeyBucketName:              true,
+ 	ExtfsKeyGCPTargetServiceAccount: true,
+ 	ExtfsKeyAnonymous:               true,
++	ExtfsKeyAzureClientID:           true,
++	ExtfsKeyAzureTenantID:           true,
++	ExtfsKeyAzureCredentialEndpoint: true,
+ }
+ 
+ var booleanExtfsKeys = map[string]bool{
+diff --git a/pkg/util/externalspec/specutil/spec_test.go b/pkg/util/externalspec/specutil/spec_test.go
+index e1ec1166f1ab4..a6c253618853f 100644
+--- a/pkg/util/externalspec/specutil/spec_test.go
++++ b/pkg/util/externalspec/specutil/spec_test.go
+@@ -67,6 +67,22 @@ func TestParseExternalSpec(t *testing.T) {
+ 		require.Equal(t, "true", spec.Extfs[ExtfsKeyUseIAM])
+ 	})
+ 
++	t.Run("Azure credential broker keys accepted", func(t *testing.T) {
++		spec, err := ParseExternalSpec(`{
++			"format":"parquet",
++			"extfs":{
++				"azure_client_id":"client",
++				"azure_tenant_id":"tenant",
++				"azure_credential_endpoint":"https://broker.example.com/v1/credentials/assume-role"
++			}
++		}`)
++		require.NoError(t, err)
++		require.Equal(t, "client", spec.Extfs[ExtfsKeyAzureClientID])
++		require.Equal(t, "tenant", spec.Extfs[ExtfsKeyAzureTenantID])
++		require.Equal(t, "https://broker.example.com/v1/credentials/assume-role",
++			spec.Extfs[ExtfsKeyAzureCredentialEndpoint])
++	})
++
+ 	t.Run("snapshot id accepts string and number", func(t *testing.T) {
+ 		spec, err := ParseExternalSpec(`{"format":"iceberg-table","snapshot_id":"5320540205222981137"}`)
+ 		require.NoError(t, err)

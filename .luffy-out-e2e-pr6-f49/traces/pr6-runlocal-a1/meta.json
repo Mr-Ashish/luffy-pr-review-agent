@@ -1,0 +1,156 @@
+{
+  "trace_id": "pr6-runlocal-a1",
+  "schema_version": 1,
+  "repo": "Mr-Ashish/odoo",
+  "pr_number": "6",
+  "run_id": "local",
+  "run_attempt": "1",
+  "model": "openai/gpt-4.1-mini",
+  "status": "success",
+  "started_at": "2026-07-31T17:21:32Z",
+  "ended_at": "2026-07-31T17:22:06Z",
+  "workspace_root": "/Users/ashishmishra/Documents/experiments/odoo",
+  "github_sha": null,
+  "github_ref": null,
+  "github_event_name": null,
+  "hermes_rc": "0",
+  "trigger_comment": "",
+  "files": {
+    "agent-loop/agent-loop.json": {
+      "bytes": 43456,
+      "sha256": "815829b3a3bcba7e6fcb1173f5b488e4d504baa288a0aa5b20b0c8f92f9cad22"
+    },
+    "agent-loop/agent-loop.md": {
+      "bytes": 13949,
+      "sha256": "06da9cbf91bc2d00273cbdb69416c9eba1f82b9e313fa367c3abd2bb318ccec4"
+    },
+    "agent-loop/agent.log": {
+      "bytes": 2401,
+      "sha256": "6fd5084351dcda95f19dea88485d673010b06b7b08613ccf5e73a3a8b1f85f39"
+    },
+    "agent-loop/errors.log": {
+      "bytes": 2901,
+      "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+    },
+    "agent-loop/usage.json": {
+      "bytes": 450,
+      "sha256": "b42455194b2300fe044a3b9062e4d032f594436dbae521f9cb53add72b4cb847"
+    },
+    "agent-loop-attempt1/agent-loop.json": {
+      "bytes": 15573,
+      "sha256": "fcfc39d5e5bef5f9ebbece5da4ff32b2ed92ad41faf46dd4fb41f94ad810638c"
+    },
+    "agent-loop-attempt1/agent-loop.md": {
+      "bytes": 4600,
+      "sha256": "ffc5e29e477889f347832e595b4e81aac7d82ce900bdb7dc08797bc6f7c96f4b"
+    },
+    "agent-loop-attempt1/agent.log": {
+      "bytes": 2401,
+      "sha256": "7783212c5affabc497ab6d9345da0cbb5223e337623967d3a1af00b17b6f7fe8"
+    },
+    "agent-loop-attempt1/errors.log": {
+      "bytes": 2901,
+      "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+    },
+    "agent-loop-attempt1/usage.json": {
+      "bytes": 444,
+      "sha256": "c76a7fb9b067d2f66642e6ee565ee0e5ad0f6e03fc8d3130ae8d136527411077"
+    },
+    "context.md": {
+      "bytes": 2467,
+      "sha256": "dc37257f36df5187c698f6d4d43c29c34c2c91f7c6aeb118ae417be011641099"
+    },
+    "files.txt": {
+      "bytes": 1345,
+      "sha256": "308685e74e54e5b504d343bea5325e960ee1dc804e549d24807f1f4277f3f636"
+    },
+    "hermes-max-turns.env": {
+      "bytes": 49,
+      "sha256": "6b66a2a2643dbe65337b35ba3df7745af620ba392034d1c7c30c6d487e581097"
+    },
+    "hermes-pin.txt": {
+      "bytes": 41,
+      "sha256": "0ea7b07d1ee10f05f03acb0228b48c579f1f1f89ba622198bbbeda984e9b631a"
+    },
+    "hermes-run.log": {
+      "bytes": 2401,
+      "sha256": "6fd5084351dcda95f19dea88485d673010b06b7b08613ccf5e73a3a8b1f85f39"
+    },
+    "hermes-usage.json": {
+      "bytes": 450,
+      "sha256": "b42455194b2300fe044a3b9062e4d032f594436dbae521f9cb53add72b4cb847"
+    },
+    "hermes.stderr": {
+      "bytes": 14436,
+      "sha256": "8f30397fac0acfff3443022320fabdae1a58b608262add5ab822f9e58c68e922"
+    },
+    "memory-after.md": {
+      "bytes": 2358,
+      "sha256": "b0a00f696d9f8ef44dcf62406e841804eb7047651efe77beeec758fa30349749"
+    },
+    "memory-before.md": {
+      "bytes": 2142,
+      "sha256": "8b4958eda8696d18e6cde83deba270c8afb73a7d384f2f075e349d0f7e92102c"
+    },
+    "meta.env": {
+      "bytes": 716,
+      "sha256": "4e31009f5e250223d144629a210a6a8a893880752261489cfc1e42210d22c503"
+    },
+    "model-tier.env": {
+      "bytes": 102,
+      "sha256": "0fa92d5883869c977aeda6801249ea1abfd541fdf2cd1f0cb45bbfaf052999a6"
+    },
+    "pr.diff": {
+      "bytes": 52267,
+      "sha256": "eba7912f32b7c85a9173ab7f7e79cc5e82942b66fa07f64813d7737f113d51a5"
+    },
+    "pr.json": {
+      "bytes": 3009,
+      "sha256": "d6fe417e845286612398b6b8a3d3946ea3e0322b2f981b71fd0cf5a506a1cf12"
+    },
+    "preflight-cost.env": {
+      "bytes": 368,
+      "sha256": "0e44b63d360dfdd3503f4024ee704749aec2763b75a0271c67a82dec2e5fadb5"
+    },
+    "prompt-reprompt.md": {
+      "bytes": 8084,
+      "sha256": "61138d09aec71f1c04bd835be367b1e0ef5d82e4ea75cabeaa77c466e1c3be39"
+    },
+    "prompt.md": {
+      "bytes": 6243,
+      "sha256": "7754968d3a806a04aa8562c868d16782190e9c52fbbf3a8a3ee083d0e1d9c351"
+    },
+    "review.md": {
+      "bytes": 3619,
+      "sha256": "ba67bdb80fbd0f735ab4041b14ac09e9163e08eae4c180ee67f02b559b010ea2"
+    },
+    "review.raw.md": {
+      "bytes": 3486,
+      "sha256": "e68910c570b4864cc054dd15201c35a79ce55f33c2835c2b071179712337cfd1"
+    },
+    "severity-calibration.env": {
+      "bytes": 160,
+      "sha256": "fae3c8f7f0bfd17ca999dafaa8fb4f8da37c446bfc53872ecdd35447690ac0e9"
+    },
+    "soul-context-preflight.env": {
+      "bytes": 108,
+      "sha256": "4c0441fe38df5259bae5c8033849b9bff2f757257509cc9d7f79fa64e2789df0"
+    },
+    "soul-context.env": {
+      "bytes": 23,
+      "sha256": "c4cbeffb88797871d982e5fe6c7b24e44e89172a4b605ff56d42a204c49c81c0"
+    },
+    "timings.json": {
+      "bytes": 446,
+      "sha256": "3854d5ed71473caa58114213c1a9e3a2f9fcac42d34b890956451f7f123986cb"
+    },
+    "tool-turns-gate.env": {
+      "bytes": 157,
+      "sha256": "c80b8ea0e24e9357e846d143b3877e875728b26afd60cee42e30f9d241ad009f"
+    },
+    "tool-turns-reprompt.env": {
+      "bytes": 129,
+      "sha256": "4e94a43615a301abd0b89fa9cf105554b8235504c45284fafaa4842cd9849c17"
+    }
+  }
+}

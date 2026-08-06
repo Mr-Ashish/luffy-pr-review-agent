@@ -1,0 +1,88 @@
+::notice::Luffy orchestrator · root=/Users/ashishmishra/Documents/experiments/pr-review-agent workspace=/Users/ashishmishra/Documents/experiments/odoo
+::notice::Luffy stage: preload_memory
+MEMORY_MODE=local
+MEMORY_PATH=.luffy
+No local memory yet at Mr-Ashish/odoo/.luffy/MEMORY.md (HTTP 404)
+Hub preload skipped (mode=local, LUFFY_HUB_PUBLISH=0)
+MEMORY_SOURCE=seed
+HUB_MEMORY=skipped
+::notice::Luffy stage: assemble
+Assembling context for Mr-Ashish/odoo#5 → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/prompt.md
+Context ready: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/prompt.md (diff_truncated=false)
+::notice::Luffy stage: hermes
+::notice::F43 preflight cost · decision=allow reason=no_budget est=$0.011369 model=openai/gpt-4.1-mini
+F43 preflight cost · decision=allow reason=no_budget est=$0.011369 model=openai/gpt-4.1-mini
+::notice::hermes version matches pin 53559aaf: /Users/ashishmishra/.local/bin/hermes
+hermes version matches pin 53559aaf: /Users/ashishmishra/.local/bin/hermes
+::notice::F46 SOUL context scan clean (Hermes will load reviewer contract)
+F46 SOUL context scan clean (Hermes will load reviewer contract)
+::notice::Hermes review · model=openai/gpt-4.1-mini tier=explicit toolsets=terminal workspace=/Users/ashishmishra/Documents/experiments/odoo hermes_home=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home timeout=1500s max_turns=40
+Hermes review · model=openai/gpt-4.1-mini tier=explicit toolsets=terminal workspace=/Users/ashishmishra/Documents/experiments/odoo hermes_home=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home timeout=1500s max_turns=40
+hermes-run.log bytes=2401
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/agent-loop
+captured steps=2 messages=2 tool_turns=0 session=20260731_223146_62f430
+::notice::F49 soft re-prompt · tool_turns=0 files=6 (H15 zero-tool multi-file)
+F49 soft re-prompt · tool_turns=0 files=6 (H15 zero-tool multi-file)
+hermes-run.log (reprompt) bytes=2401
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/agent-loop
+captured steps=20 messages=20 tool_turns=8 session=20260731_223158_96a569
+::notice::F49 soft re-prompt recovered tool_turns=8 (was 0)
+F49 soft re-prompt recovered tool_turns=8 (was 0)
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/review-5.md
+usage-summary: updated /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/review-5.md
+REVIEW_FILE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/review-5.md
+AGENT_LOOP_DIR=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/agent-loop
+::notice::Review written: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/review-5.md (3671 bytes)
+Review written: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/review-5.md (3671 bytes)
+::notice::Agent loop captured: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/agent-loop
+Agent loop captured: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/agent-loop
+::notice::Luffy stage: distill
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/memories/MEMORY.md
+Memory distilled → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/memories/MEMORY.md (2142 bytes)
+::notice::Luffy stage: save_trace
+Included agent-loop package → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/traces/pr5-runlocal-a1/agent-loop
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/traces/pr5-runlocal-a1
+TRACE_DIR=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/traces/pr5-runlocal-a1
+TRACE_ID=pr5-runlocal-a1
+Trace stored at /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/traces/pr5-runlocal-a1 (332K)
+::notice::Luffy stage: publish_local
+MEMORY_MODE=local
+MEMORY_PATH=.luffy
+payload_bytes=11324
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/hub-payload.json
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/client_payload.json
+::notice::Local memory publish → Mr-Ashish/odoo@19.0 path=.luffy
+Local memory publish → Mr-Ashish/odoo@19.0 path=.luffy
+Wrote local memory under /private/var/folders/2b/l8r1b38n75jd77wtd44p4ycr0000gn/T/tmp.iCWvmmHyCz/target/.luffy trace=pr5-runlocal-a1
+MEMORY=/private/var/folders/2b/l8r1b38n75jd77wtd44p4ycr0000gn/T/tmp.iCWvmmHyCz/target/.luffy/MEMORY.md
+RUN_DIR=/private/var/folders/2b/l8r1b38n75jd77wtd44p4ycr0000gn/T/tmp.iCWvmmHyCz/target/.luffy/runs/pr5-runlocal-a1
+LAYOUT=local
+The following paths are ignored by one of your .gitignore files:
+.luffy
+hint: Use -f if you really want to add them.
+hint: Turn this message off by running
+hint: "git config advice.addIgnoredFile false"
+No local memory changes to commit
+LOCAL_PUBLISH=noop
+::notice::Luffy stage: publish_hub
+LUFFY_HUB_PUBLISH=0 (mode=local); skip hub publish
+HUB_PUBLISH=skipped
+::notice::Luffy stage: pack_ui_bundle
+host=local trace=pr5-runlocal-a1 verdict=APPROVE files=33
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/run-bundle.json
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/traces/pr5-runlocal-a1/run-bundle.json
+RUN_BUNDLE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/run-bundle.json
+REVIEW_FILE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/review-5.md
+LUFFY_STATUS=success
+TRACE_DIR=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/traces/pr5-runlocal-a1
+RUN_BUNDLE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/run-bundle.json
+--- memory-health ---
+MEMORY_SOURCE=seed
+MEMORY_MODE=local
+MEMORY_PATH=.luffy
+LOCAL_PUBLISH=noop
+HUB_PUBLISH=skipped
+Done. Review: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/review-5.md
+Set POST_COMMENT=1 to post, or run:
+  ./scripts/post-review-comment.sh /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-pr5-f49/review-5.md 5

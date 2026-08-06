@@ -1,0 +1,124 @@
+{
+  "trace_id": "pr2-runlocal-a1",
+  "schema_version": 1,
+  "repo": "Mr-Ashish/odoo",
+  "pr_number": "2",
+  "run_id": "local",
+  "run_attempt": "1",
+  "model": "openai/gpt-4.1-mini",
+  "status": "success",
+  "started_at": "2026-07-31T16:29:44Z",
+  "ended_at": "2026-07-31T16:29:58Z",
+  "workspace_root": "/Users/ashishmishra/Documents/experiments/odoo",
+  "github_sha": null,
+  "github_ref": null,
+  "github_event_name": null,
+  "hermes_rc": "0",
+  "trigger_comment": "",
+  "files": {
+    "agent-loop/agent-loop.json": {
+      "bytes": 14012,
+      "sha256": "e76dfa6afbb7c8092ef77ff3b401a7cba6bb02713cbf05ebb74ecabafd361a93"
+    },
+    "agent-loop/agent-loop.md": {
+      "bytes": 4600,
+      "sha256": "bfaafdf676e9f70ab8dd2f834eaf7efb36202c9fd11e5de5e70a46d6ae98411e"
+    },
+    "agent-loop/agent.log": {
+      "bytes": 12910,
+      "sha256": "3734a1076a6782dbf186f794737547695d4843c23a8c6c98bdb967ca169ebf61"
+    },
+    "agent-loop/errors.log": {
+      "bytes": 2901,
+      "sha256": "1ec7e06e1b88109702b24fbe5a452a7d6c93f6513e66f625d12edd0e055fa4b6"
+    },
+    "agent-loop/usage.json": {
+      "bytes": 444,
+      "sha256": "3e91820bcc21f054c129b14be55be17c9d434d9aaeeb9cdc3b3e1a2c009fde87"
+    },
+    "context.md": {
+      "bytes": 1943,
+      "sha256": "28dec48a216e8dc59d069d40a42c40ccb0fcc3717e6c403e63252f6171c4f814"
+    },
+    "files.txt": {
+      "bytes": 308,
+      "sha256": "57e2132fbe21a7b15c9604a3e0a4403e7ac53844cc8bf6f147008dc42b4f4401"
+    },
+    "hermes-max-turns.env": {
+      "bytes": 49,
+      "sha256": "976ff529fd53115ff06ba484ef179f127c7570d5da21e34a92c659d16a9cd1b7"
+    },
+    "hermes-pin.txt": {
+      "bytes": 41,
+      "sha256": "0ea7b07d1ee10f05f03acb0228b48c579f1f1f89ba622198bbbeda984e9b631a"
+    },
+    "hermes-run.log": {
+      "bytes": 2401,
+      "sha256": "135e1c3199da562ca67f93c9c5f23aa83fdb303671cc8a9c149cb471a323021e"
+    },
+    "hermes-usage.json": {
+      "bytes": 444,
+      "sha256": "3e91820bcc21f054c129b14be55be17c9d434d9aaeeb9cdc3b3e1a2c009fde87"
+    },
+    "hermes.stderr": {
+      "bytes": 5318,
+      "sha256": "3e32a485b386975a3eca0372f524aeaca3de4be2b2e78dd2172e30bc4ee75961"
+    },
+    "memory-after.md": {
+      "bytes": 1148,
+      "sha256": "1bbad2afdf6b6fe0e218094b2f196f211b6bbac2b5bff0a6cee1188a88825f64"
+    },
+    "memory-before.md": {
+      "bytes": 937,
+      "sha256": "31ff54eaadd0872093cd7fc0b154f3386becdde89cf8ac945775e95a21312fd6"
+    },
+    "meta.env": {
+      "bytes": 717,
+      "sha256": "c5d984b28f17878fc9953a33731d6759ca807be05bfafbb462ead3bae0ca7092"
+    },
+    "model-tier.env": {
+      "bytes": 100,
+      "sha256": "e2db85c1bebe9a4991adeeb19ceab402d5a07bf0c983d2779b8a4fb5787d1e5a"
+    },
+    "pr.diff": {
+      "bytes": 6236,
+      "sha256": "b998c514897df4ea3f4c19665fa5e57d17e18ff1674c34ccc5f0c990f7546710"
+    },
+    "pr.json": {
+      "bytes": 2367,
+      "sha256": "dfce5abc0fa68e445fa0c79e2085034e72744716fc05e1ae1b044f201d994ab6"
+    },
+    "preflight-cost.env": {
+      "bytes": 366,
+      "sha256": "a0bedf0ecaaf6991eb936a47612b32f8fea50885dcfd205f60370b25e6941c1f"
+    },
+    "prompt.md": {
+      "bytes": 5283,
+      "sha256": "c1486b9d42d15a84834296b2a08bf20101cd8e243d0da79c01ea940475d6e445"
+    },
+    "review.md": {
+      "bytes": 2852,
+      "sha256": "37a6be5f99a3ea4c14f78d661c423ea47c170f2af58904a4c1a560e21f345b16"
+    },
+    "review.raw.md": {
+      "bytes": 2434,
+      "sha256": "0ef0dcfa7a6ca6f5e6d62965924bc97de1ca1e208127e2935947179fb7bf4175"
+    },
+    "soul-context-preflight.env": {
+      "bytes": 108,
+      "sha256": "4c0441fe38df5259bae5c8033849b9bff2f757257509cc9d7f79fa64e2789df0"
+    },
+    "soul-context.env": {
+      "bytes": 56,
+      "sha256": "1c3ebeb119a2aa9d1516d8d0db9ae37baaefadda8f1b50c2029f93e4ac41fc74"
+    },
+    "timings.json": {
+      "bytes": 446,
+      "sha256": "54e6744ca6adcf61c27b5363d6f90ea668cd90d79b02d1a5d8993f5123039d9d"
+    },
+    "tool-turns-gate.env": {
+      "bytes": 185,
+      "sha256": "8c87cf379abd0904b1fab8e412e00ade395cd340b307520dc8316d9f18a64f51"
+    }
+  }
+}

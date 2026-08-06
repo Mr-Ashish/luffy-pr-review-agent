@@ -1,0 +1,27 @@
+{
+  "started_at": "2026-07-31T16:47:36Z",
+  "ended_at": "2026-07-31T16:49:11Z",
+  "total_seconds": 95,
+  "stages": [
+    {
+      "name": "preload_memory",
+      "seconds": 1,
+      "exit_code": 0
+    },
+    {
+      "name": "assemble",
+      "seconds": 1,
+      "exit_code": 0
+    },
+    {
+      "name": "hermes",
+      "seconds": 93,
+      "exit_code": 0
+    },
+    {
+      "name": "distill",
+      "seconds": 0,
+      "exit_code": 0
+    }
+  ]
+}

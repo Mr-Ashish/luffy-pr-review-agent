@@ -1,0 +1,92 @@
+::notice::Luffy orchestrator · root=/Users/ashishmishra/Documents/experiments/pr-review-agent workspace=/Users/ashishmishra/Documents/experiments/pr-review-agent
+::notice::Luffy stage: preload_memory
+MEMORY_MODE=local
+MEMORY_PATH=.luffy
+::notice::Preloaded local memory: Mr-Ashish/milvus/.luffy/MEMORY.md (3438 bytes)
+Preloaded local memory: Mr-Ashish/milvus/.luffy/MEMORY.md (3438 bytes)
+MEMORY_SOURCE=local
+HUB_MEMORY=local
+::notice::Luffy stage: assemble
+Assembling context for Mr-Ashish/milvus#2 → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/prompt.md
+Context ready: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/prompt.md (diff_truncated=false lens_pack=default)
+::notice::Luffy stage: hermes
+::notice::F43 preflight cost · decision=allow reason=no_budget est=$0.012386 model=openai/gpt-4.1-mini
+F43 preflight cost · decision=allow reason=no_budget est=$0.012386 model=openai/gpt-4.1-mini
+::notice::hermes version matches pin 53559aaf: /Users/ashishmishra/.local/bin/hermes
+hermes version matches pin 53559aaf: /Users/ashishmishra/.local/bin/hermes
+::notice::F46 SOUL context scan clean (Hermes will load reviewer contract)
+F46 SOUL context scan clean (Hermes will load reviewer contract)
+::notice::Hermes review · model=openai/gpt-4.1-mini tier=explicit toolsets=terminal workspace=/Users/ashishmishra/Documents/experiments/pr-review-agent hermes_home=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home timeout=1500s max_turns=40
+Hermes review · model=openai/gpt-4.1-mini tier=explicit toolsets=terminal workspace=/Users/ashishmishra/Documents/experiments/pr-review-agent hermes_home=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home timeout=1500s max_turns=40
+hermes-run.log bytes=2401
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/agent-loop
+captured steps=2 messages=2 tool_turns=0 session=20260731_235714_56bd07
+::notice::F49 soft re-prompt · tool_turns=0 files=8 (H15 zero-tool multi-file)
+F49 soft re-prompt · tool_turns=0 files=8 (H15 zero-tool multi-file)
+hermes-run.log (reprompt) bytes=2401
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/agent-loop
+captured steps=76 messages=76 tool_turns=36 session=20260731_235729_160d87
+::notice::F49 soft re-prompt recovered tool_turns=36 (was 0)
+F49 soft re-prompt recovered tool_turns=36 (was 0)
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/review-2.md
+usage-summary: updated /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/review-2.md
+REVIEW_FILE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/review-2.md
+AGENT_LOOP_DIR=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/agent-loop
+::notice::Review written: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/review-2.md (6203 bytes)
+Review written: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/review-2.md (6203 bytes)
+::notice::Agent loop captured: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/agent-loop
+Agent loop captured: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/agent-loop
+::notice::Luffy stage: distill
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/memories/MEMORY.md
+Memory distilled → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-hermes-home/memories/MEMORY.md (3651 bytes)
+::notice::Luffy stage: save_trace
+Included agent-loop package → /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/traces/pr2-runlocal-a1/agent-loop
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/traces/pr2-runlocal-a1
+TRACE_DIR=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/traces/pr2-runlocal-a1
+TRACE_ID=pr2-runlocal-a1
+Trace stored at /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/traces/pr2-runlocal-a1 (560K)
+::notice::Luffy stage: publish_local
+MEMORY_MODE=local
+MEMORY_PATH=.luffy
+payload_bytes=14291
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/hub-payload.json
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/client_payload.json
+::notice::Local memory publish → Mr-Ashish/milvus@master path=.luffy
+Local memory publish → Mr-Ashish/milvus@master path=.luffy
+Wrote local memory under /private/var/folders/2b/l8r1b38n75jd77wtd44p4ycr0000gn/T/tmp.dqnnxMcLCv/target/.luffy trace=pr2-runlocal-a1
+MEMORY=/private/var/folders/2b/l8r1b38n75jd77wtd44p4ycr0000gn/T/tmp.dqnnxMcLCv/target/.luffy/MEMORY.md
+RUN_DIR=/private/var/folders/2b/l8r1b38n75jd77wtd44p4ycr0000gn/T/tmp.dqnnxMcLCv/target/.luffy/runs/pr2-runlocal-a1
+LAYOUT=local
+[master a670739] chore(memory): luffy local ingest PR #2 2026-07-31T1829Z
+ 5 files changed, 352 insertions(+), 5 deletions(-)
+ create mode 100644 .luffy/runs/pr2-runlocal-a1/meta.json
+ create mode 100644 .luffy/runs/pr2-runlocal-a1/review.md
+ create mode 100644 .luffy/runs/pr2-runlocal-a1/summary.md
+Current branch master is up to date.
+To https://github.com/Mr-Ashish/milvus.git
+   777d801..a670739  HEAD -> master
+::notice::Pushed local .luffy memory to Mr-Ashish/milvus@master
+Pushed local .luffy memory to Mr-Ashish/milvus@master
+LOCAL_PUBLISH=ok
+::notice::Luffy stage: publish_hub
+LUFFY_HUB_PUBLISH=0 (mode=local); skip hub publish
+HUB_PUBLISH=skipped
+::notice::Luffy stage: pack_ui_bundle
+host=local trace=pr2-runlocal-a1 verdict=APPROVE files=36
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/run-bundle.json
+/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/traces/pr2-runlocal-a1/run-bundle.json
+RUN_BUNDLE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/run-bundle.json
+REVIEW_FILE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/review-2.md
+LUFFY_STATUS=success
+TRACE_DIR=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/traces/pr2-runlocal-a1
+RUN_BUNDLE=/Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/run-bundle.json
+--- memory-health ---
+MEMORY_SOURCE=local
+MEMORY_MODE=local
+MEMORY_PATH=.luffy
+LOCAL_PUBLISH=ok
+HUB_PUBLISH=skipped
+Done. Review: /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/review-2.md
+Set POST_COMMENT=1 to post, or run:
+  ./scripts/post-review-comment.sh /Users/ashishmishra/Documents/experiments/pr-review-agent/.luffy-out-e2e-milvus-pr2/review-2.md 2
