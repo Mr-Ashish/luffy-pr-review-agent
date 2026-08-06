@@ -31,6 +31,98 @@ Also: **Actions → Luffy PR Review → Run workflow** (PR number).
 
 ## High-level architecture
 
+Install Luffy on each **target** repo. **Default memory is repo-local** (`.luffy/` on the target default branch). Central hub ingest is **opt-in** (`LUFFY_MEMORY_MODE=hub|both` or `LUFFY_HUB_PUBLISH=1`).
+
+### Component-level architecture (ASCII)
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              HUMANS / OPS                                   │
+│  Developer ──@luffy review──► PR comment   │   Ops ──Load bundle──► Console │
+└──────────────────────┬──────────────────────┴──────────────▲────────────────┘
+                       │                                     │
+                       ▼                                     │
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         TARGET REPO (per install)                           │
+│  ┌──────────────┐  ┌────────────────────┐  ┌─────────────────────────────┐  │
+│  │ Pull Request │  │ Thin GHA caller    │  │ .luffy/  (repo-local mem)   │  │
+│  │ + comments   │  │ luffy-pr-review.yml│  │  MEMORY.md                  │  │
+│  │ + labels     │  │ (or pack + scripts)│  │  runs/{trace_id}/slim       │  │
+│  └──────┬───────┘  └─────────┬──────────┘  └──────────────▲──────────────┘  │
+│         │                    │                            │                 │
+└─────────┼────────────────────┼────────────────────────────┼─────────────────┘
+          │ issue_comment /    │ workflow_call              │ publish_local
+          │ workflow_dispatch  ▼                            │
+┌─────────┼─────────────────────────────────────────────────┼─────────────────┐
+│         │         CONTROL PLANE (hub reusable / pack)     │                 │
+│         ▼                                                 │                 │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │  GitHub Actions · luffy-review-reusable.yml                          │   │
+│  │  gate (pattern · association · cooldown · concurrency)               │   │
+│  │  path-skip (F38) · sparse checkout · dual workspace · cache          │   │
+│  └───────────────────────────────┬──────────────────────────────────────┘   │
+│                                  │                                          │
+│  ┌───────────────────────────────▼──────────────────────────────────────┐   │
+│  │  Orchestrator · scripts/run-luffy-review.sh                          │   │
+│  │                                                                      │   │
+│  │  ┌─────────────┐ ┌──────────────┐ ┌─────────────┐ ┌───────────────┐  │   │
+│  │  │ preload     │ │ assemble-    │ │ hermes      │ │ normalize +   │  │   │
+│  │  │ memory      │ │ context.sh   │ │ review      │ │ usage footer  │  │   │
+│  │  └──────┬──────┘ └──────┬───────┘ └──────┬──────┘ └───────┬───────┘  │   │
+│  │         │               │                │                │          │   │
+│  │  ┌──────▼──────┐ ┌──────▼───────┐ ┌──────▼──────┐ ┌───────▼───────┐  │   │
+│  │  │ distill +   │ │ save-trace   │ │ publish     │ │ verdict ship  │  │   │
+│  │  │ fp_resolve  │ │ (fat, art.)  │ │ local|hub   │ │ post · labels │  │   │
+│  │  └─────────────┘ └──────────────┘ └─────────────┘ │ inline · status│  │   │
+│  │                                                   └───────────────┘  │   │
+│  └───────────────────────────────┬──────────────────────────────────────┘   │
+│                                  │                                          │
+│  Dual workspace (job FS)         │           Optional hosts                 │
+│  ┌──────────┐ ┌───────────┐      │    ┌──────────────────────────────────┐  │
+│  │ luffy/   │ │ workspace/│      │    │ Modal · modal_app.review_pr     │  │
+│  │ agent +  │ │ PR head   │      │    │ (same orchestrator; parity)     │  │
+│  │ scripts  │ │ (code)    │      │    │ Webhook/enqueue only spawns job │  │
+│  └──────────┘ └───────────┘      │    └──────────────────────────────────┘  │
+│  ┌──────────────────────┐        │                                          │
+│  │ .luffy-hermes-home/  │        │    Agent config surface                  │
+│  │ HERMES + MEMORY L0   │        │    agent/SOUL · packs · tools · skills   │
+│  └──────────────────────┘        │                                          │
+└──────────────────────────────────┼──────────────────────────────────────────┘
+                                   │
+          ┌────────────────────────┼────────────────────────┐
+          ▼                        ▼                        ▼
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────────────┐
+│ Hermes Agent     │───►│ OpenRouter       │    │ Optional Hub memory      │
+│ (agentic loop)   │◄───│ Claude / models  │    │ memory/repos/{slug}/     │
+│ tools: read files│    │ completions      │    │ (LUFFY_MEMORY_MODE=hub|  │
+│ in workspace/    │    └──────────────────┘    │  both or HUB_PUBLISH=1)  │
+└──────────────────┘                            └──────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Outputs                                                                    │
+│  · PR comment (replace prior <!-- luffy-review -->)                         │
+│  · Commit status luffy/review · reaction · labels · inline suggestions      │
+│  · Actions artifacts (fat traces) · run-bundle.json → ui/review-console     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Component map
+
+| Layer | Components | Role |
+|-------|------------|------|
+| **Trigger** | PR comment / `workflow_dispatch` / console Run tab / Modal webhook | Start a review |
+| **Gate** | Reusable workflow + association/cooldown/path-skip | Cheap reject / skip |
+| **Runtime FS** | `luffy/` · `workspace/` · `.luffy-hermes-home/` · `.luffy-out/` | Agent vs code vs session vs outputs |
+| **Orchestrator** | `run-luffy-review.sh` + stage scripts | Ordered pipeline, timings |
+| **Agent** | Hermes + SOUL/packs/tools | Multi-turn review over bounded context |
+| **Inference** | OpenRouter | Model API |
+| **Memory** | Target `.luffy/` (default) · hub (opt-in) · artifacts (fat) | L1 durable / L3 hub / L2 audit |
+| **Ship** | post comment · verdict · inline · labels · status | Visible PR surface |
+| **Ops UI** | `pack-run-for-ui` → `ui/review-console` | Full-run inspection |
+
+### Mermaid (compact)
+
 ```mermaid
 flowchart TB
   subgraph Humans
@@ -62,9 +154,119 @@ flowchart TB
   Scripts --> PR
 ```
 
-Install Luffy on each **target** repo. **Default memory is repo-local** (`.luffy/` on the target default branch). Central hub ingest is **opt-in** (`LUFFY_MEMORY_MODE=hub|both` or `LUFFY_HUB_PUBLISH=1`).
-
 ## E2E flow
+
+### End-to-end (ASCII)
+
+```text
+ Developer
+    │
+    │  1. "@luffy review this pr"  (or Actions Run workflow / Modal enqueue)
+    ▼
+┌──────────────────── Target PR ────────────────────┐
+│  issue_comment created                             │
+└────────────────────┬───────────────────────────────┘
+                     │
+                     ▼
+┌──────────────── GitHub Actions ───────────────────┐
+│  2. Pattern match + association + concurrency      │
+│  3. Cooldown check                                 │
+│  4. 👀 reaction                                    │
+│  5. Sparse path list → optional path-glob skip     │
+│  6. Dual checkout: luffy/ + workspace/ (PR head)    │
+│  7. Hermes home cache                              │
+└────────────────────┬───────────────────────────────┘
+                     │
+                     ▼
+┌────────── Orchestrator run-luffy-review.sh ───────┐
+│                                                    │
+│  8. preload_memory                                 │
+│       · default: target .luffy/MEMORY.md (API)     │
+│       · opt-in hub seed                            │
+│       · → HERMES_HOME/memories/MEMORY.md           │
+│                     │                              │
+│  9. assemble-context                               │
+│       · gh pr meta + capped diff + prompt + SOUL   │
+│       · no LLM                                     │
+│                     │                              │
+│ 10. hermes -z  (+ F36 wall-clock timeout)          │
+│       ┌─────────────────────────────────────┐      │
+│       │  Agentic loop                       │      │
+│       │  prompt + memory + workspace         │      │
+│       │       │                             │      │
+│       │       ▼                             │      │
+│       │  model (OpenRouter) ◄──► tools      │      │
+│       │  (read files, deepen on hunks)      │      │
+│       │       │                             │      │
+│       │       ▼                             │      │
+│       │  draft Markdown review              │      │
+│       └─────────────────────────────────────┘      │
+│                     │                              │
+│ 11. normalize-review                               │
+│       · contract · marker · size · redact secrets  │
+│ 12. usage-summary (cost/tokens footer)             │
+│ 13. distill-memory + fp_resolve update             │
+│ 14. save-trace → fat package (artifact only)       │
+│ 15. publish_local → target .luffy/ slim pack       │
+│ 16. publish_hub → opt-in only                      │
+│ 17. pack_ui_bundle → run-bundle.json               │
+└────────────────────┬───────────────────────────────┘
+                     │
+                     ▼
+┌──────────────────── Ship ─────────────────────────┐
+│ 18. Post PR comment (delete prior Luffy markers)   │
+│ 19. Verdict: reaction · commit status · labels     │
+│ 20. Inline comments + suggestion blocks (if any)   │
+│ 21. Upload Actions artifacts · job summary         │
+│ 22. Memory health env (local/hub publish signals)  │
+└────────────────────┬───────────────────────────────┘
+                     │
+          ┌──────────┴──────────┐
+          ▼                     ▼
+   Developer sees          Ops loads
+   PR review comment       run-bundle in
+   + checks/labels         Review Console
+```
+
+### Pipeline stage chain
+
+```text
+preload_memory → assemble → hermes → normalize → distill
+      → save_trace → publish_local → publish_hub? → post + verdict signals
+```
+
+```mermaid
+flowchart LR
+  A[preload_memory] --> B[assemble]
+  B --> C[hermes -z]
+  C --> D[normalize]
+  D --> E[distill]
+  E --> F[save_trace]
+  F --> G[publish_local]
+  G --> H[publish_hub opt-in]
+  H --> I[PR comment + artifacts]
+```
+
+### Memory layers
+
+```text
+L0  .luffy-hermes-home/          single-run Hermes session
+L1  target .luffy/MEMORY.md      default durable SoT (committed)
+L2  Actions artifacts            fat traces (not git)
+L3  hub memory/repos/{slug}/     opt-in federation
+         ▲
+         └── distill after each review, then publish_local
+```
+
+### Alternate hosts (same kitchen)
+
+```text
+GHA reusable ──┐
+Modal review_pr├──► run-luffy-review.sh ──► Hermes ──► OpenRouter
+Local CLI ─────┘         (parity helper: modal_parity.py)
+```
+
+### Mermaid sequence
 
 ```mermaid
 sequenceDiagram
@@ -90,25 +292,11 @@ sequenceDiagram
   Note over GHA: fat traces → Actions artifacts only
 ```
 
-**Pipeline stages**
-
-```mermaid
-flowchart LR
-  A[preload_memory] --> B[assemble]
-  B --> C[hermes -z]
-  C --> D[normalize]
-  D --> E[distill]
-  E --> F[save_trace]
-  F --> G[publish_local]
-  G --> H[publish_hub opt-in]
-  H --> I[PR comment + artifacts]
-```
-
 ## Agentic loop (example)
 
 End-to-end control plane for one review: comment trigger → Actions gate → orchestrator stages → Hermes multi-turn agentic loop (tools + OpenRouter · Claude Opus 5) → normalize → memory + full step trace → PR comment. Live package: docs/showcase/e2e-odoo-pr3-opus5-agentic-loop/.
 
-**ASCII (high level)**
+**ASCII (orchestrator + inner loop)**
 
 ```text
 @luffy review this pr
@@ -207,6 +395,8 @@ flowchart TB
 ```
 
 Inner loop: Hermes may call tools (read workspace files) before emitting the final Markdown review. Outer loop is deterministic shell orchestration so every run leaves a redacted fat trace under `.luffy-out/traces/` (artifact) and a **slim** durable pack under the target’s **`.luffy/`** (git). Hub `memory/repos/…` is opt-in.
+
+**One-liner:** Luffy is a gated control plane (GHA/Modal) that bounds PR context, runs Hermes+OpenRouter with repo-local `.luffy/` memory, normalizes the review contract, ships PR signals, and keeps fat traces out of git.
 
 ## E2E showcase (live · Opus 5 agentic loop)
 
